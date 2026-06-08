@@ -1,0 +1,14 @@
+# agentctx MCP server — repo-local Codex config.
+#
+# Copy this block into `.codex/config.toml` at the repo root (project-local,
+# requires the repo to be a trusted Codex project). Codex launches the server
+# from the repo root, so the relative args path and the default `.agentctx/`
+# resolution both work without further configuration.
+#
+# For a GLOBAL install (~/.codex/config.toml), Codex is not guaranteed to launch
+# from the repo root — use absolute paths and pin AGENTCTX_HOME instead. See
+# docs/agentctx-mcp-setup.md for that variant.
+
+[mcp_servers.agentctx]
+command = "node"
+args = ["scripts/agentctx/mcp-server.mjs"]

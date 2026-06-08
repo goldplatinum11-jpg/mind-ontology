@@ -1,0 +1,24 @@
+{
+  "_comment": "Sample hosted-memory retrieval results for fixtures/tests. Synthetic data only - no real tenant content, no credential, no endpoint.",
+  "query": { "task": "Plan the next OSS MCP foundation PR", "scopes": ["mcp"], "limit": 3 },
+  "results": [
+    {
+      "id": "mem-001",
+      "text": "Prior decision: keep the MCP server to two tools (get_context, list_constraints) in v0.",
+      "score": 0.91,
+      "source": "sirt"
+    },
+    {
+      "id": "mem-002",
+      "text": "Past lane: the compiler source list expanded to nine files in Phase 2.",
+      "score": 0.74,
+      "source": "sirt"
+    },
+    {
+      "id": "mem-003",
+      "text": "Reminder: hosted features stay behind a fail-closed adapter with local defaults.",
+      "score": 0.68,
+      "source": "sirt"
+    }
+  ]
+}

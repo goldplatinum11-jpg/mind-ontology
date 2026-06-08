@@ -1,0 +1,159 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mind Ontology Connector",
+    "version": "0.1.0",
+    "description": "Read-only thin HTTP surface over the agentctx compile contract. Exposes get_context and list_constraints for hosted clients (ChatGPT GPT Actions, and as a reference shape for the remote MCP surface). Self-hosted: replace the server URL with your own deployed endpoint. No credentials are shipped in this document."
+  },
+  "servers": [
+    {
+      "url": "https://YOUR-CONNECTOR-HOST.example/mco",
+      "description": "Self-hosted agentctx connector. Replace with your own endpoint; the OSS project hosts nothing."
+    }
+  ],
+  "paths": {
+    "/get_context": {
+      "post": {
+        "operationId": "get_context",
+        "summary": "Compile a task-scoped context pack",
+        "description": "Read-only. Always includes every constraints.md block; selects the most relevant blocks from the other sources by lexical scoring against the task and optional scope.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GetContextRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A compiled context pack.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ContextPack" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (e.g. missing task).",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/list_constraints": {
+      "post": {
+        "operationId": "list_constraints",
+        "summary": "List every constraints.md block",
+        "description": "Read-only. Returns all non-negotiable constraint blocks for the workspace.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ListConstraintsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The constraints block set.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ConstraintsResult" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Optional. The operator supplies their own bearer value at deploy time; no value is shipped here."
+      }
+    },
+    "schemas": {
+      "GetContextRequest": {
+        "type": "object",
+        "required": ["task"],
+        "properties": {
+          "task": { "type": "string", "description": "Task description to compile context for." },
+          "scope": {
+            "description": "Optional scope tag(s); comma-separated string or array of strings.",
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "format": { "type": "string", "enum": ["markdown", "json"], "default": "json" }
+        }
+      },
+      "ListConstraintsRequest": {
+        "type": "object",
+        "properties": {
+          "format": { "type": "string", "enum": ["markdown", "json"], "default": "json" }
+        }
+      },
+      "ContextPack": {
+        "type": "object",
+        "properties": {
+          "task": { "type": "string" },
+          "scopes": { "type": "array", "items": { "type": "string" } },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "selected": { "type": "array", "items": { "$ref": "#/components/schemas/Block" } },
+          "omittedCount": { "type": "integer" },
+          "sourceFiles": { "type": "array", "items": { "type": "string" } },
+          "risk": { "$ref": "#/components/schemas/Risk" }
+        }
+      },
+      "Block": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string" },
+          "title": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "score": { "description": "Numeric relevance score, or \"always\" for constraints." },
+          "reason": { "type": "string", "enum": ["always", "matched", "risk-forced"] },
+          "body": { "type": "string" }
+        }
+      },
+      "Risk": {
+        "type": "object",
+        "properties": {
+          "level": { "type": "string", "enum": ["safe", "risky"] },
+          "mode": { "type": "string", "enum": ["auto", "safe", "risky"] },
+          "signals": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "ConstraintsResult": {
+        "type": "object",
+        "properties": {
+          "file": { "type": "string", "const": "constraints.md" },
+          "blockCount": { "type": "integer" },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "tags": { "type": "array", "items": { "type": "string" } },
+                "body": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "mind-ontology",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Mind Ontology — OSS, self-hosted agentctx context compiler and MCP adapter line. Standalone product extracted from sirt-app-v2.",
+  "license": "SEE docs/mind-ontology-license-boundary.md",
+  "scripts": {
+    "test": "vitest run tests/unit",
+    "agentctx:compile": "node scripts/agentctx/compile.mjs compile",
+    "agentctx:init": "node scripts/agentctx/init.mjs",
+    "agentctx:mcp": "node scripts/agentctx/mcp-server.mjs",
+    "agentctx:proof": "vitest run tests/unit/agentctx-proof.test.mjs",
+    "agentctx:smoke": "node scripts/agentctx/acceptance-smoke.mjs",
+    "agentctx:validate": "node scripts/agentctx/schema.mjs",
+    "agentctx:metrics": "node scripts/agentctx/metrics.mjs"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

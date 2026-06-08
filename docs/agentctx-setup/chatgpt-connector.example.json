@@ -1,0 +1,8 @@
+{
+  "_comment": "Example ChatGPT developer-mode / Responses API MCP tool config for agentctx. PLACEHOLDERS ONLY - replace server_url with your self-hosted endpoint. No credential is included; pass operator auth via the client's connector settings, not here.",
+  "type": "mcp",
+  "server_label": "agentctx",
+  "server_url": "https://YOUR-CONNECTOR-HOST.example/mcp",
+  "require_approval": "always",
+  "allowed_tools": ["get_context", "list_constraints"]
+}

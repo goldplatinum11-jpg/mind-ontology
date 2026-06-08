@@ -1,0 +1,16 @@
+node_modules/
+coverage/
+dist/
+build/
+logs/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+*.local
+.tmp-staging/
+# Claude Code local session settings (session-scoped permissions — never commit)
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock

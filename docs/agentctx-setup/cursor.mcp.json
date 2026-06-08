@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agentctx": {
+      "command": "node",
+      "args": ["scripts/agentctx/mcp-server.mjs"]
+    }
+  }
+}

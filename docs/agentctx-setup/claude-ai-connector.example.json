@@ -1,0 +1,12 @@
+{
+  "_comment": "Example values for adding agentctx as a Claude.ai custom connector (Settings -> Connectors -> Add custom connector). PLACEHOLDERS ONLY - replace url with your self-hosted endpoint. No credential is included; if your endpoint requires auth, supply it in the Claude.ai connector UI, not here.",
+  "name": "agentctx",
+  "description": "Mind Ontology - task-scoped context (get_context, list_constraints).",
+  "transport": "streamable-http",
+  "url": "https://YOUR-CONNECTOR-HOST.example/mcp",
+  "auth": {
+    "type": "none",
+    "_note": "Set to operator bearer/OAuth in the Claude.ai UI if the endpoint is private. Never commit the value."
+  },
+  "tools": ["get_context", "list_constraints"]
+}
