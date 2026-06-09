@@ -63,6 +63,18 @@ npm run agentctx:metrics  -- --task "Plan the next PR"   # how focused is the pa
 npm run agentctx:smoke                    # one-command end-to-end check
 ```
 
+Prefer one command? The same engine is fronted by a single `mind-ontology` CLI
+(a thin wrapper — every `agentctx:*` script above keeps working unchanged):
+
+```sh
+npm run mind-ontology -- init
+npm run mind-ontology -- compile --task "Plan the next PR" --scope mcp
+# after `npm link`: mind-ontology compile --task "Plan the next PR" --scope mcp
+```
+
+See the [`mind-ontology` CLI guide](docs/mind-ontology-cli-v0.md) for the full
+command map. It stays local/private — nothing is published.
+
 Validate the install before trusting it:
 
 ```sh
@@ -124,7 +136,7 @@ the [CQ schema](docs/mind-ontology-cq-schema-v0.md) and the template at
 |---|---|---|
 | Sources | `.agentctx/` schema: constraints, identity, direction, projects, decisions, architecture, roles, glossary, competency questions | shipped |
 | Compiler | task-scoped scoring, risk-aware forcing, JSON/Markdown | shipped |
-| Tooling | `init`, `compile`, `validate`, `metrics`, `smoke`, `proof` | shipped |
+| Tooling | `init`, `compile`, `validate`, `metrics`, `smoke`, `proof` — plus a unified [`mind-ontology` CLI](docs/mind-ontology-cli-v0.md) | shipped |
 | Clients | Claude Code / Codex / Cursor (proven), ChatGPT / Claude.ai (thin connector, designed) | shipped / designed |
 | Hosted on-ramp | optional SIRT memory + writeback, fail-closed, off by default | contracts only |
 

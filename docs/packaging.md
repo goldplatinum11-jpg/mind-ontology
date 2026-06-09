@@ -56,6 +56,16 @@ Deliberately **excluded** from the published tarball (kept in the repo):
 `npm` always includes `package.json`, `README`, and `LICENSE` regardless of the
 allowlist; it always excludes `node_modules`, `.git`, and gitignored paths.
 
+### `bin` entry
+
+`package.json` declares one binary, `mind-ontology` →
+`scripts/agentctx/cli.mjs` (the thin CLI wrapper; see
+[the CLI guide](mind-ontology-cli-v0.md)). The target lives under
+`scripts/agentctx/**`, so the proposed allowlist above already ships it — no
+allowlist change is needed for the `bin` to resolve in an installed package.
+Declaring a `bin` does **not** publish anything: `"private": true` still makes
+`npm publish` refuse, and no `files`/`publishConfig` keys are added.
+
 ## Pre-publish checklist
 
 1. ~~License chosen and `LICENSE` committed~~ — **done: Apache-2.0**, `"license"`
