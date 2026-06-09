@@ -1,0 +1,248 @@
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
+
+// End-to-end CLI error-UX catalog (M42).
+//
+// This complements `cli-error-ux.test.mjs` (which unit-tests the pure parse /
+// validate functions in-process). Here we drive the *product-facing* wrapper
+// — `mind-ontology <command>` — as a real subprocess for every representative
+// failure mode, and assert STABLE PROPERTIES rather than brittle full-stderr
+// snapshots:
+//
+//   1. the process exits non-zero;
+//   2. the error message NAMES the problem (a regex, not a byte-for-byte copy);
+//   3. where a safe next step exists, the message POINTS to it
+//      (--task / --force / agentctx:init / the allowed values / --help);
+//   4. ordinary user errors carry NO stack trace and never leak onto the
+//      success stream.
+//
+// One row per failure mode keeps the catalog readable and makes "add a case"
+// the obvious way to lock a new failure mode against regression. The wrapper
+// uses stdio:"inherit", so the underlying engine's own message and exit code
+// flow through unchanged — exactly what an operator or agent worker sees.
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const CLI = resolve(REPO_ROOT, "scripts/agentctx/cli.mjs");
+
+const tempRoots = [];
+function tmp() {
+  const dir = mkdtempSync(join(tmpdir(), "mo-err-cat-"));
+  tempRoots.push(dir);
+  return dir;
+}
+afterEach(() => {
+  while (tempRoots.length > 0) rmSync(tempRoots.pop(), { recursive: true, force: true });
+});
+
+function runCli(args) {
+  return spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8" });
+}
+
+// A node stack frame ("    at fn (file:line:col)" / "node:internal/...").
+// Ordinary user errors must never surface one.
+const STACK_TRACE = /\n\s+at\s+\S|node:internal/;
+
+// Project-state builders. Each returns a cwd in the requested state so a row
+// can declare *what kind of project* triggers its failure, not how to build it.
+const PROJECTS = {
+  none() {
+    // A fresh dir with no .agentctx/ at all.
+    return tmp();
+  },
+  bareAgentctx() {
+    // .agentctx/ exists but is empty — the "bare directory compile" case.
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".agentctx"));
+    return cwd;
+  },
+  initialized() {
+    const cwd = tmp();
+    expect(runCli(["init", "--cwd", cwd]).status, "fixture: init should succeed").toBe(0);
+    return cwd;
+  },
+  emptyConstraints() {
+    // Initialized, then the always-required constraints.md emptied out.
+    const cwd = tmp();
+    expect(runCli(["init", "--cwd", cwd]).status, "fixture: init should succeed").toBe(0);
+    writeFileSync(join(cwd, ".agentctx", "constraints.md"), "");
+    return cwd;
+  },
+};
+
+// The catalog. `argv` is templated with the project cwd via the {cwd} token.
+// `stream` is where the human-facing message is expected: compile/init fail to
+// stderr and keep stdout clean; `validate` reports issues on stdout (it is a
+// report, not a thrown error) and keeps stderr clean. `nextAction` is optional:
+// some engine messages name the problem but do not yet point to a fix — those
+// rows assert only naming, and the gap is documented in docs/cli-errors.md as a
+// candidate repair lane rather than papered over here.
+const CASES = [
+  {
+    id: "wrapper: unknown command",
+    project: "none",
+    argv: ["frobnicate"],
+    stream: "stderr",
+    names: /Unknown command: frobnicate/,
+    nextAction: /--help|compile/,
+  },
+  {
+    id: "wrapper: unknown leading flag",
+    project: "none",
+    argv: ["--nope"],
+    stream: "stderr",
+    names: /Unknown command: --nope/,
+    nextAction: /--help/,
+  },
+  {
+    id: "compile: missing --task",
+    project: "initialized",
+    argv: ["compile", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Missing required --task argument/,
+    nextAction: /--task/,
+  },
+  {
+    id: "compile: bad --format",
+    project: "initialized",
+    argv: ["compile", "--cwd", "{cwd}", "--task", "x", "--format", "xml"],
+    stream: "stderr",
+    names: /--format must be "markdown" or "json"/,
+    nextAction: /markdown|json/,
+  },
+  {
+    id: "compile: bad --risk",
+    project: "initialized",
+    argv: ["compile", "--cwd", "{cwd}", "--task", "x", "--risk", "nope"],
+    stream: "stderr",
+    names: /--risk must be "auto", "safe", or "risky"/,
+    nextAction: /auto|safe|risky/,
+  },
+  {
+    id: "compile: unknown flag",
+    project: "initialized",
+    argv: ["compile", "--cwd", "{cwd}", "--task", "x", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    // No next-action hint today — see docs/cli-errors.md (candidate repair lane).
+    nextAction: null,
+  },
+  {
+    id: "compile: missing .agentctx/",
+    project: "none",
+    argv: ["compile", "--cwd", "{cwd}", "--task", "Implement the OAuth refresh flow"],
+    stream: "stderr",
+    names: /Missing \.agentctx\//,
+    nextAction: /agentctx:init/,
+  },
+  {
+    id: "compile: bare .agentctx/ (missing constraints.md)",
+    project: "bareAgentctx",
+    argv: ["compile", "--cwd", "{cwd}", "--task", "Implement the OAuth refresh flow"],
+    stream: "stderr",
+    names: /Missing required Mind Ontology source: \.agentctx\/constraints\.md/,
+    nextAction: /agentctx:init/,
+  },
+  {
+    id: "compile: empty constraints.md",
+    project: "emptyConstraints",
+    argv: ["compile", "--cwd", "{cwd}", "--task", "Implement the OAuth refresh flow"],
+    stream: "stderr",
+    names: /Required Mind Ontology source is empty: \.agentctx\/constraints\.md/,
+    nextAction: /constraint block/,
+  },
+  {
+    id: "init: overwrite refusal without --force",
+    project: "initialized",
+    argv: ["init", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /already exists\. Re-run with --force/,
+    nextAction: /--force/,
+  },
+  {
+    id: "init: unknown template",
+    project: "none",
+    argv: ["init", "--cwd", "{cwd}", "--template", "does-not-exist"],
+    stream: "stderr",
+    names: /Template not found: does-not-exist/,
+    // Names the bad template but does not list valid ones — candidate repair lane.
+    nextAction: null,
+  },
+  {
+    id: "init: unknown flag",
+    project: "none",
+    argv: ["init", "--cwd", "{cwd}", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: null,
+  },
+  {
+    id: "validate: missing .agentctx/",
+    project: "none",
+    argv: ["validate", "--cwd", "{cwd}"],
+    stream: "stdout", // validate prints a report, not a thrown error
+    names: /Missing \.agentctx\/|missing-dir/,
+    nextAction: /agentctx:init/,
+  },
+  {
+    id: "validate: schema failure (empty required source)",
+    project: "emptyConstraints",
+    argv: ["validate", "--cwd", "{cwd}"],
+    stream: "stdout",
+    names: /empty-required|Required source is empty: \.agentctx\/constraints\.md/,
+    // No fix hint on this issue line today — candidate repair lane.
+    nextAction: null,
+  },
+];
+
+describe("CLI error-UX catalog: every documented failure mode fails closed and loud (M42)", () => {
+  for (const c of CASES) {
+    it(`${c.id}`, () => {
+      const cwd = PROJECTS[c.project]();
+      const argv = c.argv.map((a) => (a === "{cwd}" ? cwd : a));
+      const r = runCli(argv);
+
+      const message = c.stream === "stdout" ? r.stdout : r.stderr;
+      const otherStream = c.stream === "stdout" ? r.stderr : r.stdout;
+
+      // 1. fails closed: non-zero exit.
+      expect(r.status, `${c.id}: expected non-zero exit`).not.toBe(0);
+
+      // 2. names the problem.
+      expect(message, `${c.id}: message should name the problem`).toMatch(c.names);
+
+      // 3. points to a safe next step when one exists.
+      if (c.nextAction) {
+        expect(message, `${c.id}: message should point to a next safe action`).toMatch(c.nextAction);
+      }
+
+      // 4a. no stack trace for an ordinary user error.
+      expect(STACK_TRACE.test(message), `${c.id}: message must not leak a stack trace`).toBe(false);
+
+      // 4b. the success stream stays clean (the error never bleeds into output
+      // a downstream tool/agent would parse as a result).
+      expect(otherStream.trim(), `${c.id}: the non-error stream should be empty`).toBe("");
+
+      // The message is a short, single-problem statement — not a dumped object
+      // or multi-screen trace. (Loose upper bound; validate reports may carry a
+      // summary line, so allow a handful of lines.)
+      expect(message.split("\n").filter((l) => l.trim()).length, `${c.id}: message should be concise`).toBeLessThanOrEqual(6);
+    });
+  }
+});
+
+// A negative control: prove the assertions above actually discriminate. A valid
+// invocation must exit 0, write the pack to stdout, and keep stderr clean — so
+// a runner that "passes" everything would fail this row.
+describe("CLI error-UX catalog: negative control (M42)", () => {
+  it("a valid compile exits 0, writes the pack to stdout, and keeps stderr clean", () => {
+    const cwd = PROJECTS.initialized();
+    const r = runCli(["compile", "--cwd", cwd, "--task", "Implement the OAuth refresh flow"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("# agentctx context pack");
+    expect(r.stderr.trim()).toBe("");
+  });
+});

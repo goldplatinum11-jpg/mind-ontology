@@ -42,7 +42,7 @@ the hosted SIRT backend is **not** available from this repository.
 | Proof | `npm run agentctx:proof` | 22/22 |
 | Validate | `npm run agentctx:validate` | VALID (0 errors) |
 | Smoke | `npm run agentctx:smoke` | SMOKE PASS (12/12) |
-| Full | `npm test` | 366 tests across 74 files, green |
+| Full | `npm test` | 407 tests across 77 files, green |
 
 See [`testing.md`](testing.md) for the test taxonomy. The suite has been hardened
 with guard/audit tests so docs, fixtures, and the fail-closed boundary cannot

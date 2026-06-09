@@ -10,7 +10,7 @@ network, no account, no hosted SIRT — and runs in a few seconds.
 | **Proof** | `npm run agentctx:proof` | Smallest viable validation — one file (`tests/unit/agentctx-proof.test.mjs`). Fast smoke that the core compile/validate contract holds. Run this first. |
 | **Validate** | `npm run agentctx:validate` | The shipped `.agentctx/` template conforms to the schema (`0 errors`). |
 | **Smoke** | `npm run agentctx:smoke` | End-to-end free-layer journey (init → compile → idempotency guard → friendly errors) in a throwaway temp dir: `SMOKE PASS`. |
-| **Full** | `npm test` | The entire `tests/unit` suite (375 tests across 74 files at last count). The release gate. |
+| **Full** | `npm test` | The entire `tests/unit` suite (407 tests across 77 files at last count). The release gate. |
 
 Run order before a release is in [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md).
 
@@ -26,8 +26,11 @@ The `tests/unit/` files group by what they guard:
   [The CQ regression contract](#the-cq-regression-contract).
 - **Compiler & CLI** — `agentctx-compile.test.mjs`, `agentctx-init.test.mjs`,
   `init-idempotency.test.mjs`, `agentctx-metrics.test.mjs`, `cli-ux-contract.test.mjs`,
-  `agentctx-risk.test.mjs`, `risk-modes-doc.test.mjs`: compile scoring, init safety,
-  metrics meaning, risk-mode forcing.
+  `agentctx-risk.test.mjs`, `risk-modes-doc.test.mjs`, `cli-wrapper.test.mjs`,
+  `cli-error-ux.test.mjs` (in-process parse/validate errors),
+  `cli-error-ux-catalog.test.mjs` (every failure mode driven end-to-end through the
+  `mind-ontology` wrapper, asserting stable error-UX properties): compile scoring,
+  init safety, metrics meaning, risk-mode forcing, and the friendly-error contract.
 - **MCP transport** — `agentctx-mcp.test.mjs` (handlers) and
   `mcp-server-smoke.test.mjs` (real stdio JSON-RPC round-trip).
 - **Connectors & client setup** — `agentctx-*-setup-proof.test.mjs`,
