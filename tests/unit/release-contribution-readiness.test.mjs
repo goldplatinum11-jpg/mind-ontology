@@ -18,10 +18,10 @@ describe("CONTRIBUTING is ready and license-safe (M26)", () => {
     }
   });
 
-  it("does not promise a final OSS license while the decision is open", () => {
+  it("states the decided Apache-2.0 license and keeps publish gated", () => {
     const c = read("CONTRIBUTING.md").toLowerCase();
-    expect(c).toContain("not yet licensed");
-    expect(c).not.toMatch(/released under the (mit|apache-2\.0) license/);
+    expect(c).toContain("apache-2.0");
+    expect(c).toContain("private");
   });
 
   it("references no forbidden source repo", () => {

@@ -5,9 +5,11 @@ lives in
 [`docs/mind-ontology-versioning-release-checklist-v0.md`](docs/mind-ontology-versioning-release-checklist-v0.md).
 This file is the quick pre-tag checklist.
 
-> **Distribution is fail-closed.** No release may be cut while the OSS license is
-> undecided and no `LICENSE` file exists — see [`LICENSE-DECISION.md`](LICENSE-DECISION.md).
-> Choosing the license is itself a release-blocking item below.
+> **Distribution stays fail-closed even though the license is settled.** The OSS
+> license is **Apache-2.0** (`LICENSE` shipped; see
+> [`LICENSE-DECISION.md`](LICENSE-DECISION.md)). The remaining release gate is
+> `"private": true` in `package.json` — `npm publish` refuses until it is
+> deliberately removed.
 
 ---
 
@@ -28,10 +30,11 @@ Run before tagging any release:
 
 ## Distribution gate (one-time, blocks first OSS release)
 
-- [ ] OSS license **explicitly selected** by the operator (Apache-2.0 or MIT).
-- [ ] `LICENSE` file committed with the full chosen text.
-- [ ] `package.json` `"license"` set to the matching SPDX id.
-- [ ] `LICENSE-DECISION.md` retired / updated to reflect the decision.
+- [x] OSS license **explicitly selected** by the operator — **Apache-2.0** (2026-06-09).
+- [x] `LICENSE` file committed with the full Apache-2.0 text (+ `NOTICE`).
+- [x] `package.json` `"license"` set to `Apache-2.0` (SPDX id).
+- [x] `LICENSE-DECISION.md` updated to record the decision.
+- [ ] **Remaining gate:** remove `"private": true` (deliberate publish decision).
 
 ## Versioning
 

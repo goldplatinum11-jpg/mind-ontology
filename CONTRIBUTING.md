@@ -4,12 +4,11 @@ Thanks for your interest. Mind Ontology is built in small, reviewable slices.
 This file is the actionable contributor entry point; the reasoning behind it
 lives in [`docs/mind-ontology-contribution-guide-plan-v0.md`](docs/mind-ontology-contribution-guide-plan-v0.md).
 
-> **License status:** this project is **not yet licensed for distribution.** The
-> OSS license is undecided and the repo ships **no `LICENSE` file** — see
-> [`LICENSE-DECISION.md`](LICENSE-DECISION.md). By contributing you agree your
-> contribution may be released under whichever OSS license the project later
-> selects (Apache-2.0 or MIT are the documented candidates). Do not add a
-> `LICENSE` file or declare a concrete license in a PR.
+> **License:** Mind Ontology is licensed under **Apache-2.0** (see
+> [`LICENSE`](LICENSE) and [`LICENSE-DECISION.md`](LICENSE-DECISION.md)). By
+> contributing you agree your contribution is released under the Apache-2.0
+> license. The package is still `private`/pre-release, so it is not published yet
+> — but the source license is settled.
 
 ---
 
@@ -59,6 +58,6 @@ was deliberately *not* touched.
 - Don't widen the tool surface beyond `get_context` / `list_constraints` without
   an explicit contract change (and a major version).
 - Don't make a hosted feature load-bearing for the local path.
-- Don't declare or ship an OSS license until the project decides one.
+- Don't remove `"private": true` or publish without the explicit release decision.
 
 Release readiness is tracked in [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md).

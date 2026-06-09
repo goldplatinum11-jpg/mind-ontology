@@ -1,7 +1,13 @@
 # Mind Ontology OSS License and Hosted Boundary
 
-**Status:** Draft for Phase 1 / P1-PR03  
-**Scope:** Recommendation only; no license file change in this PR  
+> **DECISION MADE (2026-06-09): the license is Apache-2.0.** This document is the
+> rationale of record; the chosen license ships in [`../LICENSE`](../LICENSE) with
+> attribution in [`../NOTICE`](../NOTICE), and the decision record is
+> [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md). Distribution stays gated by
+> `"private": true` (separate from the license choice).
+
+**Status:** Recommendation of record — adopted (Apache-2.0)  
+**Scope:** License rationale + hosted commercial boundary  
 **Product:** Mind Ontology MCP
 
 This document recommends the OSS license posture for Mind Ontology MCP and

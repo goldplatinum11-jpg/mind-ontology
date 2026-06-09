@@ -4,35 +4,34 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const read = (p) => readFileSync(resolve(REPO_ROOT, p), "utf8");
 
-// M2 — distribution stays fail-closed until the OSS license is explicitly chosen.
-// These tests are intentionally allowed to fail loudly once a real LICENSE lands:
-// when that happens, update package.json to a concrete SPDX id and relax the guard
-// in the same change so the boundary moves deliberately, not by accident.
-describe("license boundary stays fail-closed (M2)", () => {
-  it("documents the fail-closed decision", () => {
-    expect(existsSync(resolve(REPO_ROOT, "LICENSE-DECISION.md"))).toBe(true);
+// License DECIDED (2026-06-09): Apache-2.0. This guard now pins the landed
+// license posture. Distribution is still gated separately (private + version 0.0.0).
+describe("license is landed as Apache-2.0", () => {
+  it("ships the canonical Apache-2.0 LICENSE and a NOTICE", () => {
+    expect(existsSync(resolve(REPO_ROOT, "LICENSE"))).toBe(true);
+    const license = read("LICENSE");
+    expect(license).toContain("Apache License");
+    expect(license).toContain("Version 2.0");
+    expect(existsSync(resolve(REPO_ROOT, "NOTICE"))).toBe(true);
+  });
+
+  it("package.json declares the Apache-2.0 SPDX id", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.license).toBe("Apache-2.0");
+  });
+
+  it("the decision doc and boundary doc agree on Apache-2.0", () => {
+    const decision = read("LICENSE-DECISION.md");
+    expect(decision).toContain("DECIDED");
+    expect(decision).toContain("Apache-2.0");
     expect(existsSync(resolve(REPO_ROOT, "docs/mind-ontology-license-boundary.md"))).toBe(true);
   });
 
-  it("ships no LICENSE file yet (no accidental OSS grant)", () => {
-    for (const name of ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"]) {
-      expect(existsSync(resolve(REPO_ROOT, name)), `unexpected ${name} — set SPDX id and relax this guard deliberately`).toBe(false);
-    }
-  });
-
-  it("package.json license points at the boundary doc, not an invented SPDX id", () => {
-    const pkg = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8"));
-    expect(pkg.license).toBe("SEE docs/mind-ontology-license-boundary.md");
-    // Guard against a stray concrete identifier sneaking in before the decision.
-    expect(/^(MIT|Apache-2\.0|GPL|AGPL|BSD)/i.test(pkg.license)).toBe(false);
-  });
-
-  it("LICENSE-DECISION and README agree the state is OPEN / not finalized", () => {
-    const decision = readFileSync(resolve(REPO_ROOT, "LICENSE-DECISION.md"), "utf8");
-    expect(decision).toContain("fail-closed");
-    expect(decision.toLowerCase()).toContain("no oss license has been selected");
-    const readme = readFileSync(resolve(REPO_ROOT, "README.md"), "utf8");
-    expect(readme.toLowerCase()).toContain("fail-closed");
+  it("publishing stays gated even though the license is chosen", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.private).toBe(true); // npm publish still refuses
+    expect(pkg.version).toBe("0.0.0"); // pre-release
   });
 });

@@ -10,14 +10,17 @@ What counts as **breaking** vs **additive** is defined in
 the stability boundary is the contract (`get_context`, `list_constraints`) and
 the pack JSON shape; everything else can evolve additively.
 
-> **Pre-release.** No version has been published. The package is `private` and
-> not yet OSS-licensed (see [`LICENSE-DECISION.md`](LICENSE-DECISION.md)), so the
-> first real entry below will be the first tagged release after the license is
-> chosen.
+> **Pre-release.** No version has been published. The OSS license is now settled
+> — **Apache-2.0** (see [`LICENSE`](LICENSE) / [`LICENSE-DECISION.md`](LICENSE-DECISION.md))
+> — but the package is still `private` and unpublished, so the first real entry
+> below will be the first tagged release after `"private"` is removed.
 
 ## [Unreleased]
 
 ### Added
+- **Apache-2.0 license** chosen and landed: `LICENSE` (canonical text) + `NOTICE`;
+  `package.json` `license` set to the `Apache-2.0` SPDX id. Publishing stays gated
+  by `"private": true`.
 - Standalone product surface: top-level `README.md`, docs index, quickstart,
   CLI error reference, schema authoring guide, scoring explainer, testing guide,
   packaging (dry-run) plan, and a richer worked example (`docs/examples/`).

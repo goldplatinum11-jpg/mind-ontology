@@ -40,8 +40,9 @@ describe("no-leakage audit expansion: package + setup examples (M20)", () => {
     for (const [name, cmd] of Object.entries(pkg.scripts ?? {})) {
       expect(/\b(curl|wget|fetch|wrangler|deploy|publish|npm\s+publish)\b/i.test(cmd), `script "${name}" is networked/deploy-shaped: ${cmd}`).toBe(false);
     }
-    // package.json must not declare a concrete OSS license yet (fail-closed).
-    expect(pkg.license).toBe("SEE docs/mind-ontology-license-boundary.md");
+    // License is settled (Apache-2.0); publishing stays gated by `private`.
+    expect(pkg.license).toBe("Apache-2.0");
+    expect(pkg.private).toBe(true);
   });
 
   it("adapter flags default OFF with the real default environment", () => {

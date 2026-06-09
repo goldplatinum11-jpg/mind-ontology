@@ -18,8 +18,8 @@ describe("package metadata is private-pre-release-safe (M31)", () => {
     expect(PKG.engines?.node).toMatch(/>=\s*20/);
   });
 
-  it("keeps the license fail-closed (no concrete SPDX id yet)", () => {
-    expect(PKG.license).toBe("SEE docs/mind-ontology-license-boundary.md");
+  it("declares the chosen Apache-2.0 SPDX id", () => {
+    expect(PKG.license).toBe("Apache-2.0");
   });
 
   it("every script references a file that exists", () => {

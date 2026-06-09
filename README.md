@@ -11,8 +11,8 @@ way.
 > account, no database, and no network. Hosted memory is an *optional*,
 > fail-closed on-ramp that is **off by default**.
 >
-> **License:** not yet finalized — distribution is **fail-closed** until the OSS
-> license is chosen. See [Distribution & license boundary](#distribution--license-boundary).
+> **License:** [Apache-2.0](LICENSE). The package is still `private`/pre-release,
+> so it is not published yet — see [Distribution & license boundary](#distribution--license-boundary).
 
 ---
 
@@ -132,19 +132,23 @@ the [CQ schema](docs/mind-ontology-cq-schema-v0.md) and the template at
 
 ## Distribution & license boundary
 
-This package is **not yet licensed for distribution.** The OSS license has not
-been finalized, so distribution is intentionally **fail-closed**:
+Mind Ontology is licensed under **Apache-2.0** (chosen 2026-06-09; full text in
+[`LICENSE`](LICENSE), attribution/trademark scope in [`NOTICE`](NOTICE)). The
+rationale is in [`docs/mind-ontology-license-boundary.md`](docs/mind-ontology-license-boundary.md)
+and the decision record in [`LICENSE-DECISION.md`](LICENSE-DECISION.md).
 
-- `package.json` carries `"license": "SEE docs/mind-ontology-license-boundary.md"`
-  rather than a concrete SPDX identifier.
-- The recommended posture (Apache-2.0 default, MIT acceptable) is documented in
-  [`docs/mind-ontology-license-boundary.md`](docs/mind-ontology-license-boundary.md),
-  but **no `LICENSE` file is shipped yet** and none should be invented.
-- The fail-closed state and what must happen before distribution are tracked in
-  [`LICENSE-DECISION.md`](LICENSE-DECISION.md).
+**Choosing the license is not the same as publishing.** Distribution stays
+deliberately gated:
 
-Until a `LICENSE` file exists, treat this repository as **source-available for
-review only**, not as an OSS-licensed release.
+- `package.json` keeps `"private": true`, so `npm publish` refuses.
+- The version is still `0.0.0` (pre-release); there is no remote and nothing is
+  pushed.
+- Publishing is a separate, later step (remove `private`, bump the version, add a
+  `files` allowlist) — see [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
+  [`docs/packaging.md`](docs/packaging.md).
+
+So the **source license is settled (Apache-2.0)**, while **distribution remains a
+deliberate, separate decision.**
 
 ---
 

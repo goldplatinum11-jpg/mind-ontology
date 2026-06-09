@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Mind Ontology — OSS, self-hosted agentctx context compiler and MCP adapter line. Standalone product extracted from sirt-app-v2.",
-  "license": "SEE docs/mind-ontology-license-boundary.md",
+  "license": "Apache-2.0",
   "scripts": {
     "test": "vitest run tests/unit",
     "agentctx:compile": "node scripts/agentctx/compile.mjs compile",

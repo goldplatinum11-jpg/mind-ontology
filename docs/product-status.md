@@ -25,9 +25,10 @@ the hosted SIRT backend is **not** available from this repository.
 
 ## Fail-closed by design
 
-- **License/distribution** — no `LICENSE` file; `package.json` license points at
-  the boundary doc. Source-available for review, not yet OSS-licensed. See
-  [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md).
+- **License** — settled: **Apache-2.0** (`LICENSE` + `NOTICE` shipped, SPDX id in
+  `package.json`). See [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md).
+- **Distribution** — still gated: `package.json` keeps `"private": true` and the
+  version is `0.0.0`, so `npm publish` refuses. Publishing is a separate decision.
 - **Hosted memory & writeback** — adapter **contracts only**. Feature flags
   default **off**; the writeback adapter is **proposal-only** (no `execute()`);
   no adapter performs network I/O. The local path never depends on the hosted one.

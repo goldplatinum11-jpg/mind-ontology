@@ -17,9 +17,9 @@ describe("packaging stays a fail-closed dry-run plan (M47)", () => {
     expect(doc.toLowerCase()).toContain("fail-closed");
   });
 
-  it("publishing is blocked today: private + no concrete license + no files allowlist applied yet", () => {
+  it("publishing is blocked today: private + no files allowlist applied yet (license now Apache-2.0)", () => {
     expect(PKG.private).toBe(true); // npm publish refuses
-    expect(PKG.license).toBe("SEE docs/mind-ontology-license-boundary.md");
+    expect(PKG.license).toBe("Apache-2.0"); // license decided; publish still gated by `private`
     // The allowlist is still only *proposed* in the doc, not applied to package.json.
     expect(PKG.files).toBeUndefined();
     expect(PKG.publishConfig).toBeUndefined();

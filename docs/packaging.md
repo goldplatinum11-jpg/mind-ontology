@@ -3,12 +3,12 @@
 How Mind Ontology *would* be packaged for distribution. This is a **plan and a
 dry-run only** — nothing here publishes anything.
 
-> **Publishing is fail-closed twice over:**
-> 1. `package.json` has `"private": true`, so `npm publish` refuses outright.
-> 2. There is no OSS `LICENSE` yet — see [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md).
->
-> Both must change deliberately (license chosen, `private` removed) before any
-> publish. Do not run `npm publish`.
+> **Publishing stays fail-closed even though the license is chosen.** The OSS
+> license is settled — **Apache-2.0** (see [`../LICENSE`](../LICENSE) and
+> [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md)) — but `package.json` keeps
+> `"private": true`, so `npm publish` refuses outright. Removing `private` (and
+> bumping the version + adding the `files` allowlist) is a separate, deliberate
+> step. Do not run `npm publish`.
 
 ---
 
@@ -33,7 +33,8 @@ tarball ships only the product, not the workshop:
   "scripts/agentctx/**",        // the engine: compiler, MCP server, schema, adapters
   "templates/**",               // init templates
   "README.md",
-  "LICENSE",                    // once it exists
+  "LICENSE",                    // Apache-2.0 (shipped)
+  "NOTICE",
   "docs/mind-ontology-quickstart.md",
   "docs/mind-ontology-quickstart-examples-v0.md",
   "docs/agentctx-mcp.md",
@@ -55,12 +56,14 @@ Deliberately **excluded** from the published tarball (kept in the repo):
 `npm` always includes `package.json`, `README`, and `LICENSE` regardless of the
 allowlist; it always excludes `node_modules`, `.git`, and gitignored paths.
 
-## Pre-publish checklist (when the license gate opens)
+## Pre-publish checklist
 
-1. License chosen and `LICENSE` committed (see [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md)).
-2. `"private": true` removed and `"license"` set to the SPDX id.
+1. ~~License chosen and `LICENSE` committed~~ — **done: Apache-2.0**, `"license"`
+   SPDX set (see [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md)).
+2. `"private": true` removed (the remaining publish gate — a deliberate decision).
 3. `"files"` allowlist added; `npm pack --dry-run` shows only the intended files.
 4. Full suite green; `agentctx:smoke` `SMOKE PASS`.
 5. Version bumped per semver.
 
-Until step 1 is done, packaging is a dry-run exercise only.
+The license is settled; until `"private"` is removed (step 2), packaging is a
+dry-run exercise only.
