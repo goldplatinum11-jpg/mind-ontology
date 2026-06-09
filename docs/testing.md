@@ -10,7 +10,7 @@ network, no account, no hosted SIRT — and runs in a few seconds.
 | **Proof** | `npm run agentctx:proof` | Smallest viable validation — one file (`tests/unit/agentctx-proof.test.mjs`). Fast smoke that the core compile/validate contract holds. Run this first. |
 | **Validate** | `npm run agentctx:validate` | The shipped `.agentctx/` template conforms to the schema (`0 errors`). |
 | **Smoke** | `npm run agentctx:smoke` | End-to-end free-layer journey (init → compile → idempotency guard → friendly errors) in a throwaway temp dir: `SMOKE PASS`. |
-| **Full** | `npm test` | The entire `tests/unit` suite (366 tests across 74 files at last count). The release gate. |
+| **Full** | `npm test` | The entire `tests/unit` suite (375 tests across 74 files at last count). The release gate. |
 
 Run order before a release is in [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md).
 
@@ -31,8 +31,9 @@ The `tests/unit/` files group by what they guard:
 - **MCP transport** — `agentctx-mcp.test.mjs` (handlers) and
   `mcp-server-smoke.test.mjs` (real stdio JSON-RPC round-trip).
 - **Connectors & client setup** — `agentctx-*-setup-proof.test.mjs`,
-  `agentctx-connector-manifests.test.mjs`, `connector-surface-thin.test.mjs`:
-  thin two-tool surface, placeholders only.
+  `agentctx-connector-manifests.test.mjs`, `connector-surface-thin.test.mjs`,
+  `mcp-setup-fixtures.test.mjs`: thin two-tool surface, placeholders only, and the
+  full copied-config contract. See [The setup-fixture contract](#the-setup-fixture-contract).
 - **Hosted boundary & security** — `agentctx-no-leakage-audit.test.mjs`,
   `no-leakage-expansion.test.mjs`, `agentctx-adapter-flags.test.mjs`,
   `agentctx-memory-adapter.test.mjs`, `agentctx-writeback-adapter.test.mjs`,
@@ -73,6 +74,41 @@ regression task actually surfaces — so the CQ text and the compiler can't drif
 
 To extend coverage, add a row to `CASES` (and its family to `REQUIRED_FAMILIES` if
 new); keep tasks in natural language and assertions on file + reason, not on scores.
+
+## The setup-fixture contract
+
+Mind Ontology's promise to setup-copiers: **every AI client points at the same
+local MCP entrypoint and sees the same two read-only tools.** The copy-paste
+configs that make that true live in [`agentctx-setup/`](agentctx-setup/) and are
+guarded by `tests/unit/mcp-setup-fixtures.test.mjs` (the `FIXTURES_V1` block).
+
+The test is driven by one declarative manifest — every file under
+`docs/agentctx-setup/` with its *kind* — and the on-disk directory must equal that
+manifest exactly. A new or removed copied config therefore fails the suite until
+it is classified and validated; a fixture cannot land unaudited.
+
+| Kind | Fixtures | Invariant the test enforces |
+|---|---|---|
+| `stdio-json` | `claude-code.mcp.json`, `cursor.mcp.json` | exactly one server `agentctx`; `command: node`; args launch exactly the canonical `scripts/agentctx/mcp-server.mjs`; no pinned tool subset |
+| `stdio-toml` | `codex-config.toml` | exactly one `[mcp_servers.*]` table and it is `agentctx`; `command = "node"`; args include the canonical entry |
+| `hosted-json` | `claude-ai-connector.example.json`, `chatgpt-connector.example.json` | placeholder host only; two-tool surface (`tools` / `allowed_tools` = `get_context, list_constraints`); auth declared but value-less |
+| `openapi` | `mind-ontology-connector.openapi.json` | placeholder server; the two `operationId`s only; all-POST read-only shape |
+
+On top of the per-kind checks, three sweeps run across **every** fixture:
+
+- **One entry, no divergence** — all stdio clients (JSON + TOML) launch the
+  *identical* args, so Claude Code, Cursor, and Codex cannot drift apart.
+- **No tool sprawl** — the only tool tokens that appear in any config (tool lists
+  or OpenAPI `operationId`s) are `get_context` and `list_constraints`; the check
+  also proves both are actually surfaced (non-vacuous).
+- **Placeholder-and-secret-free** — every `https://` host targets the reserved
+  `.example` TLD (no Workers/`sirtai.org`/production host), no bearer/token/key
+  value is embedded, and no fixture hard-codes `sirt-app-v2` or a private clone
+  path.
+
+To extend coverage, add a row to `FIXTURES` with its `kind` (and a `toolsKey` for
+hosted JSON). Keep fixtures placeholder-only and credential-free — the sweeps
+will hold every new fixture to the same contract.
 
 ## Conventions
 
