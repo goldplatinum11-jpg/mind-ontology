@@ -1,0 +1,13 @@
+# agentctx MCP server — autopilot line, repo-local Codex config.
+#
+# Copy this block into `.codex/config.toml` at the repo root. Every agent in the
+# line (Codex controller, Claude Code worker, Cursor) launches the SAME local
+# entrypoint and sees the SAME two read-only tools: get_context, list_constraints.
+#
+# Local-first: no account, no network, no hosted SIRT. See
+# templates/mind-ontology/autopilot/autopilot-blocks.md and
+# docs/mind-ontology-autopilot-adoption-v1.md.
+
+[mcp_servers.agentctx]
+command = "node"
+args = ["scripts/agentctx/mcp-server.mjs"]

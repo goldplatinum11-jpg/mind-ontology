@@ -1,0 +1,32 @@
+{
+  "schema": "sirt.result-pack/v1",
+  "lane": "example-autopilot-lane",
+  "branch": "codex/example-autopilot-lane",
+  "worker": "claude-code",
+  "controller": "codex",
+  "status": "in-progress",
+  "runway": {
+    "mode": "loop-dynamic-self-paced",
+    "checkpoint": 1,
+    "valid_terminal_stop_reached": false,
+    "reason_for_continuation": "More safe, in-scope ADLs remain; no valid terminal stop condition met."
+  },
+  "write_scope_respected": true,
+  "forbidden_scope_touched": false,
+  "adls_completed": [
+    {
+      "id": "E1",
+      "title": "Example artifact",
+      "artifact": "docs/example.md",
+      "guard_test": "tests/unit/example.test.mjs"
+    }
+  ],
+  "validation": {
+    "npm_test": { "command": "npx vitest run tests/unit", "result": "all passed", "passed": true }
+  },
+  "uncommitted_changes": {
+    "added": ["docs/example.md", "tests/unit/example.test.mjs"],
+    "modified": []
+  },
+  "handoff": "Docs/tests only, local-first, no hosted import. Controller may review and commit."
+}

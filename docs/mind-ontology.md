@@ -51,6 +51,67 @@ The product contract is the same two tools — `get_context(task)` and
 - [MCP setup](agentctx-mcp-setup.md) · [MCP server reference](agentctx-mcp.md)
 - [Connector manifests](mind-ontology-connector-manifests-v0.md) · [thin connector strategy](mind-ontology-thin-connector-strategy-v0.md)
 
+### Autopilot integration (for AI development lines)
+
+The [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md) makes Mind
+Ontology easy for autonomous agent lines to consume — local-first, no hosted SIRT.
+
+- [Autopilot pack frame](mind-ontology-autopilot-pack-v1.md) — what it is, who uses it, the SIRT Brain / SIRT Runway boundary.
+- [Reading protocol](mind-ontology-autopilot-reading-protocol-v1.md) — when each agent calls `get_context` / `list_constraints`.
+- [Stop policy](mind-ontology-autopilot-stop-policy-v1.md) — valid vs invalid terminal stop conditions.
+- [Adoption walkthrough](mind-ontology-autopilot-adoption-v1.md) — copy-paste wiring, step by step.
+- [Quickstart run](mind-ontology-autopilot-quickstart-run-v1.md) — worked compile runs, including the wrong-axis non-dump.
+- [Autopilot concepts](mind-ontology-autopilot-concepts-v1.md) — line/runway vocabulary mapped onto the [product concepts](concepts.md).
+- [Result Pack shape](mind-ontology-autopilot-result-pack-v1.md) — the locally-checkable worker→controller handoff.
+- [Risk modes](mind-ontology-autopilot-risk-modes-v1.md) — automatic safety forcing on risky lane steps.
+- [Controller checklist](mind-ontology-autopilot-controller-checklist-v1.md) — mechanical review before approve/commit.
+- [Worker self-check](mind-ontology-autopilot-worker-selfcheck-v1.md) — faithful reporting before a checkpoint.
+- [Failure modes](mind-ontology-autopilot-failure-modes-v1.md) — what breaks when a line skips the protocol, and how it's contained.
+- [Minimal vs full ontology](mind-ontology-autopilot-minimal-vs-full-v1.md) — `constraints.md`-only line vs the nine-file line.
+- [Two-tool contract](mind-ontology-autopilot-two-tool-contract-v1.md) — the exact read-only surface a line depends on.
+- [Scope discipline](mind-ontology-autopilot-scope-discipline-v1.md) — keeping every edit inside the allowed write scope.
+- [Checkpoint cadence](mind-ontology-autopilot-checkpoint-cadence-v1.md) — when to checkpoint, and why a checkpoint is not a stop.
+- [Result Pack walkthrough](mind-ontology-autopilot-result-pack-walkthrough-v1.md) — an annotated, field-by-field example.
+- [Portability across clients](mind-ontology-autopilot-portability-v1.md) — one constitution feeds every agent the same way.
+- [Safe continuation](mind-ontology-autopilot-safe-continuation-v1.md) — why a runway optimizes for continuation, not stopping.
+- [Glossary tie-in](mind-ontology-autopilot-glossary-tie-in-v1.md) — every autopilot term, with a source link.
+- [Two-tool vs many-tool](mind-ontology-autopilot-two-tool-vs-many-v1.md) — why a small read-only surface is the trustable one.
+- [Connector parity](mind-ontology-autopilot-connector-parity-v1.md) — the thin connector mirrors exactly the two tools.
+- [Trust tie-in](mind-ontology-autopilot-trust-tie-in-v1.md) — how the pack inherits the product trust posture.
+- [Why local-first](mind-ontology-autopilot-why-local-first-v1.md) — why a line runs on local files, not a hosted service.
+- [Operator FAQ](mind-ontology-autopilot-operator-faq-v1.md) — pre-wiring questions, each answered from a local artifact.
+- [Lane lifecycle](mind-ontology-autopilot-lane-lifecycle-v1.md) — open → work → checkpoint → handoff → close.
+- [Autopilot vs single-shot](mind-ontology-autopilot-vs-single-shot-v1.md) — why a runway differs from a one-shot agent.
+- [Why two roles](mind-ontology-autopilot-two-roles-v1.md) — why worker and controller are separate agents.
+- [Common mistakes](mind-ontology-autopilot-common-mistakes-v1.md) — a one-line-each quick reference.
+- [Pack versioning](mind-ontology-autopilot-versioning-v1.md) — the `-v1` convention and what a v2 would change.
+- [Pack non-goals](mind-ontology-autopilot-non-goals-v1.md) — what the pack deliberately does not do.
+- [Extending the pack](mind-ontology-autopilot-extending-v1.md) — the contributor checklist the guards enforce.
+- [vs per-tool instruction files](mind-ontology-autopilot-vs-instruction-files-v1.md) — one constitution replaces N drifting `CLAUDE.md`/`AGENTS.md` files.
+- [Pack changelog](mind-ontology-autopilot-changelog-v1.md) — append-only summary of what landed in v1.
+- [Cost model](mind-ontology-autopilot-cost-model-v1.md) — the free local path has no per-call cost.
+- [Observability](mind-ontology-autopilot-observability-v1.md) — the Result Pack + guard tests are the line's observability.
+- [One-line instruction](mind-ontology-autopilot-one-line-instruction-v1.md) — the canonical two-sentence agent instruction.
+- [Tool-call ordering](mind-ontology-autopilot-tool-call-ordering-v1.md) — the within-step sequence of the two calls.
+- [Empty-ontology behavior](mind-ontology-autopilot-empty-ontology-v1.md) — what a bare constraints-only line does.
+- [Maturity self-audit](mind-ontology-autopilot-maturity-audit-v1.md) — the structural guarantees the pack enforces.
+- [Adopting incrementally](mind-ontology-autopilot-adopting-incrementally-v1.md) — the safe one-file-at-a-time on-ramp.
+- [Guard glossary](mind-ontology-autopilot-guard-glossary-v1.md) — each structural guard explained in one line.
+- [When NOT to use](mind-ontology-autopilot-when-not-to-use-v1.md) — the honest boundary of the pack's usefulness.
+- [Pack principles](mind-ontology-autopilot-principles-v1.md) — the six principles every artifact embodies.
+- [One-paragraph pitch](mind-ontology-autopilot-pitch-v1.md) — the whole pack in a paragraph.
+- [Reviewer quickstart](mind-ontology-autopilot-reviewer-quickstart-v1.md) — review a Result Pack in five minutes.
+- [Contributor FAQ](mind-ontology-autopilot-contributor-faq-v1.md) — quick answers before your first PR.
+- [Onboarding a new client](mind-ontology-autopilot-onboarding-client-v1.md) — add a 4th/5th agent in three steps.
+- [Principles applied](mind-ontology-autopilot-principles-applied-v1.md) — the six principles in one worked lane.
+- [Cross-pack consistency](mind-ontology-autopilot-consistency-v1.md) — how the ten guards compose into one closed loop.
+- [Line health signals](mind-ontology-autopilot-line-health-v1.md) — healthy vs drifting, read from local artifacts.
+- [Reading paths](mind-ontology-autopilot-reading-paths-v1.md) — adopter / reviewer / contributor routes.
+- [Quality bar](mind-ontology-autopilot-quality-bar-v1.md) — what "good enough to land" means for an artifact.
+- [State of the pack](mind-ontology-autopilot-state-of-pack-v1.md) — what v1 ships, at a glance.
+- [Pack at a glance](mind-ontology-autopilot-manifest-v1.md) — one-page manifest of every pack artifact.
+- Drop-in kit: `templates/mind-ontology/autopilot/` (blocks, MCP configs, README, example agent prompt).
+
 ### For contributors
 
 - [Contributing](../CONTRIBUTING.md) · [Release checklist](../RELEASE-CHECKLIST.md)

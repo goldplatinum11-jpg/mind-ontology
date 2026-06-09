@@ -185,6 +185,10 @@ extraction is recorded in [`EXTRACTION-INVENTORY.md`](EXTRACTION-INVENTORY.md)
 and [`docs/mind-ontology-extraction-map.md`](docs/mind-ontology-extraction-map.md)
 — those are read-only history, not a user quickstart.
 
+Wiring an autonomous AI development line? See the local-first
+[Autopilot Integration Pack](docs/mind-ontology-autopilot-pack-v1.md) — when each
+agent reads `.agentctx/`, the stop policy, and a drop-in kit, with no hosted SIRT.
+
 Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). Release readiness:
 [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md).
 

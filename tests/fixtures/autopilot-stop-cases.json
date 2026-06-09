@@ -1,0 +1,28 @@
+{
+  "_comment": "Canonical machine-readable stop-policy decision table for the autopilot pack. Each case is classified VALID (the line may stop) or INVALID (the line must continue). The guard test asserts docs/mind-ontology-autopilot-stop-policy-v1.md reflects this table, so the prose and the policy cannot drift apart. Local data only — no hosted dependency.",
+  "valid_terminal_stops": [
+    { "id": "time-budget", "phrase": "time budget", "doc_match": "time budget" },
+    { "id": "operator-stop", "phrase": "explicit operator STOP", "doc_match": "operator stop" },
+    { "id": "deploy-boundary", "phrase": "deploy", "doc_match": "deploy" },
+    { "id": "migration-boundary", "phrase": "migration", "doc_match": "migration" },
+    { "id": "secrets-boundary", "phrase": "secrets", "doc_match": "secrets" },
+    { "id": "live-data-boundary", "phrase": "live-data", "doc_match": "live-data" },
+    { "id": "cost-exposure", "phrase": "material cost exposure", "doc_match": "material cost" },
+    { "id": "auth-failure", "phrase": "auth failure", "doc_match": "auth failure" },
+    { "id": "irreversible-action", "phrase": "irreversible", "doc_match": "irreversible" },
+    { "id": "forbidden-scope", "phrase": "forbidden-scope", "doc_match": "forbidden-scope" },
+    { "id": "canonical-contradiction", "phrase": "canonical contradiction", "doc_match": "canonical contradiction" },
+    { "id": "repeat-blocker", "phrase": "same hard blocker repeats three times", "doc_match": "repeats three times" }
+  ],
+  "invalid_stops": [
+    { "id": "one-adl-done", "phrase": "one task / ADL completed", "doc_match": "one task" },
+    { "id": "tests-passed", "phrase": "tests passed", "doc_match": "tests passed" },
+    { "id": "docs-updated", "phrase": "docs updated", "doc_match": "docs updated" },
+    { "id": "templates-created", "phrase": "templates created", "doc_match": "templates created" },
+    { "id": "scope-done-early", "phrase": "modeled scope finished before the time budget", "doc_match": "modeled scope finished" },
+    { "id": "commit-denied", "phrase": "git commit was denied", "doc_match": "git commit was denied" },
+    { "id": "no-remote", "phrase": "no remote configured", "doc_match": "no remote" },
+    { "id": "optional-probe", "phrase": "optional live probe is pending", "doc_match": "optional live probe" },
+    { "id": "next-action-exists", "phrase": "next action plainly exists", "doc_match": "next action" }
+  ]
+}

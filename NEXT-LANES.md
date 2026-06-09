@@ -34,6 +34,36 @@ bounded, reviewable lane.
    `.npmignore`/`files` allowlist plan (dry-run only; no publish), gated behind the
    open license decision.
 
+## Autopilot Integration Pack (shipped in this lane)
+
+The [Autopilot Integration Pack v1](docs/mind-ontology-autopilot-pack-v1.md) makes
+Mind Ontology consumable by autonomous AI development lines — local-first, no
+hosted SIRT. Shipped here (docs/tests/fixtures/templates only):
+
+- Pack frame, [reading protocol](docs/mind-ontology-autopilot-reading-protocol-v1.md),
+  [stop policy](docs/mind-ontology-autopilot-stop-policy-v1.md), and
+  [adoption walkthrough](docs/mind-ontology-autopilot-adoption-v1.md).
+- Drop-in `templates/mind-ontology/autopilot/` blocks and MCP configs.
+- A compiler-backed `tests/fixtures/autopilot-line/` ontology, an autopilot CQ
+  regression, and a machine-readable stop-policy decision table.
+
+The pack has since grown to ~20 cross-linked docs (concepts, failure modes,
+risk modes, controller checklist, worker self-check, scope discipline, checkpoint
+cadence, portability, two-tool contract and rationale, connector parity, manifest,
+and more), three example fixtures (`autopilot-line/` nine-file, `autopilot-roles/`,
+`autopilot-minimal/`), a full drop-in kit, and pack/kit-completeness guards. Earlier
+follow-on ideas (wrong-axis corpus, result-pack shape guard, multi-agent role
+matrix) are all shipped.
+
+Remaining follow-on autopilot lanes (still docs/tests only):
+
+- **Trust-model tie-in** — relate the autopilot two-tool surface to the product
+  trust & security model in one doc + guard.
+- **Operator FAQ** — the questions an operator asks before wiring a line, each
+  answered from a local artifact.
+- **Deeper compiler-backed retrieval guards** — more table-driven CQ rows over the
+  example fixtures as the schema grows.
+
 ## Needs an engine lane (out of scope for docs/tests hardening)
 
 - **[engine]** `--format` extensions (e.g. a compact pack) — additive, semver-minor.
