@@ -48,18 +48,19 @@ Do not run deploy, migration, or production commands for this quickstart.
 
 ## Step 2 - Confirm source files exist
 
-The current v0 source directory is:
+The source directory holds up to nine files, all compiled:
 
 ```text
 .agentctx/
-  constraints.md
-  direction.md
-  decisions.md
-  architecture.md
+  constraints.md   # ALWAYS included
+  identity.md      direction.md     projects.md
+  decisions.md     architecture.md  agent-roles.md
+  glossary.md      cq.md            # scored against the task + scope
 ```
 
-`constraints.md` is always included in context packs. The other files are
-scored against the task and optional scope.
+`constraints.md` is always included in context packs. The other eight files are
+scored against the task and optional scope; a file you omit simply contributes
+no blocks, so a minimal project shipping only `constraints.md` still works.
 
 Neutral starter files are available in
 [`templates/mind-ontology/.agentctx/`](../templates/mind-ontology/.agentctx/).
@@ -123,6 +124,29 @@ It scaffolds a throwaway `.agentctx/` in a temp directory, compiles a real task
 pack, and prints a `PASS`/`FAIL` line per check. It never touches your repo and
 exits non-zero if any check fails, so it is safe to wire into CI.
 
+### Optional - Measure how focused the pack is
+
+The product promise is *the smallest pack that still covers the task*. Make that
+measurable:
+
+```sh
+npm run agentctx:metrics -- --task "Start Mind Ontology MCP quickstart" --scope "mcp,quickstart"
+```
+
+What the numbers mean:
+
+| Metric | Meaning | Good direction |
+|---|---|---|
+| **selection ratio** | selected blocks ÷ all available blocks | **lower** = more focused |
+| **body ratio** | delivered body bytes ÷ all body bytes | **lower** = more compression |
+| **always-included** | constraint blocks forced into every pack | context-dependent |
+| **task-matched** | blocks the task/scope actually surfaced (beyond constraints) | `> 0` means the task hit real context |
+| **scopes covered** | how many requested scopes appear in the pack | `covered / requested`; raise by tagging blocks |
+
+A pack that is *all* constraints with `task-matched: 0` means your task wording
+or tags didn't surface anything — add tags to the relevant `##` heading and
+re-run. The metrics need only local files; no hosted memory is involved.
+
 ---
 
 ## Step 4 - Start the MCP server
@@ -181,6 +205,9 @@ agent.
 ---
 
 ## Troubleshooting
+
+> Every CLI failure mode and its fix is catalogued in
+> [`cli-errors.md`](cli-errors.md). The most common ones are below.
 
 ### The compiler cannot find `.agentctx/`
 

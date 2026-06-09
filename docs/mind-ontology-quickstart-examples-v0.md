@@ -68,6 +68,32 @@ npm run agentctx:validate -- --cwd ./demo
 Outcome: `VALID — 0 error(s)` on the shipped template; a malformed source (e.g.
 a `projects.md` active block missing `Status:`) fails with a clear message.
 
+## Example 6 — End-to-end over the MCP transport
+
+The same context an agent gets, but through the stdio MCP server instead of the
+CLI. Start the server and speak JSON-RPC to it:
+
+```sh
+npm run agentctx:mcp
+```
+
+```jsonc
+// stdin (one JSON object per line):
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_context","arguments":{"task":"Decide which agent role handles code review","scope":"review","format":"json"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_constraints","arguments":{"format":"json"}}}
+```
+
+Outcome:
+- `initialize` returns `serverInfo.name: "agentctx"`, protocol `2024-11-05`;
+- `tools/list` advertises exactly `get_context` and `list_constraints`;
+- `get_context` returns the same pack Example 1 produced — constraints always
+  included — over the transport every MCP client uses.
+
+This round-trip is backed by `tests/unit/mcp-server-smoke.test.mjs`, so the MCP
+example cannot drift from the server either.
+
 ---
 
 ## One-command check
