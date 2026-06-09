@@ -87,6 +87,19 @@ changes, call list_constraints().
 See the [quickstart](docs/mind-ontology-quickstart.md) for the install-first flow
 and [client setup proofs](docs/mind-ontology.md#client-setup) for per-tool wiring.
 
+**Risk-aware by default.** When a task reads as destructive or structural, the
+compiler forces your safety blocks into the pack — no prompt engineering needed:
+
+```sh
+npm run agentctx:compile -- --task "Drop the orders table" --risk auto   # forces #safety context
+npm run agentctx:compile -- --task "Tidy docs"            --risk risky  # force it anyway
+```
+
+This decides *what context the agent sees*; the **live-write boundary is enforced
+separately and fails closed** at the adapter layer (flags off by default,
+writeback is proposal-only). See
+[task risk modes](docs/mind-ontology-task-risk-modes-v0.md).
+
 ---
 
 ## Competency Questions — the verification core
@@ -155,6 +168,22 @@ Start at the [docs index](docs/mind-ontology.md). Provenance for this standalone
 extraction is recorded in [`EXTRACTION-INVENTORY.md`](EXTRACTION-INVENTORY.md)
 and [`docs/mind-ontology-extraction-map.md`](docs/mind-ontology-extraction-map.md)
 — those are read-only history, not a user quickstart.
+
+Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). Release readiness:
+[`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md).
+
+---
+
+## Positioning
+
+Mind Ontology is the **open, local-first on-ramp**; hosted SIRT is the optional
+paid backend that adds durable memory, retrieval, typed graph, and writeback.
+The free layer is genuinely useful on its own — one portable meaning source for
+every agent — and never depends on the hosted layer. The hosted SIRT backend
+stays closed and is not part of this repository. This is open-core, not
+crippleware: the local path is complete. See
+[commercial positioning](docs/mind-ontology-commercial-positioning-v0.md) for
+the full framing.
 
 ---
 

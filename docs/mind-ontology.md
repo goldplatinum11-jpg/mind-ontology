@@ -35,7 +35,10 @@ Start here, then follow the path that matches what you're doing.
 - [Quickstart](mind-ontology-quickstart.md) — install-first local flow.
 - [Quickstart examples](mind-ontology-quickstart-examples-v0.md) — concrete runs.
 - [Competency Questions schema](mind-ontology-cq-schema-v0.md) — the verification core.
+- [How the compiler scores blocks](how-scoring-works.md) — why a block is in or out.
+- [Concepts](concepts.md) — the product's own vocabulary.
 - [Task risk modes](mind-ontology-task-risk-modes-v0.md) — fail-closed guardrails.
+- [CLI error reference](cli-errors.md) — every failure mode and its fix.
 
 ### Client setup
 
@@ -50,6 +53,10 @@ The product contract is the same two tools — `get_context(task)` and
 
 ### For contributors
 
+- [Contributing](../CONTRIBUTING.md) · [Release checklist](../RELEASE-CHECKLIST.md)
+- [Testing & the four gates](testing.md)
+- [Schema authoring guide](schema-authoring.md) · [Packaging (dry-run plan)](packaging.md)
+- [Worked examples](examples/README.md)
 - [Contribution guide plan](mind-ontology-contribution-guide-plan-v0.md)
 - [Versioning & release checklist](mind-ontology-versioning-release-checklist-v0.md)
 - [Schema validation](mind-ontology-schema-validation-v0.md)
