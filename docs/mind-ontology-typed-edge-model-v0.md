@@ -50,6 +50,31 @@ symmetric types and `null` for directional ones.
 
 ---
 
+## Examples
+
+```js
+import { buildTypedEdge, reverseEdge } from "./scripts/agentctx/adapters/edge-model.mjs";
+
+// "decision B replaces decision A"
+buildTypedEdge({ from: "decision:B", to: "decision:A", type: "supersedes" });
+// → { from: "decision:B", to: "decision:A", type: "supersedes" }   (directed; reverseEdge → null)
+
+// "this constraint conflicts with that direction"
+const conflict = buildTypedEdge({ from: "constraint:no-deploy", to: "direction:ship-fast", type: "contradicts" });
+reverseEdge(conflict);
+// → { from: "direction:ship-fast", to: "constraint:no-deploy", type: "contradicts" }   (symmetric)
+
+// "this summary was produced from that source note"
+buildTypedEdge({ from: "note:summary", to: "note:raw", type: "derived_from", metadata: { confidence: 0.9 } });
+```
+
+There is intentionally **no `supports` edge type**. Endorsement/agreement is
+modeled with `relates_to` (generic) or, where one thing replaces another, with
+`supersedes` — keeping the vocabulary small and unambiguous. Adding a relation
+type is a deliberate schema change, not an ad-hoc string.
+
+---
+
 ## Boundary & safety
 
 - **Schema only.** No persistence, no hosted call, no secret.
