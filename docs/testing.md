@@ -10,7 +10,7 @@ network, no account, no hosted SIRT — and runs in a few seconds.
 | **Proof** | `npm run agentctx:proof` | Smallest viable validation — one file (`tests/unit/agentctx-proof.test.mjs`). Fast smoke that the core compile/validate contract holds. Run this first. |
 | **Validate** | `npm run agentctx:validate` | The shipped `.agentctx/` template conforms to the schema (`0 errors`). |
 | **Smoke** | `npm run agentctx:smoke` | End-to-end free-layer journey (init → compile → idempotency guard → friendly errors) in a throwaway temp dir: `SMOKE PASS`. |
-| **Full** | `npm test` | The entire `tests/unit` suite (337 tests across 72 files at last count). The release gate. |
+| **Full** | `npm test` | The entire `tests/unit` suite (366 tests across 74 files at last count). The release gate. |
 
 Run order before a release is in [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md).
 
@@ -20,6 +20,10 @@ The `tests/unit/` files group by what they guard:
 
 - **Schema conformance** — `agentctx-*-schema.test.mjs`, `agentctx-validate.test.mjs`,
   `cq-product-core.test.mjs`: each `.agentctx/` source schema and the validator.
+- **Competency-question regression** — `cq-regression.test.mjs` (CQs name real,
+  compiled sources), `cq-regression-table.test.mjs` (each CQ topic's task surfaces the
+  file that answers it): the verification-core contract, regressed at retrieval. See
+  [The CQ regression contract](#the-cq-regression-contract).
 - **Compiler & CLI** — `agentctx-compile.test.mjs`, `agentctx-init.test.mjs`,
   `init-idempotency.test.mjs`, `agentctx-metrics.test.mjs`, `cli-ux-contract.test.mjs`,
   `agentctx-risk.test.mjs`, `risk-modes-doc.test.mjs`: compile scoring, init safety,
@@ -40,6 +44,35 @@ The `tests/unit/` files group by what they guard:
   `docs-gates-ordering.test.mjs`, `release-contribution-readiness.test.mjs`,
   `doc-link-audit.test.mjs`, `control-plane-import-audit.test.mjs`: docs cite real
   commands/files, links resolve, license stays fail-closed, no control-plane imports.
+
+## The CQ regression contract
+
+Competency questions are Mind Ontology's verification core: the product promise is
+that, given a task, the compiler surfaces the ontology file(s) needed to answer it.
+`cq-regression-table.test.mjs` locks that promise against drift with a table — one
+row per CQ topic family, each a task phrased the way an agent would actually ask it
+(prose, no tag injection), plus the source file that must appear in the compiled pack.
+
+| CQ topic family | Task style (example) | Must surface |
+|---|---|---|
+| project / scope | "What is the active project and which repos belong to it?" | `projects.md` |
+| project / scope | "What is the current direction and near-term priorities?" | `direction.md` |
+| constraints / safety | "What must the agent avoid, and which writes are forbidden?" | `constraints.md` (always) |
+| vocabulary / glossary | "What does the term context pack mean?" | `glossary.md` |
+| architecture / layering | "Explain the architecture layers and the layer map." | `architecture.md` |
+| decisions / rationale | "Why did we decide to keep the free layer self-hosted?" | `decisions.md` |
+| agent roles / delegation | "Which agent role handles code review and delegation?" | `agent-roles.md` |
+
+The contract is **semantic, not numeric**: rows assert that the expected file appears
+and *how* it appears (`matched` = earned by scoring the task; `always` = the
+constraints.md safety floor), never exact scores — so the suite survives scorer tuning
+but fails if a topic family stops being answerable. A negative-control row proves the
+matches are earned (an unrelated task surfaces only the safety floor, not topic files),
+and a bridge row asserts every source file the template's `cq.md` *names* is one a
+regression task actually surfaces — so the CQ text and the compiler can't drift apart.
+
+To extend coverage, add a row to `CASES` (and its family to `REQUIRED_FAMILIES` if
+new); keep tasks in natural language and assertions on file + reason, not on scores.
 
 ## Conventions
 
