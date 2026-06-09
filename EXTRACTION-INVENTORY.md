@@ -8,6 +8,14 @@ out of `sirt-app-v2` into an independent product workspace.
 - **Worker:** Claude Code (Worker AI), Codex = Controller (did not implement)
 - **Mode:** read/copy only from source; no source mutation, no remote, no push, no deploy
 
+> **Provenance chain:** this file is the **executed** record of the extraction.
+> The **plan** it carried out is
+> [`docs/mind-ontology-extraction-map.md`](docs/mind-ontology-extraction-map.md)
+> (target package shape, boundary rules, extraction sequence). All `sirt-app-v2`
+> paths named below are **read-only provenance** — do not edit, re-extract, or
+> treat them as live sources. The current user entry point is
+> [`README.md`](README.md), not this inventory.
+
 ## Source
 
 - **Source path:** `C:\Users\qmbqb\sirt-codex-clones\sirt-app-v2-pr08-acceptance`

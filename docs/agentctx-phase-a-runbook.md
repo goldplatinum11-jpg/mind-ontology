@@ -1,75 +1,70 @@
-# agentctx Phase A Runbook
+# agentctx Phase A Runbook — Historical / Excluded Control-Plane
 
-Phase A is the first real-operation pass after PR #4394 lands. The goal is to
-prove that the SIRT dispatch queue can hand work to Claude Code with the same
-scoped context contract that Codex sees.
+> **Status: HISTORICAL. Not a product feature.**
+>
+> Phase A described a **SIRT control-plane** dispatch flow (operator queue →
+> staging Claude Code runner → draft PR) that lived in `sirt-app-v2`. That
+> machinery — including the `scripts/operator/agentctx-phase-a-packet.mjs`
+> script and the `agentctx:phase-a-packet` package script it backed — was
+> **deliberately excluded** from the standalone Mind Ontology extraction.
+>
+> This page is kept only as provenance. **Do not run the commands described in
+> the historical section below; they do not exist in this package.** See
+> [`EXTRACTION-INVENTORY.md`](../EXTRACTION-INVENTORY.md) for the exclusion
+> record.
 
-Product framing: this is the first Mind Ontology execution proof. Mind Ontology
-is the product surface, SIRT is the dispatch and memory substrate, and agentctx
-is the compiler that injects the right task-scoped context into the worker AI.
+---
 
-## Stop Conditions
+## What replaces Phase A for product users
 
-Stop only for these conditions:
-
-- A task needs paid external capacity beyond the normal Claude/Codex plan.
-- A task requires secrets, production config, deployment, migration, or forceful
-  git history changes.
-- The queue cannot authenticate to SIRT or the runner cannot authenticate as a
-  staging runner.
-- The requested work changes product direction rather than implementation path.
-
-Routine implementation choices should stay inside the runner lane and produce a
-draft PR, not a human checkpoint.
-
-## Safety Profile
-
-Every Phase A queue item must use:
-
-- `executor_type: "claude_code"`
-- `approval_policy: "staging_claude_code_v0"`
-- `safety_profile: "restricted"`
-- `target_branch: "codex/agentctx-sirt-autopilot-line-main"` until PR #4394 is
-  merged, then `main`
-- draft PR output only
-
-Forbidden task text is rejected before enqueue. Keep payloads away from deploy,
-secret, migration, destructive shell, or force-push wording so the dispatch API
-auto-deny gate remains clean.
-
-## Queue Packet
-
-Generate the packet:
+Mind Ontology is a **local-first** context compiler. There is no operator queue,
+no dispatch API, and no staging runner in this package. To prove the local
+product works, use the validation gates that *do* ship:
 
 ```sh
-npm run agentctx:phase-a-packet
+npm run agentctx:proof       # smallest viable gate (fast, local)
+npm run agentctx:validate    # validate .agentctx/ against the schema
+npm run agentctx:smoke       # one-command end-to-end acceptance check
+npm test                     # full unit suite
 ```
 
-Validate only:
+To compile and inspect a task-scoped context pack locally:
 
 ```sh
-npm run agentctx:phase-a-packet -- --check
+npm run agentctx:compile -- --task "Add Claude Code setup docs" --scope "mind-ontology,mcp"
+npm run agentctx:metrics  -- --task "Add Claude Code setup docs"
 ```
 
-Write to staging queue, if `SIRT_BASE_URL` and `SIRT_OPERATOR_KEY` are present:
+None of these require SIRT, an account, a network, or credentials.
 
-```sh
-npm run agentctx:phase-a-packet -- --post
-```
+---
 
-The post mode calls `POST {SIRT_BASE_URL}/v2/agent_tasks` once per payload with
-the operator key. It prints task ids and never prints the key.
+## Historical record (excluded — for provenance only)
 
-## Phase A Tasks
+The original Phase A runbook proved that a SIRT dispatch queue could hand work to
+Claude Code with the same scoped context contract Codex saw. It relied on:
 
-1. Add agentctx context injection to the Claude Code runner prompt.
-2. Add MCP setup templates for Codex and Claude Code so both agents can call the
-   same repo-local context source.
-3. Add an acceptance smoke proving the queued Claude Code path receives an
-   agentctx context pack before execution.
+- an operator packet generator (`scripts/operator/agentctx-phase-a-packet.mjs`)
+  invoked through an `agentctx:phase-a-packet` package script;
+- a staging dispatch API (`POST {SIRT_BASE_URL}/v2/agent_tasks`) authenticated
+  with an operator key;
+- a restricted safety profile and draft-PR-only output.
 
-## Acceptance
+All of that is **SIRT control-plane infrastructure**, not Mind Ontology product
+code. It was excluded from this package on purpose so that the OSS surface stays
+thin, local, and free of operator/runner/queue dependencies. The dependency
+direction is one-way: hosted SIRT may use Mind Ontology; Mind Ontology never
+imports SIRT control-plane internals.
 
-Phase A is complete when a queued staging Claude Code task creates a draft PR
-whose implementation used `agentctx` context from `.agentctx/`, with tests
-passing and no live deployment or production mutation.
+If you are looking for the autonomous dispatch line, it remains in the hosted
+SIRT system and is out of scope for this repository.
+
+---
+
+## Why this matters for trust
+
+A product user must never be told to run an operator/control-plane script as if
+it were a local feature. Presenting excluded dispatch machinery as a quickstart
+step would (a) break, because the script is not shipped, and (b) blur the
+open-core boundary this package is built to keep clean. The current product gates
+above are the only supported way to prove the local context contract.

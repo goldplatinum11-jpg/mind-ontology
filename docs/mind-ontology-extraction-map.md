@@ -1,12 +1,18 @@
 # Mind Ontology Standalone Extraction Map
 
-**Status:** Draft for Phase 1 / P1-PR02  
+**Status:** Plan of record — **executed**. The standalone extraction this map
+describes has since been carried out; the executed inventory is
+[`../EXTRACTION-INVENTORY.md`](../EXTRACTION-INVENTORY.md).  
 **Scope:** OSS MCP foundation  
-**Base repo:** `sirt-app-v2`
+**Base repo:** `sirt-app-v2` (read-only provenance — not a live source)
 
-This document defines how the current repo-local Mind Ontology / agentctx
-prototype can become a standalone OSS MCP package without leaking hosted SIRT
-backend value.
+> **Provenance chain:** this is the *plan* (target shape, boundary rules,
+> extraction sequence). For what was actually copied, reviewed, excluded, and
+> tested, see [`../EXTRACTION-INVENTORY.md`](../EXTRACTION-INVENTORY.md). All
+> `sirt-app-v2` paths below are historical references, not editable sources.
+
+This document defines how the repo-local Mind Ontology / agentctx prototype
+became a standalone OSS MCP package without leaking hosted SIRT backend value.
 
 The extraction goal is not to move files immediately. The goal is to make the
 future package boundary explicit enough that the next PRs can build toward it

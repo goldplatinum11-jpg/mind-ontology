@@ -25,6 +25,53 @@ which context an agent receives for a specific task.
 
 ---
 
+## Documentation map
+
+Start here, then follow the path that matches what you're doing.
+
+### For users (run it locally)
+
+- [Top-level README](../README.md) — product surface and 60-second start.
+- [Quickstart](mind-ontology-quickstart.md) — install-first local flow.
+- [Quickstart examples](mind-ontology-quickstart-examples-v0.md) — concrete runs.
+- [Competency Questions schema](mind-ontology-cq-schema-v0.md) — the verification core.
+- [Task risk modes](mind-ontology-task-risk-modes-v0.md) — fail-closed guardrails.
+
+### Client setup
+
+The product contract is the same two tools — `get_context(task)` and
+`list_constraints()` — across every agent. Setup pages stay thin:
+
+- [Claude Code setup proof](mind-ontology-claude-code-setup-proof-v0.md)
+- [Codex setup proof](mind-ontology-codex-setup-proof-v0.md)
+- [Cursor setup proof](mind-ontology-cursor-setup-proof-v0.md)
+- [MCP setup](agentctx-mcp-setup.md) · [MCP server reference](agentctx-mcp.md)
+- [Connector manifests](mind-ontology-connector-manifests-v0.md) · [thin connector strategy](mind-ontology-thin-connector-strategy-v0.md)
+
+### For contributors
+
+- [Contribution guide plan](mind-ontology-contribution-guide-plan-v0.md)
+- [Versioning & release checklist](mind-ontology-versioning-release-checklist-v0.md)
+- [Schema validation](mind-ontology-schema-validation-v0.md)
+- [Distribution & license boundary](mind-ontology-license-boundary.md) · [decision state](../LICENSE-DECISION.md)
+
+### Architecture & boundary
+
+- [Typed edge model](mind-ontology-typed-edge-model-v0.md)
+- [Adapter feature flags](mind-ontology-adapter-feature-flags-v0.md)
+- [SIRT memory adapter contract](mind-ontology-sirt-memory-adapter-contract-v0.md)
+- [SIRT writeback proposal contract](mind-ontology-sirt-writeback-proposal-contract-v0.md)
+- [Hosted auth / tenant boundary](mind-ontology-hosted-auth-tenant-boundary-v0.md)
+- [Trust & security model](mind-ontology-trust-security-model-v0.md)
+- [Self-host deployment plan](mind-ontology-selfhost-deployment-plan-v0.md) (planned, no deploy executed)
+
+### Provenance (read-only history)
+
+- [Extraction inventory](../EXTRACTION-INVENTORY.md) · [extraction map](mind-ontology-extraction-map.md)
+- [Phase A runbook](agentctx-phase-a-runbook.md) — historical/excluded control-plane.
+
+---
+
 ## Product promise
 
 ```text
@@ -176,9 +223,12 @@ meaning plus action policy, compiled into the form each AI tool can use.
 
 ## Development runway
 
-The autonomous development plan for turning this prototype into an open-core
-product is defined in
-[`docs/operator/mind-ontology-autonomous-development-plan-v0.md`](operator/mind-ontology-autonomous-development-plan-v0.md).
+The autonomous development plan that drove this work
+(`docs/operator/mind-ontology-autonomous-development-plan-v0.md`) was **SIRT
+control-plane material and was deliberately excluded** from the standalone
+extraction — see [`EXTRACTION-INVENTORY.md`](../EXTRACTION-INVENTORY.md). It is
+not shipped here and is not required to use the product. Long-running worker
+lanes use the Claude Code interactive `/loop` transport described below.
 
 The public-facing OSS product README draft is
 [`docs/mind-ontology-mcp-readme.md`](mind-ontology-mcp-readme.md). It defines
