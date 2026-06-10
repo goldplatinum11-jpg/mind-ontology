@@ -19,9 +19,13 @@ Execution compiler:
 ```
 
 The important distinction is that Mind Ontology is not a generic note app, a
-RAG store, or another static instruction file. It is a personal operating
-ontology for AI agents: a curated meaning system plus the rules that decide
-which context an agent receives for a specific task.
+RAG store, or another hand-written static instruction file. It is a personal
+operating ontology for AI agents: a curated meaning system plus the rules that
+decide which context an agent receives for a specific task. Static instruction
+files (`AGENTS.md`, `CLAUDE.md`) are not competitors to this layer — they are
+its **compile targets**: `mind-ontology emit` builds them from the same
+ontology, and `emit --check` fails CI when they drift from it
+(["static files as targets, not sources"](workbench-w1-emit-target-spec.md)).
 
 ---
 
@@ -38,6 +42,8 @@ Start here, then follow the path that matches what you're doing.
 - [How the compiler scores blocks](how-scoring-works.md) — why a block is in or out.
 - [Concepts](concepts.md) — the product's own vocabulary.
 - [Task risk modes](mind-ontology-task-risk-modes-v0.md) — fail-closed guardrails.
+- [Emit target spec](workbench-w1-emit-target-spec.md) — compile `AGENTS.md` / `CLAUDE.md` from the ontology; headers, drift classes, CI recipe.
+- [Operator CLI spec](workbench-w2-cli-spec.md) — `emit` flags, exit codes, and JSON shapes.
 - [CLI error reference](cli-errors.md) — every failure mode and its fix.
 
 ### Client setup
@@ -125,7 +131,8 @@ Ontology easy for autonomous agent lines to consume — local-first, no hosted S
 
 ### Architecture & boundary
 
-- [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) — the human-facing operator surface (design only; includes the AGENTS.md compile-target strategy and the implementation ADL plan).
+- [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) — the human-facing operator surface (includes the AGENTS.md compile-target strategy and the implementation ADL plan; the emit track W1–W4 is shipped).
+- [Emit target spec (W1)](workbench-w1-emit-target-spec.md) · [operator CLI spec (W2)](workbench-w2-cli-spec.md) — the shipped compile-target contract.
 - [Typed edge model](mind-ontology-typed-edge-model-v0.md)
 - [Adapter feature flags](mind-ontology-adapter-feature-flags-v0.md)
 - [SIRT memory adapter contract](mind-ontology-sirt-memory-adapter-contract-v0.md)
@@ -195,8 +202,9 @@ a shared meaning layer, and more powerful when connected to hosted SIRT.
 
 The boundary is deliberate:
 
-- OSS: MCP server, schema, `.agentctx/` source layout, `get_context(task)`, and
-  `list_constraints()`.
+- OSS: MCP server, schema, `.agentctx/` source layout, `get_context(task)`,
+  `list_constraints()`, and the `emit` compile targets with their drift check
+  (local and file-based, so free by the standing boundary rule).
 - Hosted SIRT: persistent memory graph, retrieval, writeback, multi-tenant
   storage, automation history, and cross-agent learning.
 - Not v0: a closed black-box MCP that developers must trust without source, or
@@ -258,8 +266,10 @@ That creates immediate value:
 
 - cross-AI consistency across Claude Code, Codex, ChatGPT-compatible clients,
   Cursor, and other MCP clients;
-- one source of truth instead of maintaining `CLAUDE.md`, `AGENTS.md`, and
-  editor rules separately;
+- one source of truth instead of hand-maintaining `CLAUDE.md`, `AGENTS.md`, and
+  editor rules separately — and where a tool *needs* a static file,
+  `mind-ontology emit` compiles it from that source and `emit --check` keeps it
+  provably fresh;
 - queryable guardrails that agents can check before acting;
 - smaller context packs because the compiler returns task-relevant blocks
   instead of dumping every rule.

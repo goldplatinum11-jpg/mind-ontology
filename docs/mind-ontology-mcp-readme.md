@@ -6,9 +6,12 @@ Mind Ontology MCP gives Claude Code, Codex, Cursor, ChatGPT-compatible MCP
 clients, and other agent tools the same task-scoped understanding of your
 direction, decisions, constraints, vocabulary, projects, and operating rules.
 
-It is not a generic note app, a vector database, or another static instruction
-file. It is a small self-hosted MCP layer that compiles a curated personal
-ontology into the context an AI agent needs for the task in front of it.
+It is not a generic note app, a vector database, or another hand-written
+static instruction file. It is a small self-hosted MCP layer that compiles a
+curated personal ontology into the context an AI agent needs for the task in
+front of it — and, where a tool reads a static file, compiles that file too:
+static instruction files are emit *targets*, not sources (see the
+[emit target spec](workbench-w1-emit-target-spec.md)).
 
 ---
 
@@ -17,10 +20,10 @@ ontology into the context an AI agent needs for the task in front of it.
 AI coding and work agents drift when every tool has its own private memory and
 instruction file:
 
-- `CLAUDE.md` is tuned for Claude Code.
-- `AGENTS.md` is tuned for Codex.
+- `CLAUDE.md` is hand-tuned for Claude Code.
+- `AGENTS.md` is hand-tuned for Codex.
 - Cursor rules, ChatGPT project instructions, and custom connectors all become
-  separate places to keep the same meaning in sync.
+  separate places to keep the same meaning in sync, by hand.
 
 Mind Ontology MCP replaces that split-brain setup with one source:
 
@@ -183,8 +186,9 @@ list_constraints()
 ```
 
 The result should give the agent enough context to act under the same direction
-as every other AI client, without copying a long static instruction file into
-every session.
+as every other AI client, without hand-copying a long instruction file into
+every session. (Tools that do read a static file get one *compiled* from the
+same source by `mind-ontology emit`, kept fresh by `emit --check`.)
 
 ---
 
@@ -206,9 +210,11 @@ process slash commands.
 ## Product shape
 
 Mind Ontology MCP should feel like a better, portable, task-aware successor to
-agent instruction files:
+hand-written agent instruction files:
 
 - one source of truth across AI tools;
+- static instruction files as compile targets (`mind-ontology emit`), never as
+  hand-synced sources;
 - queryable constraints before risky actions;
 - per-task context packs instead of full dumps;
 - git-native editing and review;

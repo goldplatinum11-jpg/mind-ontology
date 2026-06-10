@@ -1,11 +1,13 @@
 # Mind Ontology
 
-**Your portable meaning layer for AI agents.**
+**Stop hand-writing AGENTS.md. Compile it.**
 
-One curated source of *what you're doing and why* — direction, decisions,
-constraints, vocabulary, projects, roles — compiled into exactly the context an
-AI agent needs for the task in front of it, and served to every agent the same
-way.
+One ontology, every agent. Compile AGENTS.md, CLAUDE.md, and more from a
+single git-native source.
+
+Mind Ontology is the product; **`agentctx`** is the CLI and package name it
+ships under — a small, auditable compiler + MCP server over a folder of plain
+Markdown files you own (`.agentctx/`).
 
 > **Status:** standalone, pre-release, **local-first**. The free layer needs no
 > account, no database, and no network. Hosted memory is an *optional*,
@@ -16,73 +18,139 @@ way.
 
 ---
 
-## The problem
+## The problem: you are the sync mechanism
 
-Every AI tool keeps its own memory and its own instruction file. `CLAUDE.md` for
-Claude Code. `AGENTS.md` for Codex. Cursor rules. ChatGPT project instructions.
-The *same* meaning, copied into N drifting places. Change your direction once and
-you update it everywhere — or your agents quietly disagree.
+Every AI tool demands its own instruction file. `CLAUDE.md` for Claude Code.
+`AGENTS.md` for Codex. Cursor rules. ChatGPT project instructions. The *same*
+meaning — direction, constraints, vocabulary, roles — hand-copied into N files
+that start drifting the moment you stop babysitting them. Change a constraint
+once and you get to re-phrase it everywhere, by hand — or your agents quietly
+disagree about the rules.
 
-## The idea
+That maintenance loop is a build step you have been running manually. Nobody
+hand-syncs compiled output in any other part of their stack; instruction files
+somehow got an exemption.
 
-Keep the meaning **once**, in a small folder of Markdown files (`.agentctx/`),
-and compile a **task-scoped** slice of it on demand:
+## The inversion: static files as targets, not sources
+
+Mind Ontology stops treating `AGENTS.md` and `CLAUDE.md` as documents you
+*write* and starts treating them as artifacts you *build*. The meaning lives
+once, in `.agentctx/` — small Markdown files you review in PRs like any other
+source — and everything an agent reads is compiled from it:
 
 ```text
-.agentctx/ source files
-  → agentctx compiler (scores blocks against your task)
-  → get_context(task) / list_constraints()
-  → any MCP-capable agent
+.agentctx/ source files   (one ontology: plain Markdown, git-native, PR-reviewed)
+   ├── mind-ontology emit ───────► AGENTS.md + CLAUDE.md   static compile targets
+   └── agentctx MCP server ──────► get_context(task)        live, task-scoped packs
 ```
 
-Agents don't get your whole ontology on every task. They get the relevant
-direction, the matching decisions, the full set of non-negotiable constraints —
-and, on a risky task, the safety blocks forced in.
+Emitted artifacts are never sources: `emit` writes only the declared targets,
+never reads them back, and never merges. Each artifact carries a
+machine-readable header with a source fingerprint and a content fingerprint,
+so a stale or hand-edited file is mechanically detectable — and
+[fails CI](#drift-fails-ci).
 
-## Why it's different
+## Try it in 30 seconds
 
-- **Not a notes app, not a vector DB, not another static instruction file.** It's
-  a tiny compiler + MCP adapter over files you can read and review in a PR.
-- **Scoped, not dumped.** `get_context("fix the OAuth flow")` returns a focused
-  pack, not the whole brain.
-- **Portable.** The same source feeds Claude Code, Codex, Cursor, and — via a
-  thin self-hosted connector — ChatGPT and Claude.ai.
-- **Local-first and trustable.** No account, no database, no network for the free
-  layer. Hosted memory is opt-in and reversible.
-
----
-
-## 60-second start
+From this repo (the package is not published yet):
 
 ```sh
-npm install                               # vitest is the only dependency
-npm run agentctx:init                     # scaffold .agentctx/ from the template
-npm run agentctx:compile -- --task "Plan the next PR" --scope mcp
-npm run agentctx:validate                 # check your ontology against the schema
-npm run agentctx:metrics  -- --task "Plan the next PR"   # how focused is the pack?
-npm run agentctx:smoke                    # one-command end-to-end check
+npm install
+npm run mind-ontology -- init     # scaffold .agentctx/ from the template
+npm run mind-ontology -- emit     # compile the static artifacts
 ```
 
-Prefer one command? The same engine is fronted by a single `mind-ontology` CLI
-(a thin wrapper — every `agentctx:*` script above keeps working unchanged):
+```text
+WROTE  AGENTS.md  (agents-md, profile default, 96 payload lines)
+WROTE  CLAUDE.md  (claude-md, profile default, 100 payload lines)
+```
+
+Every emitted file opens with its own audit trail. This is the actual header
+of the `AGENTS.md` compiled from the bundled template — emit is deterministic
+(no timestamps, no machine info, no model calls), so you get these exact
+bytes:
+
+```text
+<!-- mind-ontology:emit
+target: agents-md
+profile: default
+emit_version: 2
+source: .agentctx/
+source_digest: sha256:6d2764a612e0365d1b6d3428fca2bf447b65c2422f497684988b5356062353b7
+content_digest: sha256:9b947e91092255cb55a665d51f9c0cafdc3ec5a1ca75b0e42df8543ff99c859f
+note: GENERATED FILE - do not hand-edit. Edit .agentctx/ and re-run: mind-ontology emit
+-->
+```
+
+Now edit any source file — and the artifacts know they are stale:
 
 ```sh
-npm run mind-ontology -- init
+npm run mind-ontology -- emit --check
+```
+
+```text
+STALE        AGENTS.md (agents-md) - .agentctx/ changed (or emit_version bumped) since last emit; run: mind-ontology emit --target agents-md
+STALE        CLAUDE.md (claude-md) - .agentctx/ changed (or emit_version bumped) since last emit; run: mind-ontology emit --target claude-md
+DRIFT - 2 of 2 targets need attention
+```
+
+Re-emit, and the gate goes green:
+
+```text
+OK           AGENTS.md (agents-md, profile default)
+OK           CLAUDE.md (claude-md, profile default)
+OK - 2 of 2 targets fresh
+```
+
+Every command and output block above is the real behavior of the shipped
+engine, verified against this README by
+`tests/unit/readme-claims-audit.test.mjs`. v1 emits two targets, `agents-md`
+and `claude-md`; `--target` narrows the set, `--full` opts into a
+whole-ontology dump, and a pre-existing hand-written file is never silently
+overwritten (see the [emit target spec](docs/workbench-w1-emit-target-spec.md)).
+
+## Drift fails CI
+
+A static instruction file is only trustworthy if it provably matches its
+sources, so `emit --check` is built to be a CI gate, not a suggestion. There
+is no warn mode:
+
+```sh
+npx mind-ontology emit --check    # exit 0 fresh · 1 drift (re-emit) · 2 hard error (fix the ontology)
+```
+
+The three-way exit code lets CI tell "re-emit and commit" apart from "the
+ontology itself is broken" without parsing anything. A copy-paste GitHub
+Actions step and an optional pre-commit hook are in the
+[emit target spec §12](docs/workbench-w1-emit-target-spec.md#12-ci-recipe-w4).
+
+## "Generated context files degrade agents, though?"
+
+A fair objection — research from ETH Zurich found that *LLM-auto-generated*
+context files (auto-summarized repo instructions) can degrade agent
+performance. That finding is about machine-written meaning, and it does not
+apply here: **there is no LLM anywhere in the emit pipeline.** `emit` is a
+deterministic, rule-based compilation of the `.agentctx/` sources a human
+curated; no emitted byte is model-generated, and identical sources produce
+byte-identical artifacts. The same body of research is consistent with
+human-curated context helping agents — and that is exactly the split this
+design lands on: humans curate the meaning once, the compiler only re-projects
+it per tool.
+
+## The live path: compile per task, not per file
+
+Static targets are the on-ramp. The same ontology also serves **live,
+task-scoped** context to any MCP-capable agent — that is the "and more" in the
+headline:
+
+```sh
 npm run mind-ontology -- compile --task "Plan the next PR" --scope mcp
-# after `npm link`: mind-ontology compile --task "Plan the next PR" --scope mcp
 ```
 
-See the [`mind-ontology` CLI guide](docs/mind-ontology-cli-v0.md) for the full
-command map. It stays local/private — nothing is published.
-
-Validate the install before trusting it:
-
-```sh
-npm run agentctx:proof                    # smallest viable gate (fast, local)
-npm test                                  # full unit suite
-```
-
-Wire it into an agent (Claude Code shown; Codex/Cursor analogous):
+Agents don't get the whole brain. `get_context("fix the OAuth flow")` returns
+the relevant direction, the matching decisions, and the full set of
+non-negotiable constraints — scored for the task in front of them. Wire it in
+once (Claude Code shown; Codex/Cursor analogous):
 
 ```json
 // .mcp.json
@@ -96,18 +164,34 @@ At task start, call get_context(task). Before destructive or structural
 changes, call list_constraints().
 ```
 
-See the [quickstart](docs/mind-ontology-quickstart.md) for the install-first flow
-and [client setup proofs](docs/mind-ontology.md#client-setup) for per-tool wiring.
+See the [quickstart](docs/mind-ontology-quickstart.md) for the install-first
+flow and [client setup proofs](docs/mind-ontology.md#client-setup) for
+per-tool wiring. The engine's classic entry points keep working too:
+
+```sh
+npm run agentctx:compile -- --task "Plan the next PR" --scope mcp
+npm run agentctx:validate                 # check your ontology against the schema
+npm run agentctx:metrics  -- --task "Plan the next PR"   # how focused is the pack?
+npm run agentctx:smoke                    # one-command end-to-end check
+npm run agentctx:proof                    # smallest viable gate (fast, local)
+npm test                                  # full unit suite
+```
+
+The full command map is in the
+[`mind-ontology` CLI guide](docs/mind-ontology-cli-v0.md).
 
 **Risk-aware by default.** When a task reads as destructive or structural, the
-compiler forces your safety blocks into the pack — no prompt engineering needed:
+compiler forces your safety blocks into the pack — no prompt engineering
+needed:
 
 ```sh
 npm run agentctx:compile -- --task "Drop the orders table" --risk auto   # forces #safety context
 npm run agentctx:compile -- --task "Tidy docs"            --risk risky  # force it anyway
 ```
 
-This decides *what context the agent sees*; the **live-write boundary is enforced
+Static targets get the same floor: `emit` assumes worst-case risk, so every
+safety-tagged block is compiled into the artifact's Constraints section. This
+decides *what context the agent sees*; the **live-write boundary is enforced
 separately and fails closed** at the adapter layer (flags off by default,
 writeback is proposal-only). See
 [task risk modes](docs/mind-ontology-task-risk-modes-v0.md).
@@ -136,9 +220,16 @@ the [CQ schema](docs/mind-ontology-cq-schema-v0.md) and the template at
 |---|---|---|
 | Sources | `.agentctx/` schema: constraints, identity, direction, projects, decisions, architecture, roles, glossary, competency questions | shipped |
 | Compiler | task-scoped scoring, risk-aware forcing, JSON/Markdown | shipped |
+| Emit | `AGENTS.md` + `CLAUDE.md` compile targets, deterministic with fingerprint headers, `emit --check` drift gate for CI | shipped |
 | Tooling | `init`, `compile`, `validate`, `metrics`, `smoke`, `proof` — plus a unified [`mind-ontology` CLI](docs/mind-ontology-cli-v0.md) | shipped |
 | Clients | Claude Code / Codex / Cursor (proven), ChatGPT / Claude.ai (thin connector, designed) | shipped / designed |
 | Hosted on-ramp | optional SIRT memory + writeback, fail-closed, off by default | contracts only |
+
+Everything in this repo that runs locally over your files — the compiler, the
+MCP server, **emit and its drift check included** — is free OSS, forever; the
+paid hosted layer is for things a file on your disk cannot do (shared durable
+memory across machines and teammates). See
+[commercial positioning](docs/mind-ontology-commercial-positioning-v0.md).
 
 ---
 
@@ -167,6 +258,8 @@ deliberate, separate decision.**
 ## Trust
 
 - The free layer is local, file-based, and reviewable — no account, no network.
+- The emit pipeline is deterministic and model-free: identical sources compile
+  to byte-identical artifacts, and the fingerprint header proves it.
 - Every hosted feature is opt-in, fail-closed, and reversible; the local path is
   never load-bearing.
 - No credentials live in this repo: connector URLs and tokens are
@@ -180,9 +273,13 @@ and the [OSS↔hosted boundary](docs/mind-ontology.md) docs for the full posture
 
 ## Documentation
 
-Start at the [docs index](docs/mind-ontology.md). Provenance for this standalone
-extraction is recorded in [`EXTRACTION-INVENTORY.md`](EXTRACTION-INVENTORY.md)
-and [`docs/mind-ontology-extraction-map.md`](docs/mind-ontology-extraction-map.md)
+Start at the [docs index](docs/mind-ontology.md). For emit specifically: the
+[emit target spec](docs/workbench-w1-emit-target-spec.md) (what is compiled,
+headers, drift classes, CI recipe) and the
+[operator CLI spec](docs/workbench-w2-cli-spec.md) (flags, exit codes, JSON
+shapes). Provenance for this standalone extraction is recorded in
+[`EXTRACTION-INVENTORY.md`](EXTRACTION-INVENTORY.md) and
+[`docs/mind-ontology-extraction-map.md`](docs/mind-ontology-extraction-map.md)
 — those are read-only history, not a user quickstart.
 
 Wiring an autonomous AI development line? See the local-first
@@ -198,10 +295,10 @@ Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). Release readiness:
 
 Mind Ontology is the **open, local-first on-ramp**; hosted SIRT is the optional
 paid backend that adds durable memory, retrieval, typed graph, and writeback.
-The free layer is genuinely useful on its own — one portable meaning source for
-every agent — and never depends on the hosted layer. The hosted SIRT backend
-stays closed and is not part of this repository. This is open-core, not
-crippleware: the local path is complete. See
+The free layer is genuinely useful on its own — one compiled meaning source for
+every agent, static or live — and never depends on the hosted layer. The hosted
+SIRT backend stays closed and is not part of this repository. This is
+open-core, not crippleware: the local path is complete. See
 [commercial positioning](docs/mind-ontology-commercial-positioning-v0.md) for
 the full framing.
 

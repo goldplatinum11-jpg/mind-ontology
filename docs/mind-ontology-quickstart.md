@@ -178,7 +178,10 @@ call list_constraints().
 
 That single instruction is the adoption wedge. Claude Code, Codex, Cursor, and
 ChatGPT-compatible MCP clients should all start from the same source of truth
-instead of separate drifting instruction files.
+instead of separately hand-maintained instruction files. (Tools that read a
+static `AGENTS.md` / `CLAUDE.md` get one *compiled* from the same source —
+`mind-ontology emit` — kept provably fresh by `emit --check`; see the
+[emit target spec](workbench-w1-emit-target-spec.md).)
 
 ---
 

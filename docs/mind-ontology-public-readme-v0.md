@@ -1,5 +1,10 @@
 # Mind Ontology
 
+> **Draft status:** this was the P5 draft of the public README. The live
+> [top-level README](../README.md) supersedes it; since Workbench W10 the
+> public headline is the compile-target positioning ("Stop hand-writing
+> AGENTS.md. Compile it."). This draft is kept as provenance.
+
 **Your portable meaning layer for AI agents.**
 
 One curated source of *what you're doing and why* — direction, decisions,
@@ -13,8 +18,8 @@ way.
 
 Every AI tool keeps its own memory and its own instruction file. `CLAUDE.md` for
 Claude Code. `AGENTS.md` for Codex. Cursor rules. ChatGPT project instructions.
-The *same* meaning, copied into N drifting places. Change your direction once and
-you update it everywhere — or your agents quietly disagree.
+The *same* meaning, hand-copied into N drifting places. Change your direction
+once and you update it everywhere — or your agents quietly disagree.
 
 ## The idea
 
@@ -34,8 +39,10 @@ and, on a risky task, the safety blocks forced in.
 
 ## Why it's different
 
-- **Not a notes app, not a vector DB, not another static instruction file.** It's
-  a tiny compiler + MCP adapter over files you can read and review in a PR.
+- **Not a notes app, not a vector DB, not another hand-written instruction
+  file.** It's a tiny compiler + MCP adapter over files you can read and review
+  in a PR — and static instruction files become its compile *targets*
+  (`mind-ontology emit`), not competing sources.
 - **Scoped, not dumped.** `get_context("fix the OAuth flow")` returns a focused
   pack, not the whole brain. (Typical: a quarter of the ontology body.)
 - **Portable.** The same source feeds Claude Code, Codex, Cursor, and — via a

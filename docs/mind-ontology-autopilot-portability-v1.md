@@ -31,9 +31,11 @@ surface; the only tools anywhere are `get_context` and `list_constraints`.
 
 ## Why portability matters for a line
 
-- **No per-tool drift.** The old failure was one instruction file per tool
-  (`CLAUDE.md`, `AGENTS.md`, Cursor rules) drifting apart. One constitution,
-  compiled the same way, removes that drift across the whole line.
+- **No per-tool drift.** The old failure was one hand-written instruction file
+  per tool (`CLAUDE.md`, `AGENTS.md`, Cursor rules) drifting apart. One
+  constitution, compiled the same way, removes that drift across the whole line
+  — and where a tool reads a static file, that file is itself a compile target
+  (`mind-ontology emit`), never a second hand-synced source.
 - **Mixed lines work.** A Codex controller and a Claude Code worker read the
   *identical* constraints and direction — they cannot disagree about the rules.
 - **Swap-friendly.** Replacing one client with another changes nothing about the
