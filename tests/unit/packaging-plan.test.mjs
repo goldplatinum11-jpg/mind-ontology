@@ -17,9 +17,9 @@ describe("packaging stays a fail-closed dry-run plan (M47)", () => {
     expect(doc.toLowerCase()).toContain("fail-closed");
   });
 
-  it("publishing is blocked today: private stays true; the files allowlist is applied (release prep)", () => {
-    expect(PKG.private).toBe(true); // npm publish refuses — the one remaining gate
-    expect(PKG.license).toBe("Apache-2.0"); // license decided; publish still gated by `private`
+  it("publish-ready: the private gate is removed; the files allowlist is applied (release prep)", () => {
+    expect(PKG.private).toBeUndefined(); // gate moved to the explicit operator publish decision
+    expect(PKG.license).toBe("Apache-2.0"); // license decided; publish gated by operator approval
     // The allowlist is APPLIED for the prepared 0.1.0 release.
     expect(Array.isArray(PKG.files)).toBe(true);
     expect(PKG.publishConfig).toBeUndefined();

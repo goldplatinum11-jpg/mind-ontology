@@ -14,13 +14,13 @@ describe("top-level README points at the autopilot pack (A34)", () => {
     expect(text()).toContain("Autopilot Integration Pack");
   });
 
-  it("keeps the mention local-first / no hosted SIRT", () => {
+  it("keeps the mention local-first / no hosted backend", () => {
     const t = text();
     const idx = t.indexOf("Autopilot Integration Pack");
     // Look at the surrounding sentence (before and after the link).
     const window = t.slice(Math.max(0, idx - 80), idx + 200).toLowerCase();
     expect(window).toMatch(/local-first/);
-    expect(window).toMatch(/no hosted sirt/);
+    expect(window).toMatch(/no hosted (sirt|backend)/);
   });
 
   it("the linked frame doc actually exists", () => {

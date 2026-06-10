@@ -32,12 +32,14 @@ copyleft leverage, so AGPL/GPL was not chosen.
 Choosing the license does **not** mean the package is published. Distribution
 remains deliberately gated:
 
-- `package.json` keeps `"private": true` — `npm publish` refuses.
-- Version is still `0.0.0` (pre-release).
-- No remote, no push.
+- The package is prepared as `0.1.0` with the `files` allowlist applied and the
+  `private` flag removed — publish-ready, but **unpublished**.
+- No public remote, no push, no `npm publish` without the explicit operator
+  publish decision.
 
-Publishing is a later, separate decision (remove `private`, bump version, add a
-`files` allowlist) tracked in [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
+Publishing is a later, separate operator decision (create the public GitHub
+repository, add its URL to `package.json`, then approve the publish) tracked in
+[`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
 [`docs/packaging.md`](docs/packaging.md). The Apache-2.0 grant applies to the
 source as licensed; actual distribution is its own step.
 

@@ -6,12 +6,13 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const PKG = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8"));
 
-// M31 — package.json must stay suitable for private, pre-release standalone dev:
-// private, license-undecided, every script backed by a real local file, no
+// M31 — package.json must stay suitable for pre-release standalone dev:
+// publish-ready (the `private` gate is removed; publishing is an explicit
+// operator decision), every script backed by a real local file, no
 // remote/publish coupling.
-describe("package metadata is private-pre-release-safe (M31)", () => {
-  it("is private with a name, description, and engines", () => {
-    expect(PKG.private).toBe(true);
+describe("package metadata is pre-release-safe (M31)", () => {
+  it("is publish-ready with a name, description, and engines", () => {
+    expect(PKG.private).toBeUndefined();
     expect(typeof PKG.name).toBe("string");
     expect(PKG.name).toBe("mind-ontology");
     expect(typeof PKG.description).toBe("string");

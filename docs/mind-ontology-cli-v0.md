@@ -6,10 +6,10 @@ point the matching `agentctx:*` npm script already runs, forwarding your
 options verbatim and propagating the exit code. The wrapper adds **no behavior
 of its own** — it exists so the package has one discoverable entry point.
 
-> **Local / private only.** `package.json` stays `"private": true`, so nothing
-> is published. The `bin` simply makes the command available after a local
-> `npm install`/`npm link`; it does not change the publish posture (see
-> [packaging](packaging.md)).
+> **Local only — unpublished.** The package is publish-ready but unpublished;
+> publishing is an explicit operator decision. The `bin` simply makes the
+> command available after a local `npm install`/`npm link`; it does not change
+> the publish posture (see [packaging](packaging.md)).
 
 ## Commands
 

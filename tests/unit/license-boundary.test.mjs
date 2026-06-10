@@ -7,7 +7,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (p) => readFileSync(resolve(REPO_ROOT, p), "utf8");
 
 // License DECIDED (2026-06-09): Apache-2.0. This guard now pins the landed
-// license posture. Distribution is still gated separately (`private` stays true).
+// license posture. Distribution is gated separately (explicit operator publish decision).
 describe("license is landed as Apache-2.0", () => {
   it("ships the canonical Apache-2.0 LICENSE and a NOTICE", () => {
     expect(existsSync(resolve(REPO_ROOT, "LICENSE"))).toBe(true);
@@ -29,9 +29,9 @@ describe("license is landed as Apache-2.0", () => {
     expect(existsSync(resolve(REPO_ROOT, "docs/mind-ontology-license-boundary.md"))).toBe(true);
   });
 
-  it("publishing stays gated even though the license is chosen", () => {
+  it("publishing stays an operator decision even though the license is chosen", () => {
     const pkg = JSON.parse(read("package.json"));
-    expect(pkg.private).toBe(true); // npm publish still refuses
+    expect(pkg.private).toBeUndefined(); // publish-ready; gate is the operator decision
     expect(pkg.version).toBe("0.1.0"); // first release prepared, unpublished
   });
 });

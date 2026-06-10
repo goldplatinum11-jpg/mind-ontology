@@ -21,7 +21,7 @@ describe("CONTRIBUTING is ready and license-safe (M26)", () => {
   it("states the decided Apache-2.0 license and keeps publish gated", () => {
     const c = read("CONTRIBUTING.md").toLowerCase();
     expect(c).toContain("apache-2.0");
-    expect(c).toContain("private");
+    expect(c).toContain("operator"); // publishing requires the explicit operator release decision
   });
 
   it("references no forbidden source repo", () => {

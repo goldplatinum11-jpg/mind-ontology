@@ -83,8 +83,8 @@ describe("npm pack --dry-run is non-publishing and fail-closed (M48)", () => {
     expect(paths.length).toBeLessThan(60);
   });
 
-  it("would produce a 0.1.0 tarball that still refuses to publish (private stays true)", () => {
-    expect(PKG.private, "removing private is a separate operator decision").toBe(true);
+  it("would produce a 0.1.0 tarball; publishing stays an explicit operator decision", () => {
+    expect(PKG.private, "publish-ready: the gate is the operator decision, not package.json").toBeUndefined();
     expect(PKG.publishConfig).toBeUndefined();
     // filename encodes name + the prepared first-release version.
     expect(pack.filename.replace(/\\/g, "/")).toMatch(/mind-ontology-0\.1\.0\.tgz$/);

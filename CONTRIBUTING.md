@@ -58,7 +58,9 @@ was deliberately *not* touched.
 - Don't widen the tool surface beyond `get_context` / `list_constraints` without
   an explicit contract change (and a major version).
 - Don't make a hosted feature load-bearing for the local path.
-- Don't remove `"private": true` or publish without the explicit release decision.
+- Don't run `npm publish` — publishing happens only on the explicit operator
+  release decision (Apache-2.0 is the source license; distribution is gated
+  separately).
 
 ---
 

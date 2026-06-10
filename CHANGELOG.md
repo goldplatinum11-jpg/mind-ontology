@@ -13,9 +13,9 @@ the pack JSON shape; everything else can evolve additively.
 > **Pre-release.** No version has been published. The OSS license is settled —
 > **Apache-2.0** (see [`LICENSE`](LICENSE) / [`LICENSE-DECISION.md`](LICENSE-DECISION.md))
 > — and the first release is **prepared as `0.1.0`** (version bumped, `files`
-> allowlist applied), but the package is still `private` and unpublished. The
-> first real entry below will be the first tagged release after `"private"` is
-> removed.
+> allowlist applied, `private` gate removed: the package is publish-ready but
+> unpublished). The first real entry below will be the first tagged release
+> after the explicit operator publish decision.
 
 ## [Unreleased]
 
@@ -26,15 +26,16 @@ The contents of this section ship as **`0.1.0`**, the first public release.
   bumped from `0.0.0`; `files` allowlist applied so the npm tarball ships only
   the product surface (engine, templates, user-facing docs — no tests, examples,
   or internal provenance docs); npm `keywords` added; package description
-  rewritten to the public product framing. Publishing stays gated by
-  `"private": true`. Support/contact: **GitHub Issues only**.
+  rewritten to the public product framing; the `private` flag removed so the
+  package is publish-ready (publishing itself remains an explicit operator
+  decision). Support/contact: **GitHub Issues only**.
 - **Emit wedge** (`mind-ontology emit`): deterministic `AGENTS.md` / `CLAUDE.md`
   compile targets with fingerprint headers and the `emit --check` three-value
   CI drift gate, plus the inspection track (`explain`, `preview`, `status`,
   `review`, CQ gate).
 - **Apache-2.0 license** chosen and landed: `LICENSE` (canonical text) + `NOTICE`;
-  `package.json` `license` set to the `Apache-2.0` SPDX id. Publishing stays gated
-  by `"private": true`.
+  `package.json` `license` set to the `Apache-2.0` SPDX id. Publishing remains an
+  explicit operator decision.
 - Standalone product surface: top-level `README.md`, docs index, quickstart,
   CLI error reference, schema authoring guide, scoring explainer, testing guide,
   packaging (dry-run) plan, and a richer worked example (`docs/examples/`).

@@ -40,9 +40,9 @@ describe("no-leakage audit expansion: package + setup examples (M20)", () => {
     for (const [name, cmd] of Object.entries(pkg.scripts ?? {})) {
       expect(/\b(curl|wget|fetch|wrangler|deploy|publish|npm\s+publish)\b/i.test(cmd), `script "${name}" is networked/deploy-shaped: ${cmd}`).toBe(false);
     }
-    // License is settled (Apache-2.0); publishing stays gated by `private`.
+    // License is settled (Apache-2.0); publishing stays gated by the operator decision.
     expect(pkg.license).toBe("Apache-2.0");
-    expect(pkg.private).toBe(true);
+    expect(pkg.private).toBeUndefined();
   });
 
   it("adapter flags default OFF with the real default environment", () => {

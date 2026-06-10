@@ -5,11 +5,13 @@ lives in
 [`docs/mind-ontology-versioning-release-checklist-v0.md`](docs/mind-ontology-versioning-release-checklist-v0.md).
 This file is the quick pre-tag checklist.
 
-> **Distribution stays fail-closed even though the license is settled.** The OSS
-> license is **Apache-2.0** (`LICENSE` shipped; see
-> [`LICENSE-DECISION.md`](LICENSE-DECISION.md)). The remaining release gate is
-> `"private": true` in `package.json` — `npm publish` refuses until it is
-> deliberately removed.
+> **Distribution stays fail-closed: publishing is an explicit operator decision
+> even though the license is settled.** The OSS license is **Apache-2.0**
+> (`LICENSE` shipped; see
+> [`LICENSE-DECISION.md`](LICENSE-DECISION.md)). The `"private"` gate has been
+> removed — the package is publish-ready — but `npm publish` runs only on the
+> deliberate operator publish decision, after the public GitHub repository
+> exists and its URL is added to `package.json`.
 
 ---
 
@@ -39,7 +41,9 @@ Run before tagging any release:
       surface (engine, templates, user-facing docs); regressed by
       `tests/unit/packaging-dry-run-contract.test.mjs`.
 - [x] Support/contact channel decided: **GitHub Issues only**.
-- [ ] **Remaining gate:** remove `"private": true` (deliberate publish decision).
+- [x] `"private": true` removed (2026-06-11) — the package is publish-ready.
+- [ ] **Remaining gate:** the deliberate operator publish decision (`npm publish`
+      runs only on explicit operator approval).
 - [ ] **At publish time:** create the public GitHub repository and add its URL
       as `repository`/`bugs` in `package.json` (Issues is the support channel).
 
@@ -51,5 +55,5 @@ Run before tagging any release:
       changing `--risk`/flag semantics).
 - [ ] Phase closeout doc updated if a phase completed.
 
-No `npm publish`, deploy, or push is part of this checklist while the
-`"private": true` gate is in place.
+No `npm publish`, deploy, or push is part of this checklist. Publishing happens
+only on the explicit operator publish decision.

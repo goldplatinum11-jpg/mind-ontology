@@ -1,20 +1,15 @@
-# Mind Ontology Migration Plan
+# Mind Ontology Migration Plan — COMPLETE
 
-## Current State
+> **Status: the migration/extraction is complete.** This repository is the
+> standalone Mind Ontology product workspace; no active migration is running.
+> This file is retained as the historical record of the extraction plan.
 
-Active Claude Code runway is still running from:
-`C:\Users\qmbqb\sirt-codex-clones\sirt-app-v2-pr08-acceptance`
+## Outcome
 
-Latest observed stage:
-Phase 5 launch readiness, P5-PR08 / closeout.
+The source Claude Code runway (Phase 5 launch readiness, P5-PR08/closeout)
+reached its Result Pack, and the planned asset families were extracted into
+this repository:
 
-## Rule
-
-Do not move active code until the Claude runway returns a Result Pack, hard gate, or explicit stop.
-
-## Reusable Assets
-
-Candidate asset families:
 - `.agentctx/**`
 - `docs/agentctx*.md`
 - `docs/mind-ontology*.md`
@@ -23,12 +18,15 @@ Candidate asset families:
 - `templates/mind-ontology/**`
 - related package scripts such as `agentctx:*`
 
-## Do Not Import
+Provenance for what was moved is recorded in `EXTRACTION-INVENTORY.md` and
+`docs/mind-ontology-extraction-map.md` (read-only history).
 
-- SIRT ADL runner/controller infrastructure unless required as an adapter boundary
-- BioStack OS content
-- production deploy/migration/secrets/live-write paths
+## Boundary held during extraction (and still enforced)
 
-## Next Safe Step
+- No runner/controller infrastructure from the parent workspace unless
+  required as an adapter boundary.
+- No unrelated content.
+- No production deploy/migration/secrets/live-write paths.
 
-Wait for the active Claude runway Result Pack, then produce an asset extraction list from the final stack tip.
+This file is internal: it is excluded from the npm tarball by the `files`
+allowlist (regressed by `tests/unit/packaging-dry-run-contract.test.mjs`).

@@ -4,7 +4,7 @@
 > rationale of record; the chosen license ships in [`../LICENSE`](../LICENSE) with
 > attribution in [`../NOTICE`](../NOTICE), and the decision record is
 > [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md). Distribution stays gated by
-> `"private": true` (separate from the license choice).
+> the explicit operator publish decision (separate from the license choice).
 
 **Status:** Recommendation of record — adopted (Apache-2.0)  
 **Scope:** License rationale + hosted commercial boundary  

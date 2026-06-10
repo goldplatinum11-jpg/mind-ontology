@@ -2,7 +2,7 @@
 
 A plain snapshot of what Mind Ontology can do **today**, what is deliberately
 held closed, and what comes next. This is the standalone, local-first product;
-the hosted SIRT backend is **not** available from this repository.
+a hosted backend is **not** available from this repository.
 
 ---
 
@@ -27,9 +27,12 @@ the hosted SIRT backend is **not** available from this repository.
 
 - **License** — settled: **Apache-2.0** (`LICENSE` + `NOTICE` shipped, SPDX id in
   `package.json`). See [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md).
-- **Distribution** — release-prepared but still gated: version `0.1.0` and the
-  `files` allowlist are in place, yet `package.json` keeps `"private": true`, so
-  `npm publish` refuses. Removing `private` is a separate operator decision.
+- **Distribution** — release-prepared and publish-ready, but unpublished:
+  version `0.1.0`, the `files` allowlist, and the local release gates (full
+  suite, proof, validate, smoke, dry-run pack) are in place, and the `private`
+  flag has been removed. Running `npm publish` remains a separate, explicit
+  operator decision, after the public GitHub repository exists and its URL is
+  added to `package.json`.
 - **Hosted memory & writeback** — adapter **contracts only**. Feature flags
   default **off**; the writeback adapter is **proposal-only** (no `execute()`);
   no adapter performs network I/O. The local path never depends on the hosted one.

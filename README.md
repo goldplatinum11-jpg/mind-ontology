@@ -224,7 +224,7 @@ the [CQ schema](docs/mind-ontology-cq-schema-v0.md) and the template at
 | Emit | `AGENTS.md` + `CLAUDE.md` compile targets, deterministic with fingerprint headers, `emit --check` drift gate for CI | shipped |
 | Tooling | `init`, `compile`, `validate`, `metrics`, `smoke`, `proof` — plus a unified [`mind-ontology` CLI](docs/mind-ontology-cli-v0.md) | shipped |
 | Clients | Claude Code / Codex / Cursor (proven), ChatGPT / Claude.ai (thin connector, designed) | shipped / designed |
-| Hosted on-ramp | optional SIRT memory + writeback, fail-closed, off by default | contracts only |
+| Hosted on-ramp | optional hosted memory + writeback, fail-closed, off by default | contracts only |
 
 Everything in this repo that runs locally over your files — the compiler, the
 MCP server, **emit and its drift check included** — is free OSS, forever; the
@@ -244,12 +244,11 @@ and the decision record in [`LICENSE-DECISION.md`](LICENSE-DECISION.md).
 **Choosing the license is not the same as publishing.** Distribution stays
 deliberately gated:
 
-- `package.json` keeps `"private": true`, so `npm publish` refuses.
 - The first release is **prepared but unpublished**: version `0.1.0`, with a
-  `files` allowlist so the tarball ships only the product surface. There is no
-  public remote and nothing is pushed.
-- Publishing is a separate, later step (remove `private` — the one remaining
-  gate) — see [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
+  `files` allowlist so the tarball ships only the product surface. The package
+  is publish-ready, but there is no public remote and nothing is pushed.
+- Publishing is a separate, later step — an explicit operator decision — see
+  [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
   [`docs/packaging.md`](docs/packaging.md).
 
 So the **source license is settled (Apache-2.0)**, while **distribution remains a
@@ -286,7 +285,7 @@ shapes). Provenance for this standalone extraction is recorded in
 
 Wiring an autonomous AI development line? See the local-first
 [Autopilot Integration Pack](docs/mind-ontology-autopilot-pack-v1.md) — when each
-agent reads `.agentctx/`, the stop policy, and a drop-in kit, with no hosted SIRT.
+agent reads `.agentctx/`, the stop policy, and a drop-in kit, with no hosted backend.
 
 Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). Release readiness:
 [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md).
@@ -299,11 +298,11 @@ public repository.
 
 ## Positioning
 
-Mind Ontology is the **open, local-first on-ramp**; hosted SIRT is the optional
-paid backend that adds durable memory, retrieval, typed graph, and writeback.
+Mind Ontology is the **open, local-first on-ramp**; an optional paid hosted
+backend adds durable memory, retrieval, typed graph, and writeback.
 The free layer is genuinely useful on its own — one compiled meaning source for
-every agent, static or live — and never depends on the hosted layer. The hosted
-SIRT backend stays closed and is not part of this repository. This is
+every agent, static or live — and never depends on the hosted layer. The
+hosted backend stays closed and is not part of this repository. This is
 open-core, not crippleware: the local path is complete. See
 [commercial positioning](docs/mind-ontology-commercial-positioning-v0.md) for
 the full framing.
@@ -314,5 +313,5 @@ the full framing.
 
 Mind Ontology is built in public, one reviewable change at a time, across five
 arcs: OSS foundation → schema & context quality → multi-client distribution →
-hosted on-ramp → launch readiness. The hosted SIRT backend remains a closed,
+hosted on-ramp → launch readiness. The hosted backend remains a closed,
 optional service; this repository is the open, local-first product surface.

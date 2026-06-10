@@ -1,7 +1,6 @@
 {
   "name": "mind-ontology",
   "version": "0.1.0",
-  "private": true,
   "description": "Mind Ontology — compile AGENTS.md, CLAUDE.md, and live task-scoped context packs from one git-native Markdown ontology. Local-first OSS context compiler + MCP server.",
   "license": "Apache-2.0",
   "keywords": [

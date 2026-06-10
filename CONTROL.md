@@ -2,17 +2,23 @@
 
 Purpose: independent product workspace for Mind Ontology / agentctx / ontology MCP work.
 
-Current source of truth during migration:
-- Active Claude Code runway: `mind-ontology-seven-hour-runway`
-- Worker session id: `fa70c538-d2da-409d-9e10-c7968803feef`
-- Current observed lane: Phase 5 launch readiness, P5-PR08 or later
-- Active worktree before extraction: `C:\Users\qmbqb\sirt-codex-clones\sirt-app-v2-pr08-acceptance`
+> **Migration status: COMPLETE.** The extraction from the original development
+> workspace finished; this repository is the standalone source of truth for
+> Mind Ontology. The notes below are kept as the historical control record —
+> nothing here describes an active migration.
 
-Do not mix here:
-- SIRT ADL dashboard/control-plane implementation
-- Biohack tools
-- Generic sirt-app-v2 runner infrastructure unless explicitly required as an adapter boundary
+Historical migration record (closed):
+- Source runway: `mind-ontology-seven-hour-runway` (worker session
+  `fa70c538-d2da-409d-9e10-c7968803feef`), Phase 5 launch readiness.
+- The runway reached its Result Pack; only Mind Ontology files and PR lineage
+  were extracted. Provenance: `EXTRACTION-INVENTORY.md` and
+  `docs/mind-ontology-extraction-map.md`.
 
-Migration rule:
-- Let the active Claude runway reach a clean Result Pack or hard gate before moving code.
-- Extract only Mind Ontology files and PR lineage after the stack is reviewed.
+Boundary (still enforced):
+- No control-plane/dashboard implementation from the parent workspace.
+- No biohack/unrelated tooling.
+- No generic runner infrastructure unless explicitly required as an adapter
+  boundary (regressed by the control-plane import audit test).
+
+This file is internal: it is excluded from the npm tarball by the `files`
+allowlist (regressed by `tests/unit/packaging-dry-run-contract.test.mjs`).

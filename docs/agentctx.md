@@ -31,7 +31,7 @@ short pack, focused on what it actually needs.
 | Cross-agent portability | Vendor-specific format | Markdown; any agent reads it |
 | Approval loop | Edit the file directly | Git diff / PR per change |
 | Embedding / vector store | No | No — lexical scoring only (v0) |
-| MCP integration | Via Cursor rules etc. | Planned adapter after CLI proves value |
+| MCP integration | Via Cursor rules etc. | Shipped — local stdio MCP server (`agentctx:mcp`) |
 
 agentctx is not a replacement for `CLAUDE.md`. Keep top-level coding
 preferences there. Mind Ontology holds identity, project direction, vocabulary,
@@ -40,11 +40,11 @@ the subset that matters for the current task.
 
 ---
 
-## CLI-first, MCP later
+## CLI-first, MCP shipped
 
-The first implementation is a command-line compiler. If the CLI cannot produce
-a concise, trustworthy context pack for real tasks, MCP integration will not
-help. Prove value at the command line first.
+The first implementation was a command-line compiler: prove value at the
+command line first, then expose the same engine over MCP. Both layers now
+ship.
 
 ```sh
 # Compile context for a specific task
@@ -54,9 +54,12 @@ npm run agentctx:compile -- --task "Fix OAuth PKCE flow" --scope auth
 npm run agentctx:compile -- --task "Add MCP tool wrapper" --format json
 ```
 
-MCP wrapping is planned for after v0. The `compileContext` function is already
-designed for it — the MCP tool would accept the same `task` and `scopes`
-parameters and return the same pack.
+MCP wrapping is **implemented**: `npm run agentctx:mcp` starts a local stdio
+JSON-RPC server (`scripts/agentctx/mcp-server.mjs`) exposing `get_context` and
+`list_constraints`. The MCP tools accept the same `task` and `scopes`
+parameters as the CLI and return the same pack — see
+[`agentctx-mcp.md`](agentctx-mcp.md) and
+[`agentctx-mcp-setup.md`](agentctx-mcp-setup.md).
 
 ---
 
