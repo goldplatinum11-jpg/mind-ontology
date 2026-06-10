@@ -1,9 +1,9 @@
 # Competency Questions
 
-## Which project does this lane belong to, and which repo? #cq #projects
+## Which projects do lanes belong to, and which repository? #cq #projects
 
 The ontology should answer, from `projects.md`, which of the storefront, billing,
-or data-platform projects a lane touches and which repository it uses.
+or data-platform projects lanes touch and which repository each uses.
 
 ## What is the current cross-project direction? #cq #direction
 
