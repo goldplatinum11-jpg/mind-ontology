@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "written": [
+    {
+      "target": "agents-md",
+      "path": "AGENTS.md",
+      "profile": "default",
+      "emit_version": 1,
+      "source_digest": "sha256:df11033650f69c7d1876369fa9fed41e346c58df20b92e85a399710a0fb21818",
+      "content_digest": "sha256:6bdfd4de89788fcb311d5697c7d246419c2d09f5485d15de66216102c456a159",
+      "payload_lines": 106
+    },
+    {
+      "target": "claude-md",
+      "path": "CLAUDE.md",
+      "profile": "default",
+      "emit_version": 1,
+      "source_digest": "sha256:df11033650f69c7d1876369fa9fed41e346c58df20b92e85a399710a0fb21818",
+      "content_digest": "sha256:1c38e916ea063ac09d093e8aa11ff3bc27ac9dcbd58aa7eef06c9a07bcbd6db2",
+      "payload_lines": 110
+    }
+  ],
+  "warnings": [
+    {
+      "type": "dual-target-note"
+    }
+  ]
+}

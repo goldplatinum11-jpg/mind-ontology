@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +69,21 @@ const PROJECTS = {
     const cwd = tmp();
     expect(runCli(["init", "--cwd", cwd]).status, "fixture: init should succeed").toBe(0);
     writeFileSync(join(cwd, ".agentctx", "constraints.md"), "");
+    return cwd;
+  },
+  unmanagedArtifact() {
+    // Initialized, plus a pre-existing hand-written AGENTS.md (no emit header).
+    const cwd = tmp();
+    expect(runCli(["init", "--cwd", cwd]).status, "fixture: init should succeed").toBe(0);
+    writeFileSync(join(cwd, "AGENTS.md"), "# AGENTS.md\n\nHand-written instructions.\n");
+    return cwd;
+  },
+  staleEmit() {
+    // Emitted once, then a source edited so every target is stale.
+    const cwd = tmp();
+    expect(runCli(["init", "--cwd", cwd]).status, "fixture: init should succeed").toBe(0);
+    expect(runCli(["emit", "--cwd", cwd]).status, "fixture: emit should succeed").toBe(0);
+    appendFileSync(join(cwd, ".agentctx", "constraints.md"), "\n## Extra rule #safety\n\nAdded after emit.\n");
     return cwd;
   },
 };
@@ -195,6 +210,80 @@ const CASES = [
     names: /empty-required|Required source is empty: \.agentctx\/constraints\.md/,
     // No fix hint on this issue line today — candidate repair lane.
     nextAction: null,
+  },
+  // ── W3: `mind-ontology emit` rows (W2 §10, merged into docs/cli-errors.md
+  //    in the same change) ──────────────────────────────────────────────────
+  {
+    id: "emit: unknown target id",
+    project: "initialized",
+    argv: ["emit", "--cwd", "{cwd}", "--target", "bogus"],
+    stream: "stderr",
+    names: /--target must be one of "agents-md", "claude-md", got: bogus/,
+    nextAction: /agents-md/,
+  },
+  {
+    id: "emit: refuses an un-managed file without --force",
+    project: "unmanagedArtifact",
+    argv: ["emit", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Refusing to overwrite AGENTS\.md: file exists but has no emit header/,
+    nextAction: /--force/,
+  },
+  {
+    id: "emit: --full cannot combine with --check",
+    project: "initialized",
+    argv: ["emit", "--cwd", "{cwd}", "--full", "--check"],
+    stream: "stderr",
+    names: /--full cannot be combined with --check/,
+    nextAction: /--check/,
+  },
+  {
+    id: "emit: --force cannot combine with --check",
+    project: "initialized",
+    argv: ["emit", "--cwd", "{cwd}", "--force", "--check"],
+    stream: "stderr",
+    names: /--force cannot be combined with --check/,
+    nextAction: /--check/,
+  },
+  {
+    id: "emit: bad --format",
+    project: "initialized",
+    argv: ["emit", "--cwd", "{cwd}", "--format", "xml"],
+    stream: "stderr",
+    names: /--format must be "text" or "json", got: xml/,
+    nextAction: /text|json/,
+  },
+  {
+    id: "emit: unknown flag",
+    project: "initialized",
+    argv: ["emit", "--cwd", "{cwd}", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: null,
+  },
+  {
+    id: "emit: missing .agentctx/ (compile pass-through)",
+    project: "none",
+    argv: ["emit", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Missing \.agentctx\//,
+    nextAction: /agentctx:init/,
+  },
+  {
+    id: "emit --check: drift is a stdout report with the re-emit action",
+    project: "staleEmit",
+    argv: ["emit", "--cwd", "{cwd}", "--check"],
+    stream: "stdout",
+    names: /STALE/,
+    nextAction: /run: mind-ontology emit/,
+  },
+  {
+    id: "emit --check: broken ontology is a hard error",
+    project: "emptyConstraints",
+    argv: ["emit", "--cwd", "{cwd}", "--check"],
+    stream: "stderr",
+    names: /Required Mind Ontology source is empty/,
+    nextAction: /constraint block/,
   },
 ];
 

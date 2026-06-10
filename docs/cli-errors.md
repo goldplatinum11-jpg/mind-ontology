@@ -26,6 +26,9 @@ to the operator, and apply the named fix. Do not retry verbatim.
 
 > Exit codes: CLIs exit `1` on error, `0` on success. The MCP server instead
 > returns JSON-RPC error objects (it is a long-lived server, not a one-shot CLI).
+> One deliberate exception: `mind-ontology emit --check` is three-way — `0`
+> fresh, `1` drift, `2` hard error — so CI can branch without parsing JSON
+> (see its section below).
 
 ---
 
@@ -79,6 +82,50 @@ The `INVALID — N error(s)` summary plus a non-zero exit is the machine signal.
 See [schema validation](mind-ontology-schema-validation-v0.md) for the full rule
 list.
 
+## `mind-ontology emit` (write mode)
+
+Exit `1` on every failure. A multi-target emit is **all-or-nothing**: when it
+refuses, nothing is written for *any* target, so a half-written pair can never
+exist. Specs: [W1 emit targets](workbench-w1-emit-target-spec.md),
+[W2 CLI surface](workbench-w2-cli-spec.md).
+
+| Failure | Message (stderr) | Next safe action |
+|---|---|---|
+| Unknown target id | `--target must be one of "agents-md", "claude-md", got: <x>` | Use a registry id (`agents-md`, `claude-md`). |
+| Existing un-managed file, no `--force` | `Refusing to overwrite <path>: file exists but has no emit header. Move its content into .agentctx/ sources, then re-run with --force to overwrite.` | Port the content into `.agentctx/`, then `mind-ontology emit --force --target <id>`. |
+| `--full` with `--check` | `--full cannot be combined with --check (--check verifies against the profile recorded in the artifact header)` | Drop one flag. |
+| `--force` with `--check` | `--force cannot be combined with --check (--check never writes)` | Drop one flag. |
+| Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Compile errors | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
+| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+
+Warnings (stderr, exit `0`, artifacts still written — cataloged here so
+operators find them; they never change artifact bytes):
+
+| Warning | Message (stderr) |
+|---|---|
+| Budget overflow | `warning: <target> payload is <n> lines (soft budget 400); largest contributors: <file list>` |
+| Dual-target note | `note: AGENTS.md and CLAUDE.md carry identical payloads. If every tool you run reads AGENTS.md, emit only it: mind-ontology emit --target agents-md` — printed only on a no-`--target` emit |
+
+## `mind-ontology emit --check`
+
+The one three-way exit code in the CLI family (W2 §2.4 ruling): `0` every
+checked target fresh; `1` drift — the report is on **stdout**, one line per
+target plus a summary, and the next safe action is mechanical (re-emit); `2`
+hard error on **stderr** (usage errors and compile failures), where the next
+safe action needs a human. `1` therefore means exactly "re-emit needed".
+
+| Class (stdout report line) | Detail sentence | Next safe action |
+|---|---|---|
+| `MISSING` | `artifact has never been emitted (or was deleted); run: mind-ontology emit --target <id>` | Emit it. |
+| `UNMANAGED` | `file exists but is not managed by emit; emit will not touch it without --force. Move hand-written content into .agentctx/ sources, then run: mind-ontology emit --force --target <id>` | Port content to sources, then `--force`. |
+| `HAND-EDITED` | `file was edited after generation; hand edits will be lost on re-emit. Port the edits into .agentctx/ sources, then re-emit. Diff hint: git diff <path>` | Port the edits, re-emit. |
+| `STALE` | `.agentctx/ changed (or emit_version bumped) since last emit; run: mind-ontology emit --target <id>` | Re-run `mind-ontology emit`. |
+
+Hard errors (stderr, exit `2`): the unknown-target and flag-combo rows from
+the write-mode table, plus compile failures passing through unchanged. On a
+hard error stdout stays empty — no partial verdict (fail closed, W1 §8).
+
 ## `agentctx:mcp` (JSON-RPC error codes)
 
 | Failure | Code | Meaning |
@@ -123,3 +170,6 @@ them is a deliberate, reviewed UX change — not an accident:
   every failure mode above and asserts the stable properties (non-zero exit,
   problem named, next action where one exists, no stack trace, clean success
   stream) rather than brittle full-stderr snapshots.
+- [`tests/unit/emit-check.test.mjs`](../tests/unit/emit-check.test.mjs) —
+  locks the `emit --check` classification matrix (every drift class, its
+  detail sentence, and the three-way exit code) end-to-end.

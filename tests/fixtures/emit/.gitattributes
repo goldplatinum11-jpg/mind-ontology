@@ -1,0 +1,3 @@
+# Emit fixtures and goldens are byte-frozen LF artifacts (W1 §7/§9): keep
+# autocrlf checkouts from rewriting the bytes the golden tests compare.
+* text eol=lf

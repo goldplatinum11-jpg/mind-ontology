@@ -277,6 +277,15 @@ is the merge-gate strength the design packet's A2 promises the team
 maintainer ("CQ verification as the merge gate"): an unanswered CQ is a
 broken promise by the ontology, not a style nit.
 
+> **Ratified amendment (operator ruling, 2026-06-10 — supersedes the
+> paragraph above for v1; W8 implements this version):** the v1 gate is
+> softened to the **required** CQs only — an unanswered CQ whose topic is one
+> of the [CQ schema](mind-ontology-cq-schema-v0.md)'s required topics
+> (`#context` / `#safety`) exits `1`; every other unanswered CQ renders as an
+> advisory `UNANSWERED` line in the report without failing the gate. A
+> `--strict-cq` flag restoring full-gate strength is logged for v2
+> consideration and does not exist in v1.
+
 JSON shape (normative keys):
 
 ```json
@@ -753,3 +762,14 @@ they are product calls:
 4. **`status` representative tasks = CQ titles** (§4): zero-config and
    deterministic, but it couples the metrics section to `cq.md` authoring.
    Confirm, or name an alternative task source for W7.
+
+**Operator rulings (2026-06-10, recorded before W3 froze the first goldens):**
+
+1. **Confirmed.** The three-way `emit --check` split (`0` fresh / `1` drift /
+   `2` hard error) ships in W3 as specified in §2.4.
+2. **Confirmed**, including mitigation (c): the CLAUDE.md notice sentence is
+   part of W3's first golden frame, so it costs no `emit_version` bump.
+3. **Softened** — see the ratified amendment in §6: v1 gates required CQs
+   (`#context` / `#safety`) only; other unanswered CQs are advisory report
+   lines. `--strict-cq` is a v2 consideration.
+4. **Confirmed.** `status` representative tasks are the CQ question titles.

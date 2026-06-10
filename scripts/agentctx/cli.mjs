@@ -16,6 +16,12 @@
  *   mind-ontology metrics  --task "..."   ->  scripts/agentctx/metrics.mjs ...
  *   mind-ontology mcp                     ->  scripts/agentctx/mcp-server.mjs
  *   mind-ontology smoke                   ->  scripts/agentctx/acceptance-smoke.mjs
+ *
+ * Operator (Workbench) commands are born inside the wrapper and have no npm
+ * alias by design (W2 §11: the agentctx:* namespace is frozen back-compat,
+ * not a growth surface):
+ *
+ *   mind-ontology emit [--check]          ->  scripts/agentctx/emit.mjs ...
  */
 
 import { spawnSync } from "node:child_process";
@@ -31,43 +37,58 @@ export const CLI_NAME = "mind-ontology";
 // Subcommand -> the sibling script it delegates to. `prefix` is forwarded ahead
 // of the user's args (compile.mjs reads a leading positional command token,
 // mirroring `npm run agentctx:compile` => `node compile.mjs compile`). The
-// `npmScript` field documents the backward-compatible alias each one wraps.
+// `npmScript` field documents the backward-compatible alias each one wraps;
+// operator commands set it to null — they predate nothing and the wrapper is
+// their only spelling. `group` drives the two help-text headings (W2 §11).
 export const COMMANDS = {
   compile: {
     script: "compile.mjs",
     prefix: ["compile"],
     npmScript: "agentctx:compile",
+    group: "engine",
     summary: "Compile a task-scoped context pack from .agentctx/ sources.",
   },
   init: {
     script: "init.mjs",
     prefix: [],
     npmScript: "agentctx:init",
+    group: "engine",
     summary: "Scaffold a starter .agentctx/ template into a project.",
   },
   validate: {
     script: "schema.mjs",
     prefix: [],
     npmScript: "agentctx:validate",
+    group: "engine",
     summary: "Validate .agentctx/ sources against the ontology schema.",
   },
   metrics: {
     script: "metrics.mjs",
     prefix: [],
     npmScript: "agentctx:metrics",
+    group: "engine",
     summary: "Report context-quality metrics for a compiled pack.",
   },
   mcp: {
     script: "mcp-server.mjs",
     prefix: [],
     npmScript: "agentctx:mcp",
+    group: "engine",
     summary: "Run the agentctx MCP server (stdio JSON-RPC).",
   },
   smoke: {
     script: "acceptance-smoke.mjs",
     prefix: [],
     npmScript: "agentctx:smoke",
+    group: "engine",
     summary: "Run the acceptance smoke checks.",
+  },
+  emit: {
+    script: "emit.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Emit static per-tool artifacts (AGENTS.md, CLAUDE.md) from .agentctx/.",
   },
 };
 
@@ -84,16 +105,20 @@ export function readVersion() {
 }
 
 export function buildHelp() {
-  const rows = Object.entries(COMMANDS).map(
-    ([name, spec]) => `  ${name.padEnd(10)} ${spec.summary}`,
-  );
+  const rowsFor = (group) =>
+    Object.entries(COMMANDS)
+      .filter(([, spec]) => spec.group === group)
+      .map(([name, spec]) => `  ${name.padEnd(10)} ${spec.summary}`);
   return `${CLI_NAME} — context compiler & MCP adapter for agent ontologies.
 
 Usage:
   ${CLI_NAME} <command> [options]
 
-Commands:
-${rows.join("\n")}
+Engine commands:
+${rowsFor("engine").join("\n")}
+
+Operator commands:
+${rowsFor("operator").join("\n")}
 
 Other:
   --help, -h        Show this help message.
@@ -102,10 +127,11 @@ Other:
 Each command forwards its options to the underlying engine. Run a command with
 --help for its own options, e.g. "${CLI_NAME} compile --help".
 
-Backward compatibility: every command also remains available as its original
-npm script (compile -> agentctx:compile, init -> agentctx:init, validate ->
-agentctx:validate, metrics -> agentctx:metrics, mcp -> agentctx:mcp,
-smoke -> agentctx:smoke). This wrapper adds no behavior of its own.
+Backward compatibility: every engine command also remains available as its
+original npm script (compile -> agentctx:compile, init -> agentctx:init,
+validate -> agentctx:validate, metrics -> agentctx:metrics, mcp -> agentctx:mcp,
+smoke -> agentctx:smoke). This wrapper adds no behavior of its own. Operator
+commands have no npm alias; "${CLI_NAME} emit" is their only spelling.
 `;
 }
 

@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "targets": [
+    {
+      "target": "agents-md",
+      "path": "AGENTS.md",
+      "status": "ok",
+      "detail": null
+    },
+    {
+      "target": "claude-md",
+      "path": "CLAUDE.md",
+      "status": "ok",
+      "detail": null
+    }
+  ]
+}

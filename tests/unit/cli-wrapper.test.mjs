@@ -165,8 +165,15 @@ describe("backward compatibility: agentctx scripts and metadata preserved", () =
     expect(PKG.publishConfig).toBeUndefined();
   });
 
-  it("every wrapped command corresponds to a preserved agentctx:* script", () => {
-    for (const spec of Object.values(COMMANDS)) {
+  it("every wrapped engine command corresponds to a preserved agentctx:* script", () => {
+    for (const [name, spec] of Object.entries(COMMANDS)) {
+      // Operator commands (emit, …) are born inside the wrapper and have no
+      // npm alias by design (W2 §11: the agentctx:* namespace is frozen
+      // back-compat, not a growth surface).
+      if (spec.npmScript === null) {
+        expect(spec.group, `${name} without an alias must be an operator command`).toBe("operator");
+        continue;
+      }
       expect(PKG.scripts[spec.npmScript], `missing ${spec.npmScript}`).toBeTruthy();
     }
   });
