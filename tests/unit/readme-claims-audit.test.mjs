@@ -16,7 +16,9 @@ import { COMMANDS } from "../../scripts/agentctx/cli.mjs";
 // refreshed — the README obeys the same freshness contract emit enforces.
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const README = readFileSync(resolve(REPO_ROOT, "README.md"), "utf8");
+// CRLF-normalized like the engine's own source reads (emit.mjs): the README's
+// working-tree EOL is a git autocrlf artifact, not part of the audited claims.
+const README = readFileSync(resolve(REPO_ROOT, "README.md"), "utf8").replace(/\r\n/g, "\n");
 const PKG = JSON.parse(readFileSync(resolve(REPO_ROOT, "package.json"), "utf8"));
 const CLI = resolve(REPO_ROOT, "scripts/agentctx/cli.mjs");
 const TEMPLATE_AGENTCTX = resolve(REPO_ROOT, "templates/mind-ontology/.agentctx");
