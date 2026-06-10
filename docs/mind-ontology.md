@@ -125,6 +125,7 @@ Ontology easy for autonomous agent lines to consume — local-first, no hosted S
 
 ### Architecture & boundary
 
+- [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) — the human-facing operator surface (design only; includes the AGENTS.md compile-target strategy and the implementation ADL plan).
 - [Typed edge model](mind-ontology-typed-edge-model-v0.md)
 - [Adapter feature flags](mind-ontology-adapter-feature-flags-v0.md)
 - [SIRT memory adapter contract](mind-ontology-sirt-memory-adapter-contract-v0.md)
