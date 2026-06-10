@@ -10,14 +10,28 @@ What counts as **breaking** vs **additive** is defined in
 the stability boundary is the contract (`get_context`, `list_constraints`) and
 the pack JSON shape; everything else can evolve additively.
 
-> **Pre-release.** No version has been published. The OSS license is now settled
-> — **Apache-2.0** (see [`LICENSE`](LICENSE) / [`LICENSE-DECISION.md`](LICENSE-DECISION.md))
-> — but the package is still `private` and unpublished, so the first real entry
-> below will be the first tagged release after `"private"` is removed.
+> **Pre-release.** No version has been published. The OSS license is settled —
+> **Apache-2.0** (see [`LICENSE`](LICENSE) / [`LICENSE-DECISION.md`](LICENSE-DECISION.md))
+> — and the first release is **prepared as `0.1.0`** (version bumped, `files`
+> allowlist applied), but the package is still `private` and unpublished. The
+> first real entry below will be the first tagged release after `"private"` is
+> removed.
 
 ## [Unreleased]
 
+The contents of this section ship as **`0.1.0`**, the first public release.
+
 ### Added
+- **Release preparation for `0.1.0`** (additive, no contract change): version
+  bumped from `0.0.0`; `files` allowlist applied so the npm tarball ships only
+  the product surface (engine, templates, user-facing docs — no tests, examples,
+  or internal provenance docs); npm `keywords` added; package description
+  rewritten to the public product framing. Publishing stays gated by
+  `"private": true`. Support/contact: **GitHub Issues only**.
+- **Emit wedge** (`mind-ontology emit`): deterministic `AGENTS.md` / `CLAUDE.md`
+  compile targets with fingerprint headers and the `emit --check` three-value
+  CI drift gate, plus the inspection track (`explain`, `preview`, `status`,
+  `review`, CQ gate).
 - **Apache-2.0 license** chosen and landed: `LICENSE` (canonical text) + `NOTICE`;
   `package.json` `license` set to the `Apache-2.0` SPDX id. Publishing stays gated
   by `"private": true`.

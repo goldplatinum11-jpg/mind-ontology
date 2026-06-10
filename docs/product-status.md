@@ -27,8 +27,9 @@ the hosted SIRT backend is **not** available from this repository.
 
 - **License** — settled: **Apache-2.0** (`LICENSE` + `NOTICE` shipped, SPDX id in
   `package.json`). See [`../LICENSE-DECISION.md`](../LICENSE-DECISION.md).
-- **Distribution** — still gated: `package.json` keeps `"private": true` and the
-  version is `0.0.0`, so `npm publish` refuses. Publishing is a separate decision.
+- **Distribution** — release-prepared but still gated: version `0.1.0` and the
+  `files` allowlist are in place, yet `package.json` keeps `"private": true`, so
+  `npm publish` refuses. Removing `private` is a separate operator decision.
 - **Hosted memory & writeback** — adapter **contracts only**. Feature flags
   default **off**; the writeback adapter is **proposal-only** (no `execute()`);
   no adapter performs network I/O. The local path never depends on the hosted one.
@@ -42,7 +43,7 @@ the hosted SIRT backend is **not** available from this repository.
 | Proof | `npm run agentctx:proof` | 22/22 |
 | Validate | `npm run agentctx:validate` | VALID (0 errors) |
 | Smoke | `npm run agentctx:smoke` | SMOKE PASS (12/12) |
-| Full | `npm test` | 407 tests across 77 files, green |
+| Full | `npm test` | 1205 tests across 170 files, green |
 
 See [`testing.md`](testing.md) for the test taxonomy. The suite has been hardened
 with guard/audit tests so docs, fixtures, and the fail-closed boundary cannot

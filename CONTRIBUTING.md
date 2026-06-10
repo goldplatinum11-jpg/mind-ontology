@@ -60,4 +60,12 @@ was deliberately *not* touched.
 - Don't make a hosted feature load-bearing for the local path.
 - Don't remove `"private": true` or publish without the explicit release decision.
 
+---
+
+## Support & contact
+
+**GitHub Issues only.** There is no email, chat, or paid support channel;
+questions, bug reports, and feature requests all go through the issue tracker
+of the public repository.
+
 Release readiness is tracked in [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md).

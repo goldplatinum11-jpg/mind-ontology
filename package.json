@@ -1,9 +1,33 @@
 {
   "name": "mind-ontology",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Mind Ontology — OSS, self-hosted agentctx context compiler and MCP adapter line. Standalone product extracted from sirt-app-v2.",
+  "description": "Mind Ontology — compile AGENTS.md, CLAUDE.md, and live task-scoped context packs from one git-native Markdown ontology. Local-first OSS context compiler + MCP server.",
   "license": "Apache-2.0",
+  "keywords": [
+    "agents",
+    "agents-md",
+    "claude-md",
+    "context",
+    "context-engineering",
+    "mcp",
+    "ontology",
+    "cli"
+  ],
+  "files": [
+    "scripts/agentctx/**",
+    "templates/**",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "docs/mind-ontology-quickstart.md",
+    "docs/mind-ontology-quickstart-examples-v0.md",
+    "docs/agentctx-mcp.md",
+    "docs/agentctx-mcp-setup.md",
+    "docs/cli-errors.md",
+    "docs/schema-authoring.md",
+    "docs/testing.md"
+  ],
   "bin": {
     "mind-ontology": "scripts/agentctx/cli.mjs"
   },

@@ -5,9 +5,10 @@
 One ontology, every agent. Compile AGENTS.md, CLAUDE.md, and more from a
 single git-native source.
 
-Mind Ontology is the product; **`agentctx`** is the CLI and package name it
-ships under — a small, auditable compiler + MCP server over a folder of plain
-Markdown files you own (`.agentctx/`).
+Mind Ontology ships as the **`mind-ontology`** package and CLI — a small,
+auditable compiler + MCP server over a folder of plain Markdown files you own.
+`agentctx` is the internal compiler name; it survives as the source folder
+(`.agentctx/`) and the MCP server name.
 
 > **Status:** standalone, pre-release, **local-first**. The free layer needs no
 > account, no database, and no network. Hosted memory is an *optional*,
@@ -244,10 +245,11 @@ and the decision record in [`LICENSE-DECISION.md`](LICENSE-DECISION.md).
 deliberately gated:
 
 - `package.json` keeps `"private": true`, so `npm publish` refuses.
-- The version is still `0.0.0` (pre-release); there is no remote and nothing is
-  pushed.
-- Publishing is a separate, later step (remove `private`, bump the version, add a
-  `files` allowlist) — see [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
+- The first release is **prepared but unpublished**: version `0.1.0`, with a
+  `files` allowlist so the tarball ships only the product surface. There is no
+  public remote and nothing is pushed.
+- Publishing is a separate, later step (remove `private` — the one remaining
+  gate) — see [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) and
   [`docs/packaging.md`](docs/packaging.md).
 
 So the **source license is settled (Apache-2.0)**, while **distribution remains a
@@ -288,6 +290,10 @@ agent reads `.agentctx/`, the stop policy, and a drop-in kit, with no hosted SIR
 
 Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). Release readiness:
 [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md).
+
+**Support & contact: GitHub Issues only.** No email, chat, or paid support
+channel exists; questions and bug reports go through the issue tracker of the
+public repository.
 
 ---
 

@@ -161,7 +161,8 @@ describe("backward compatibility: agentctx scripts and metadata preserved", () =
   it("adds the bin without flipping private or adding a publish surface", () => {
     expect(PKG.private).toBe(true);
     expect(PKG.bin?.["mind-ontology"]).toBe("scripts/agentctx/cli.mjs");
-    expect(PKG.files).toBeUndefined();
+    // The files allowlist (release prep) must keep shipping the bin target.
+    expect(PKG.files).toContain("scripts/agentctx/**");
     expect(PKG.publishConfig).toBeUndefined();
   });
 

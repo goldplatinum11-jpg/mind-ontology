@@ -23,12 +23,12 @@ describe("CHANGELOG scaffold (M49)", () => {
     expect(c.toLowerCase()).toContain("semantic versioning");
   });
 
-  it("does not claim a published release while pre-release/unlicensed", () => {
+  it("does not claim a published release while unpublished (0.1.0 prepared, private)", () => {
     const c = read("CHANGELOG.md");
     const pkg = JSON.parse(read("package.json"));
-    expect(pkg.version).toBe("0.0.0");
+    expect(pkg.version).toBe("0.1.0"); // first release prepared, not yet published
     expect(pkg.private).toBe(true);
-    // No dated release headings like "## [1.0.0] - 2026-..." yet.
+    // No dated release headings like "## [1.0.0] - 2026-..." until a release is actually cut.
     expect(/^##\s*\[\d+\.\d+\.\d+\]/m.test(c)).toBe(false);
     expect(c.toLowerCase()).toContain("pre-release");
   });

@@ -34,14 +34,22 @@ Run before tagging any release:
 - [x] `LICENSE` file committed with the full Apache-2.0 text (+ `NOTICE`).
 - [x] `package.json` `"license"` set to `Apache-2.0` (SPDX id).
 - [x] `LICENSE-DECISION.md` updated to record the decision.
+- [x] Version set to **`0.1.0`** for the first public release (2026-06-11).
+- [x] `files` allowlist applied — `npm pack --dry-run` ships only the product
+      surface (engine, templates, user-facing docs); regressed by
+      `tests/unit/packaging-dry-run-contract.test.mjs`.
+- [x] Support/contact channel decided: **GitHub Issues only**.
 - [ ] **Remaining gate:** remove `"private": true` (deliberate publish decision).
+- [ ] **At publish time:** create the public GitHub repository and add its URL
+      as `repository`/`bugs` in `package.json` (Issues is the support channel).
 
 ## Versioning
 
-- [ ] `package.json` version bumped per semver (major **only** for a contract
-      break: removing/renaming a tool, removing/retyping a pack field, removing a
-      `SOURCE_FILES` entry, or changing `--risk`/flag semantics).
+- [x] `package.json` version bumped per semver — `0.1.0` prepared for the first
+      release (major **only** for a contract break: removing/renaming a tool,
+      removing/retyping a pack field, removing a `SOURCE_FILES` entry, or
+      changing `--risk`/flag semantics).
 - [ ] Phase closeout doc updated if a phase completed.
 
-No `npm publish`, deploy, or push is part of this checklist while the license
-gate is open.
+No `npm publish`, deploy, or push is part of this checklist while the
+`"private": true` gate is in place.

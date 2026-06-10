@@ -17,20 +17,23 @@ describe("packaging stays a fail-closed dry-run plan (M47)", () => {
     expect(doc.toLowerCase()).toContain("fail-closed");
   });
 
-  it("publishing is blocked today: private + no files allowlist applied yet (license now Apache-2.0)", () => {
-    expect(PKG.private).toBe(true); // npm publish refuses
+  it("publishing is blocked today: private stays true; the files allowlist is applied (release prep)", () => {
+    expect(PKG.private).toBe(true); // npm publish refuses — the one remaining gate
     expect(PKG.license).toBe("Apache-2.0"); // license decided; publish still gated by `private`
-    // The allowlist is still only *proposed* in the doc, not applied to package.json.
-    expect(PKG.files).toBeUndefined();
+    // The allowlist is APPLIED for the prepared 0.1.0 release.
+    expect(Array.isArray(PKG.files)).toBe(true);
     expect(PKG.publishConfig).toBeUndefined();
   });
 
-  it("the proposed allowlist would ship the engine + templates, not tests/examples", () => {
+  it("the applied allowlist ships the engine + templates, not tests/examples", () => {
     const doc = read("docs/packaging.md");
     expect(doc).toContain("scripts/agentctx/**");
     expect(doc).toContain("templates/**");
     // explicitly documents excluding tests and examples from the tarball
     expect(doc).toContain("tests/**");
     expect(doc).toContain("docs/examples/**");
+    // package.json and the doc agree on the engine + templates core
+    expect(PKG.files).toContain("scripts/agentctx/**");
+    expect(PKG.files).toContain("templates/**");
   });
 });

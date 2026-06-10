@@ -68,20 +68,27 @@ describe("npm pack --dry-run is non-publishing and fail-closed (M48)", () => {
     }
   });
 
-  it("still bundles a broad tree (tests included) — the `files` allowlist is not applied yet", () => {
+  it("ships only the allowlisted product surface — tests, examples, and internal docs excluded", () => {
     const paths = filePaths();
-    expect(PKG.files, "a files allowlist would narrow the tarball").toBeUndefined();
-    // With no allowlist, npm ships everything not gitignored, including tests/**.
-    expect(paths.some((p) => p.startsWith("tests/")), "expected test files in the broad tarball").toBe(true);
-    expect(paths.length).toBeGreaterThan(50);
+    // The `files` allowlist is applied (release prep for 0.1.0); the tarball is
+    // the product, not the workshop.
+    expect(Array.isArray(PKG.files), "the files allowlist must be applied").toBe(true);
+    expect(PKG.files).toContain("scripts/agentctx/**");
+    expect(PKG.files).toContain("templates/**");
+    expect(paths.some((p) => p.startsWith("tests/")), "tests/** must not ship in the tarball").toBe(false);
+    expect(paths.some((p) => p.startsWith("docs/examples/")), "docs/examples/** must not ship").toBe(false);
+    for (const internal of ["EXTRACTION-INVENTORY.md", "CONTROL.md", "NEXT-LANES.md", "MIGRATION-PLAN.md"]) {
+      expect(paths, `${internal} is internal and must not ship`).not.toContain(internal);
+    }
+    expect(paths.length).toBeLessThan(60);
   });
 
-  it("would produce a private, un-bumped tarball name and refuses to publish", () => {
+  it("would produce a 0.1.0 tarball that still refuses to publish (private stays true)", () => {
     expect(PKG.private, "removing private is a separate operator decision").toBe(true);
     expect(PKG.publishConfig).toBeUndefined();
-    // filename encodes name + current version; no version bump in this lane.
-    expect(pack.filename.replace(/\\/g, "/")).toMatch(/mind-ontology-0\.0\.0\.tgz$/);
-    expect(pack.version ?? PKG.version).toBe("0.0.0");
+    // filename encodes name + the prepared first-release version.
+    expect(pack.filename.replace(/\\/g, "/")).toMatch(/mind-ontology-0\.1\.0\.tgz$/);
+    expect(pack.version ?? PKG.version).toBe("0.1.0");
   });
 });
 
