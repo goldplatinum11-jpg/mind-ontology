@@ -61,9 +61,9 @@ const FIXTURE_TABLE = [
   },
   {
     fixture: "autopilot-team",
-    answered: 2,
+    answered: 3,
     expectations: [
-      { id: 1, answeredBy: null },
+      { id: 1, answeredBy: "projects.md" },
       { id: 2, answeredBy: "direction.md" },
       { id: 3, answeredBy: "agent-roles.md" },
     ],
