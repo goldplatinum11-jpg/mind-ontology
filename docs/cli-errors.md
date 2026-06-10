@@ -126,6 +126,69 @@ Hard errors (stderr, exit `2`): the unknown-target and flag-combo rows from
 the write-mode table, plus compile failures passing through unchanged. On a
 hard error stdout stays empty — no partial verdict (fail closed, W1 §8).
 
+## `mind-ontology status`
+
+`status` is a **report command** ([W2 §2.3](workbench-w2-cli-spec.md)): an
+unhealthy section is a successful report of a bad state — the report stays on
+**stdout** and the exit code is `1`. Only a hard error (a broken ontology that
+prevents producing any verdict) goes to stderr, with no partial report.
+
+| Failure | Stream | Message | Next safe action |
+|---|---|---|---|
+| Any section unhealthy | **stdout report** | the per-section report; the summary line names the unhealthy sections (`UNHEALTHY - sections needing attention: …`) | Fix the named sections (re-emit for drift, answer the named CQs, fix schema errors). |
+| Broken ontology / missing `.agentctx/` | stderr | compile/validate pass-through (the `agentctx:compile` rows above) | per the compile section |
+| Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+
+## `mind-ontology preview`
+
+`preview` is `compile` plus per-block provenance ([W2 §5](workbench-w2-cli-spec.md)):
+the `--task` / `--scope` / `--risk` / `--cwd` rows are identical to the
+`agentctx:compile` section above, by construction. The one new row is the
+Workbench `--format` vocabulary (`text|json`, not compile's `markdown|json`).
+
+| Failure | Message (stderr) | Next safe action |
+|---|---|---|
+| No `--task` | `Missing required --task argument` | Pass `--task "…"`. |
+| Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Bad `--risk` | `--risk must be "auto", "safe", or "risky", got: <x>` | Use `auto`, `safe`, or `risky`. |
+| Broken ontology | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
+| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+
+## `mind-ontology cq`
+
+`cq` is a **report command**: unanswered CQs are a report on **stdout**; the
+exit code applies the required-only gate ([W2 §6 ratified amendment](workbench-w2-cli-spec.md)) —
+an unanswered `#context` / `#safety` CQ exits `1`, other unanswered CQs are
+advisory lines. Hard errors go to stderr with no report. Missing `cq.md` is
+deliberately a hard error here (the operator explicitly asked for a CQ
+report), while `status` skips the section instead.
+
+| Failure | Stream | Message | Next safe action |
+|---|---|---|---|
+| Missing `cq.md` | stderr | `Missing .agentctx/cq.md. Add competency questions (see the cq schema) before running cq.` | Author `cq.md` per the [CQ schema](mind-ontology-cq-schema-v0.md). |
+| `--id` out of range | stderr | `--id must be between 1 and <N>, got: <x>` | Use a listed id. |
+| Unanswered required CQ(s) | **stdout report** | per-CQ `UNANSWERED … (required)` lines + `FAIL` summary | Add/extend the source blocks the CQ's topic tags point at. |
+| Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Broken ontology | stderr | compile pass-through (the `agentctx:compile` rows above) | per the compile section |
+| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+
+## `mind-ontology review`
+
+`review` is a **report command**: shape violations are a report on **stdout**
+(per-invariant `FAIL` lines), exit `1`. Hard errors go to stderr with no
+report. `review` takes no `--cwd` — its one input is the explicit `--pack`
+path ([W2 §2.1](workbench-w2-cli-spec.md)).
+
+| Failure | Stream | Message | Next safe action |
+|---|---|---|---|
+| Missing `--pack` | stderr | `Missing required --pack argument` | Pass `--pack <path>`. |
+| Unreadable path | stderr | `Cannot read Result Pack: <path>` | Check the path. |
+| Not valid JSON | stderr | `Result Pack is not valid JSON: <path>` | Fix or regenerate the pack. |
+| Shape violations | **stdout report** | per-invariant `FAIL` lines + `INVALID` summary | Send back to the worker with the failed invariant. |
+| Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+
 ## `agentctx:mcp` (JSON-RPC error codes)
 
 | Failure | Code | Meaning |

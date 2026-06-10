@@ -71,6 +71,13 @@ const PROJECTS = {
     writeFileSync(join(cwd, ".agentctx", "constraints.md"), "");
     return cwd;
   },
+  initializedNoCq() {
+    // Initialized, then cq.md removed — valid ontology, no competency questions.
+    const cwd = tmp();
+    expect(runCli(["init", "--cwd", cwd]).status, "fixture: init should succeed").toBe(0);
+    rmSync(join(cwd, ".agentctx", "cq.md"));
+    return cwd;
+  },
   unmanagedArtifact() {
     // Initialized, plus a pre-existing hand-written AGENTS.md (no emit header).
     const cwd = tmp();
@@ -265,6 +272,134 @@ const CASES = [
     id: "emit: missing .agentctx/ (compile pass-through)",
     project: "none",
     argv: ["emit", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Missing \.agentctx\//,
+    nextAction: /agentctx:init/,
+  },
+  // ── W9: `mind-ontology review` hard-error rows (W2 §10; the violation-report
+  //    path is locked in review-command.test.mjs) ────────────────────────────
+  {
+    id: "review: missing --pack",
+    project: "none",
+    argv: ["review"],
+    stream: "stderr",
+    names: /Missing required --pack argument/,
+    nextAction: /--pack/,
+  },
+  {
+    id: "review: unreadable pack path",
+    project: "none",
+    argv: ["review", "--pack", "does/not/exist.json"],
+    stream: "stderr",
+    names: /Cannot read Result Pack: does\/not\/exist\.json/,
+    nextAction: null,
+  },
+  {
+    id: "review: unknown flag",
+    project: "none",
+    argv: ["review", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: null,
+  },
+  // ── W8: `mind-ontology cq` hard-error rows (W2 §10; the unanswered-report
+  //    path and the required-only gate are locked in cq-command.test.mjs) ─────
+  {
+    id: "cq: missing cq.md is a hard error",
+    project: "initializedNoCq",
+    argv: ["cq", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Missing \.agentctx\/cq\.md/,
+    nextAction: /cq schema/,
+  },
+  {
+    id: "cq: --id out of range names the valid range",
+    project: "initialized",
+    argv: ["cq", "--cwd", "{cwd}", "--id", "99"],
+    stream: "stderr",
+    names: /--id must be between 1 and \d+, got: 99/,
+    nextAction: null,
+  },
+  {
+    id: "cq: bad --format",
+    project: "initialized",
+    argv: ["cq", "--cwd", "{cwd}", "--format", "xml"],
+    stream: "stderr",
+    names: /--format must be "text" or "json", got: xml/,
+    nextAction: /text|json/,
+  },
+  {
+    id: "cq: unknown flag",
+    project: "initialized",
+    argv: ["cq", "--cwd", "{cwd}", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: null,
+  },
+  // ── W7: `mind-ontology status` hard-error rows (W2 §10; the unhealthy-report
+  //    path is a multi-line stdout report, locked in status-command.test.mjs) ──
+  {
+    id: "status: missing .agentctx/ is a hard error (compile pass-through)",
+    project: "none",
+    argv: ["status", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Missing \.agentctx\//,
+    nextAction: /agentctx:init/,
+  },
+  {
+    id: "status: bad --format",
+    project: "initialized",
+    argv: ["status", "--cwd", "{cwd}", "--format", "xml"],
+    stream: "stderr",
+    names: /--format must be "text" or "json", got: xml/,
+    nextAction: /text|json/,
+  },
+  {
+    id: "status: unknown flag",
+    project: "initialized",
+    argv: ["status", "--cwd", "{cwd}", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: null,
+  },
+  // ── W6: `mind-ontology preview` rows (W2 §10: identical to compile's, plus
+  //    the Workbench text|json --format vocabulary) ──────────────────────────
+  {
+    id: "preview: missing --task",
+    project: "initialized",
+    argv: ["preview", "--cwd", "{cwd}"],
+    stream: "stderr",
+    names: /Missing required --task argument/,
+    nextAction: /--task/,
+  },
+  {
+    id: "preview: bad --format uses the Workbench vocabulary",
+    project: "initialized",
+    argv: ["preview", "--cwd", "{cwd}", "--task", "x", "--format", "markdown"],
+    stream: "stderr",
+    names: /--format must be "text" or "json", got: markdown/,
+    nextAction: /text|json/,
+  },
+  {
+    id: "preview: bad --risk",
+    project: "initialized",
+    argv: ["preview", "--cwd", "{cwd}", "--task", "x", "--risk", "nope"],
+    stream: "stderr",
+    names: /--risk must be "auto", "safe", or "risky"/,
+    nextAction: /auto|safe|risky/,
+  },
+  {
+    id: "preview: unknown flag",
+    project: "initialized",
+    argv: ["preview", "--cwd", "{cwd}", "--task", "x", "--bogus"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: null,
+  },
+  {
+    id: "preview: missing .agentctx/ (compile pass-through)",
+    project: "none",
+    argv: ["preview", "--cwd", "{cwd}", "--task", "Implement the OAuth refresh flow"],
     stream: "stderr",
     names: /Missing \.agentctx\//,
     nextAction: /agentctx:init/,

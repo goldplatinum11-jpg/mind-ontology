@@ -31,6 +31,15 @@ The `tests/unit/` files group by what they guard:
   `cli-error-ux-catalog.test.mjs` (every failure mode driven end-to-end through the
   `mind-ontology` wrapper, asserting stable error-UX properties): compile scoring,
   init safety, metrics meaning, risk-mode forcing, and the friendly-error contract.
+- **Workbench (operator commands)** — `compile-explain.test.mjs` (the W5
+  `--explain` provenance tuple; non-explain output stays byte-untouched),
+  `preview-command.test.mjs` (frozen `preview` text snapshot + explain JSON),
+  `status-command.test.mjs` (section sourcing, degradation rules, JSON shape
+  lock), `cq-command.test.mjs` (the answerability predicate, table-driven, and
+  the required-only gate), `review-command.test.mjs` +
+  `autopilot-result-pack-shape.test.mjs` (one shared shape module, two
+  consumers), plus `emit-golden.test.mjs` / `emit-check.test.mjs` /
+  `emit-registry-sync.test.mjs` (W3/W4 goldens and the drift matrix).
 - **MCP transport** — `agentctx-mcp.test.mjs` (handlers) and
   `mcp-server-smoke.test.mjs` (real stdio JSON-RPC round-trip).
 - **Connectors & client setup** — `agentctx-*-setup-proof.test.mjs`,
@@ -43,7 +52,7 @@ The `tests/unit/` files group by what they guard:
   `adapter-no-write-path.test.mjs`, `agentctx-edge-model.test.mjs`,
   `edge-model-relations.test.mjs`: flags default-off, proposal-only writeback,
   no credentials/endpoints.
-- **Docs & repo hygiene** — `agentctx-public-readme.test.mjs`,
+- **Docs & repo hygiene** — `readme-claims-audit.test.mjs`,
   `license-boundary.test.mjs`, `schema-messages.test.mjs`,
   `docs-gates-ordering.test.mjs`, `release-contribution-readiness.test.mjs`,
   `doc-link-audit.test.mjs`, `control-plane-import-audit.test.mjs`: docs cite real

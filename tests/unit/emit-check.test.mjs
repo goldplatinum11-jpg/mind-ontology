@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DUAL_TARGET_NOTE,
   PAYLOAD_LINE_BUDGET,
@@ -25,6 +25,10 @@ import {
 // immunity, budget warning, dual-target advisory, and the all-or-nothing
 // UNMANAGED refusal. Everything here is built in temp dirs, not stored
 // goldens.
+
+// Nearly every test spawns 2-4 CLI subprocesses (init/emit/check); under a
+// fully parallel suite run on a loaded machine the 5s default flakes.
+vi.setConfig({ testTimeout: 60_000 });
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = resolve(REPO_ROOT, "scripts/agentctx/cli.mjs");

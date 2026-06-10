@@ -83,12 +83,40 @@ export const COMMANDS = {
     group: "engine",
     summary: "Run the acceptance smoke checks.",
   },
+  status: {
+    script: "status.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "One health roll-up: validate, metrics, CQ answerability, emit freshness.",
+  },
+  preview: {
+    script: "preview.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Preview the pack an agent would see, with per-block provenance.",
+  },
+  cq: {
+    script: "cq.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Report per-CQ answerability with the contributing blocks.",
+  },
   emit: {
     script: "emit.mjs",
     prefix: [],
     npmScript: null,
     group: "operator",
     summary: "Emit static per-tool artifacts (AGENTS.md, CLAUDE.md) from .agentctx/.",
+  },
+  review: {
+    script: "review.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Validate a worker Result Pack against its shape invariants.",
   },
 };
 
@@ -131,7 +159,7 @@ Backward compatibility: every engine command also remains available as its
 original npm script (compile -> agentctx:compile, init -> agentctx:init,
 validate -> agentctx:validate, metrics -> agentctx:metrics, mcp -> agentctx:mcp,
 smoke -> agentctx:smoke). This wrapper adds no behavior of its own. Operator
-commands have no npm alias; "${CLI_NAME} emit" is their only spelling.
+commands have no npm alias; "${CLI_NAME} <command>" is their only spelling.
 `;
 }
 

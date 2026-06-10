@@ -14,7 +14,9 @@ const PHASE_CLOSEOUTS = [
 ];
 
 const PHASE5_DOCS = [
-  "docs/mind-ontology-public-readme-v0.md",
+  // The P5 public-README draft was superseded by the root README (W10 ruling);
+  // the live file is the launch artifact now.
+  "README.md",
   "docs/mind-ontology-quickstart-examples-v0.md",
   "docs/mind-ontology-shared-ontology-demo-v0.md",
   "docs/mind-ontology-trust-security-model-v0.md",

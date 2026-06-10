@@ -561,6 +561,52 @@ const TEXT_STATUS = {
 };
 
 /**
+ * The check verdict as data (W2 §7.4 shape) — one shape, two consumers:
+ * `emit --check --format json` prints it verbatim, and the W7 `status`
+ * command embeds it verbatim as its emit section.
+ */
+export function checkResultJson(results) {
+  return {
+    ok: results.every((r) => r.status === "ok"),
+    targets: results.map((r) => ({
+      target: r.target,
+      path: r.path,
+      status: r.status,
+      detail: r.detail,
+    })),
+  };
+}
+
+/**
+ * The check verdict as text: one line per target plus the frozen summary
+ * line ("OK - n of n targets fresh" / "DRIFT - n of m targets need
+ * attention"). Shared with `status` so both screens render freshness
+ * identically.
+ */
+export function renderCheckText(results) {
+  const drifted = results.filter((r) => r.status !== "ok");
+  const lines = results.map((r) =>
+    r.status === "ok"
+      ? `${TEXT_STATUS.ok.padEnd(13)}${r.path} (${r.target}, profile ${r.profile})`
+      : `${TEXT_STATUS[r.status].padEnd(13)}${r.path} (${r.target}) - ${r.detail}`,
+  );
+  lines.push(
+    drifted.length === 0
+      ? `OK - ${results.length} of ${results.length} targets fresh`
+      : `DRIFT - ${drifted.length} of ${results.length} targets need attention`,
+  );
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Classify every requested target from in-memory sources (the `--check`
+ * core, also embedded by `status`).
+ */
+export function checkTargets({ cwd, targets, sources }) {
+  return targets.map((target) => classifyTarget({ cwd, target, sources }));
+}
+
+/**
  * Check mode (W1 §8, W2 §7.3-7.4). Writes nothing. A negative verdict is a
  * successful report of a bad state: report on stdout, exit 1. Hard errors
  * (compile failure, usage errors) are thrown and exit 2 in the entry point.
@@ -569,41 +615,13 @@ export function runEmitCheck(options) {
   validateAgentctxSources(options.cwd);
   const sources = readAgentctx(options.cwd);
 
-  const results = options.targets.map((target) =>
-    classifyTarget({ cwd: options.cwd, target, sources }),
-  );
-  const drifted = results.filter((r) => r.status !== "ok");
-  const ok = drifted.length === 0;
+  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
+  const ok = results.every((r) => r.status === "ok");
 
-  let stdout;
-  if (options.format === "json") {
-    stdout =
-      JSON.stringify(
-        {
-          ok,
-          targets: results.map((r) => ({
-            target: r.target,
-            path: r.path,
-            status: r.status,
-            detail: r.detail,
-          })),
-        },
-        null,
-        2,
-      ) + "\n";
-  } else {
-    const lines = results.map((r) =>
-      r.status === "ok"
-        ? `${TEXT_STATUS.ok.padEnd(13)}${r.path} (${r.target}, profile ${r.profile})`
-        : `${TEXT_STATUS[r.status].padEnd(13)}${r.path} (${r.target}) - ${r.detail}`,
-    );
-    lines.push(
-      ok
-        ? `OK - ${results.length} of ${results.length} targets fresh`
-        : `DRIFT - ${drifted.length} of ${results.length} targets need attention`,
-    );
-    stdout = lines.join("\n") + "\n";
-  }
+  const stdout =
+    options.format === "json"
+      ? JSON.stringify(checkResultJson(results), null, 2) + "\n"
+      : renderCheckText(results);
 
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
 }

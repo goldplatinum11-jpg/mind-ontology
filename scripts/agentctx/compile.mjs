@@ -74,6 +74,7 @@ export function parseArgv(argv = process.argv.slice(2)) {
     maxBlocksPerFile: DEFAULT_MAX_BLOCKS_PER_FILE,
     minScore: DEFAULT_MIN_SCORE,
     riskMode: DEFAULT_RISK_MODE,
+    explain: false,
   };
 
   const args = [...argv];
@@ -107,6 +108,8 @@ export function parseArgv(argv = process.argv.slice(2)) {
         throw new Error(`--risk must be "auto", "safe", or "risky", got: ${m}`);
       }
       parsed.riskMode = m;
+    } else if (arg === "--explain") {
+      parsed.explain = true;
     } else if (arg === "-h" || arg === "--help") {
       parsed.command = "help";
     } else {
@@ -294,7 +297,33 @@ export function compileContext({
   };
 }
 
-export function renderContextPack(pack) {
+// W5 — the per-block provenance tuple the Workbench surfaces (W2 §5).
+// Maps the compiler's internal inclusion reasons onto the spec enum:
+// "always" -> "constraint", "matched" -> "scored", "risk-forced" stays.
+// `score` is the lexical score for scored inclusion and null otherwise —
+// constraint and risk-forced blocks are included regardless of score, so
+// reporting one would imply a selection mechanism that did not run.
+export const EXPLAIN_REASONS = Object.freeze({
+  always: "constraint",
+  matched: "scored",
+  "risk-forced": "risk-forced",
+});
+
+export function explainBlock(block) {
+  return {
+    sourceFile: block.file,
+    heading: block.title,
+    score: block.reason === "matched" ? block.score : null,
+    reason: EXPLAIN_REASONS[block.reason],
+  };
+}
+
+function renderExplainLine(block) {
+  const e = explainBlock(block);
+  return `Explain: sourceFile=${e.sourceFile} heading="${e.heading}" score=${e.score === null ? "null" : e.score} reason=${e.reason}`;
+}
+
+export function renderContextPack(pack, options = {}) {
   const lines = [
     "# agentctx context pack",
     "",
@@ -315,6 +344,7 @@ export function renderContextPack(pack) {
     lines.push("");
     lines.push(`Source: ${block.file}`);
     lines.push(`Reason: ${reason}`);
+    if (options.explain) lines.push(renderExplainLine(block));
     if (block.tags.length > 0) lines.push(`Tags: ${block.tags.map((tag) => `#${tag}`).join(" ")}`);
     lines.push("");
     lines.push(block.body);
@@ -335,7 +365,7 @@ export function renderContextPack(pack) {
   return `${lines.join("\n").trim()}\n`;
 }
 
-export function renderContextPackJson(pack) {
+export function renderContextPackJson(pack, options = {}) {
   return (
     JSON.stringify(
       {
@@ -349,6 +379,7 @@ export function renderContextPackJson(pack) {
           score: b.score === Infinity ? "always" : b.score,
           reason: b.reason,
           body: b.body,
+          ...(options.explain ? { explain: explainBlock(b) } : {}),
         })),
         omittedCount: pack.omitted.length,
         sourceFiles: pack.sourceFiles,
@@ -371,7 +402,10 @@ export function compileFromCwd(options) {
     minScore: options.minScore,
     riskMode: options.riskMode,
   });
-  return options.format === "json" ? renderContextPackJson(pack) : renderContextPack(pack);
+  const render = { explain: options.explain === true };
+  return options.format === "json"
+    ? renderContextPackJson(pack, render)
+    : renderContextPack(pack, render);
 }
 
 function splitCsv(value) {
@@ -400,6 +434,9 @@ Options:
   --risk auto|safe|risky        Task-risk mode. Default: ${DEFAULT_RISK_MODE}. "auto" classifies the
                                 task; on a risky task (delete/drop/migrate/deploy/etc.) safety-tagged
                                 blocks are forced into the pack regardless of score.
+  --explain                     Add per-block provenance (sourceFile, heading, score,
+                                reason: constraint|scored|risk-forced) to the output.
+                                Without this flag the output is byte-identical to before.
   -h, --help                    Show this help message.
 
 Source files (under .agentctx/):
