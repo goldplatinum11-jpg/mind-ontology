@@ -1,7 +1,7 @@
 <!-- mind-ontology:emit
 target: agents-md
 profile: default
-emit_version: 1
+emit_version: 2
 source: .agentctx/
 source_digest: sha256:4df84f0c8bd99ad32ea9898ce39bae8be2a5cbb477e32071b81742f0f011cb6a
 content_digest: sha256:0812e41e160c9be6e59d2b4d80d1d7d320165775ecfae6fb5fb588e4bd510824

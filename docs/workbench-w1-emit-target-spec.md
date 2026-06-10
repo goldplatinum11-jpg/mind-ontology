@@ -46,8 +46,8 @@ engine implementation and golden files are W3/W4. Nothing here ships code.
    always behaves as if the task were risky: every safety-tagged block
    (the `SAFETY_TAGS` set in `scripts/agentctx/compile.mjs`: `safety`,
    `destructive`, `security`, `secrets`, `irreversible`) from **any** source
-   file is forced into the artifact's Constraints section, regardless of the
-   profile's per-file selection rules.
+   file — `cq.md` excepted, see section 3 — is forced into the artifact's
+   Constraints section, regardless of the profile's per-file selection rules.
 5. **Fail closed.** `emit --check` exits non-zero on any drift, missing
    artifact, or unmanaged file (section 8). A broken ontology
    (missing/empty `constraints.md`) fails `emit` with the same errors
@@ -122,6 +122,19 @@ Plus, from principle 4: safety-tagged blocks in `none`-rule files are always
 emitted (appended to the Constraints section, annotated with their source
 file). A block is never emitted twice; if it is selected by its file's rule it
 is not re-appended by the safety sweep.
+
+**Exception — `cq.md` never participates in the safety sweep** (operator
+ruling recorded in W4; shipped as the `emit_version` 1 → 2 bump, constant
+`SWEEP_EXEMPT_FILES` in `scripts/agentctx/emit.mjs`). Competency questions
+are verification scaffolding: a `#safety` tag on a CQ marks the question's
+*topic* — it is the CQ schema's required safety question — not an executable
+constraint. The sweep's semantics are "force enforceable rules into the
+artifact's Constraints section", and an unanswered question cannot be
+enforced; sweeping one in would put a non-instruction into an instruction
+file. No safety *rule* is lost by the exemption: rules live in
+`constraints.md` (rule `all`) and in the safety-tagged blocks of every other
+excluded file, which are swept as before. CQ surfacing belongs to the live
+MCP path.
 
 Modifiers:
 
@@ -260,7 +273,8 @@ Format rules (normative for W3/W4):
   contributing an empty content string. Files the profile excludes are *not*
   digested — editing an unused source must not dirty the artifact. The one
   asymmetry: because safety-tagged blocks in excluded files can be forced in
-  (principle 4), excluded files are scanned for safety tags, and any excluded
+  (principle 4), excluded files (minus the sweep-exempt `cq.md`, section 3)
+  are scanned for safety tags, and any excluded
   file that currently contributes ≥1 forced block **is** included in the
   digest. (Consequence: edits to such a file re-flag the artifact — correct,
   since its safety blocks are in the output.)
@@ -366,11 +380,11 @@ same data. The `status` command's "emitted-target freshness" section (W7) is
 defined as exactly this check's result — in v1 the emitted headers *are* the
 manifest; no separate manifest file exists (see W2 handoff).
 
-**CI recipe** (documented here per the W4 ADL): run `mind-ontology emit
---check` as a CI step after install; a non-zero exit blocks merge. Repos using
-markdown formatters must exclude the artifact paths (e.g. in
-`.prettierignore`) — a formatter rewrite is, by design, indistinguishable from
-a hand edit.
+**CI recipe** (documented in this doc per the W4 ADL): see section 12 for the
+GitHub Actions step with exit-code branching and the optional pre-commit
+variant. Repos using markdown formatters must exclude the artifact paths
+(e.g. in `.prettierignore`) — a formatter rewrite is, by design,
+indistinguishable from a hand edit.
 
 ## 9. Edge cases
 
@@ -456,3 +470,76 @@ product calls an implementer should not lock in silently:
    freezes golden files?
 4. **Section-level emit** (section 9): rejected for v1 with rationale; any
    known user case that should reverse this before W3?
+
+## 12. CI recipe (W4)
+
+**The promise.** A static instruction file is only trustworthy if it provably
+matches its sources, and the only way that property survives contact with a
+team is to make its violation a build failure. That is the core promise this
+product makes about emitted artifacts: **drift fails CI.** There is no warn
+mode and no flag that downgrades drift (operator ruling Q7, section 8); the
+moment `.agentctx/` and a committed `AGENTS.md` / `CLAUDE.md` disagree, the
+gate goes red and stays red until someone re-emits — so the artifact an agent
+reads is never silently older, or stranger, than the meaning the operator
+curated. A context file you cannot trust is worse than none; the CI gate is
+what upgrades "generated once" to "guaranteed current".
+
+`emit --check` uses the three-way exit-code split ratified in the
+[W2 CLI spec](workbench-w2-cli-spec.md) §2.4: `0` = every checked target
+fresh, `1` = drift (the fix is mechanical: re-emit and commit), `2` = hard
+error (broken ontology or invocation — needs a human, not a re-emit). Naive
+CI that treats any non-zero exit as failure is already correct; the branching
+below just gives operators the right next action in the log.
+
+**GitHub Actions step** (any CI runs the same two commands — install, then
+check):
+
+```yaml
+jobs:
+  ontology-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Verify emitted artifacts are fresh
+        run: |
+          set +e
+          npx mind-ontology emit --check
+          code=$?
+          set -e
+          if [ "$code" -eq 1 ]; then
+            echo "::error::AGENTS.md / CLAUDE.md drifted from .agentctx/." \
+                 "Fix: run 'mind-ontology emit', commit the refreshed artifacts."
+          elif [ "$code" -eq 2 ]; then
+            echo "::error::emit --check could not produce a verdict" \
+                 "(broken ontology or bad invocation) - fix the ontology, not the artifacts."
+          fi
+          exit "$code"
+```
+
+Treat exit `2` as an infrastructure failure, not a drift signal: re-emitting
+cannot fix it, and a red gate with a "re-emit" hint would send the operator
+to the wrong tool. The check writes nothing (section 8), so the step needs no
+working-tree cleanup and is safe to run on any ref.
+
+**Pre-commit hook** (optional, local-only — CI remains the enforcement
+layer; the hook just shortens the feedback loop):
+
+```sh
+#!/bin/sh
+# .git/hooks/pre-commit — optional adoption, chmod +x
+npx mind-ontology emit --check
+code=$?
+if [ "$code" -eq 1 ]; then
+  echo "emit drift: run 'mind-ontology emit' and stage AGENTS.md / CLAUDE.md" >&2
+fi
+exit "$code"
+```
+
+Working-tree hygiene that keeps both layers byte-stable: the
+`.gitattributes` lines from section 9 (`AGENTS.md text eol=lf`, same for
+`CLAUDE.md`) and the formatter exclusions from section 8
+(e.g. `.prettierignore`).

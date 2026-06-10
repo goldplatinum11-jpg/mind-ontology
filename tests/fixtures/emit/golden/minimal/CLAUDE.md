@@ -1,7 +1,7 @@
 <!-- mind-ontology:emit
 target: claude-md
 profile: default
-emit_version: 1
+emit_version: 2
 source: .agentctx/
 source_digest: sha256:4df84f0c8bd99ad32ea9898ce39bae8be2a5cbb477e32071b81742f0f011cb6a
 content_digest: sha256:1ea702ef4907a5e0109a3805e171e0171c8a27b8a49a5a7cc4edd946fdf74e97

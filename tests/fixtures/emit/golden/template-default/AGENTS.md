@@ -1,10 +1,10 @@
 <!-- mind-ontology:emit
 target: agents-md
 profile: default
-emit_version: 1
+emit_version: 2
 source: .agentctx/
-source_digest: sha256:df11033650f69c7d1876369fa9fed41e346c58df20b92e85a399710a0fb21818
-content_digest: sha256:6bdfd4de89788fcb311d5697c7d246419c2d09f5485d15de66216102c456a159
+source_digest: sha256:6d2764a612e0365d1b6d3428fca2bf447b65c2422f497684988b5356062353b7
+content_digest: sha256:9b947e91092255cb55a665d51f9c0cafdc3ec5a1ca75b0e42df8543ff99c859f
 note: GENERATED FILE - do not hand-edit. Edit .agentctx/ and re-run: mind-ontology emit
 -->
 # AGENTS.md
@@ -34,16 +34,6 @@ follow the project-specific stop policy.
 Agents should receive the smallest context pack that can safely guide the task.
 Do not dump the whole ontology into every session when `get_context(task)` can
 select the relevant blocks.
-
-### What must the agent avoid? <!-- (from .agentctx/cq.md) -->
-The ontology should answer which actions are forbidden, risky, destructive, or
-outside the current scope, drawn from `constraints.md`.
-
-### Which writes are forbidden, and when must the agent fail closed? <!-- (from .agentctx/cq.md) -->
-The ontology should name the writes the agent must never perform (deploy,
-migration, secrets, production config, live data, hosted writeback execution)
-and the conditions under which it stops rather than proceeds. See
-`constraints.md` and the task risk modes.
 
 ## Identity
 

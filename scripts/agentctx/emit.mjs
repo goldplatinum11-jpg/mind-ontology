@@ -27,7 +27,17 @@ import {
   validateAgentctxSources,
 } from "./compile.mjs";
 
-export const EMIT_VERSION = 1;
+// 2: cq.md exempted from the safety sweep (W4 operator ruling, W1 §3) —
+// payloads emitted under version 1 no longer match and re-flag as STALE.
+export const EMIT_VERSION = 2;
+
+// W4 operator ruling (W1 §3): competency questions are questions, not
+// executable constraints — a #safety tag on a CQ marks its topic (the CQ
+// schema's required safety question), not an enforceable rule. Sweeping an
+// unanswered question into the Constraints section would put a
+// non-instruction into an instruction file, so cq.md never participates in
+// the safety sweep. The live MCP path owns CQ surfacing.
+export const SWEEP_EXEMPT_FILES = new Set(["cq.md"]);
 
 // Normative target registry (W1 §2). Ids are stable forever; the registry-sync
 // guard test asserts this constant matches the W1 spec table. Only `v1: true`
@@ -176,11 +186,11 @@ export function buildArtifact({ sources, target, profile = "default" }) {
 
   // Safety sweep (W1 principle 4): safety-tagged blocks in excluded files are
   // forced into the Constraints section. A block selected by its own file's
-  // rule is never re-appended.
+  // rule is never re-appended. cq.md is exempt (SWEEP_EXEMPT_FILES).
   const forcedBlocks = [];
   const forcedFiles = new Set();
   for (const file of SOURCE_FILES) {
-    if (rules[file] !== "none") continue;
+    if (rules[file] !== "none" || SWEEP_EXEMPT_FILES.has(file)) continue;
     for (const block of blocksByFile[file]) {
       if (isSafetyBlock(block)) {
         forcedBlocks.push(block);

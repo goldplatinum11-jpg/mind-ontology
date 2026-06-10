@@ -178,6 +178,20 @@ describe("golden artifact: safety sweep (freeze 5)", () => {
     expect(artifact).not.toContain("## Projects");
   });
 
+  it("cq.md is exempt from the safety sweep: a #safety CQ changes neither payload nor digest (W4 ruling, W1 §3)", () => {
+    const sources = readSources(SWEEP_AGENTCTX);
+    const base = buildArtifact({ sources, target: "agents-md" });
+    const withSafetyCq = buildArtifact({
+      sources: {
+        ...sources,
+        "cq.md":
+          "# Competency Questions\n\n## What must the agent avoid? #cq #safety\n\nQuestions are not constraints.\n",
+      },
+      target: "agents-md",
+    });
+    expect(withSafetyCq.artifact).toBe(base.artifact);
+  });
+
   it("editing a swept excluded file re-flags the artifact; editing an unswept one does not (W1 §6 digest asymmetry)", () => {
     const sources = readSources(SWEEP_AGENTCTX);
     const base = buildArtifact({ sources, target: "agents-md" });
