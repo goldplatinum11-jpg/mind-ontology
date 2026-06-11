@@ -3,6 +3,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { initFromRepo } from "./init-from-repo.mjs";
 
 export const DEFAULT_TEMPLATE_NAME = "mind-ontology";
 export const DEFAULT_TARGET_DIR = ".agentctx";
@@ -16,6 +17,7 @@ export function parseInitArgv(argv = process.argv.slice(2)) {
     cwd: process.cwd(),
     force: false,
     template: DEFAULT_TEMPLATE_NAME,
+    fromRepo: false,
     help: false,
   };
 
@@ -27,6 +29,8 @@ export function parseInitArgv(argv = process.argv.slice(2)) {
       options.template = argv[++i] ?? DEFAULT_TEMPLATE_NAME;
     } else if (arg === "--force") {
       options.force = true;
+    } else if (arg === "--from-repo") {
+      options.fromRepo = true;
     } else if (arg === "-h" || arg === "--help") {
       options.help = true;
     } else {
@@ -89,6 +93,11 @@ Usage:
 Options:
   --cwd <path>            Directory where .agentctx/ will be created. Default: cwd.
   --template <name>       Template name under templates/. Default: ${DEFAULT_TEMPLATE_NAME}.
+  --from-repo             Inspect the repository at --cwd (manifest, README,
+                          LICENSE, layout, CLAUDE.md / AGENTS.md, recent git
+                          commit subjects) and generate a populated draft
+                          instead of placeholder files. Takes precedence over
+                          --template.
   --force                 Overwrite template files when .agentctx/ already exists.
   -h, --help              Show this help message.
 `;
@@ -99,6 +108,24 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const options = parseInitArgv();
     if (options.help) {
       process.stdout.write(printHelp());
+      process.exit(0);
+    }
+    if (options.fromRepo) {
+      const result = initFromRepo(options);
+      const facts = result.facts;
+      process.stdout.write(
+        [
+          `Created ${DEFAULT_TARGET_DIR}/ drafted from this repository.`,
+          `Project: ${facts.name}${facts.language ? ` (${facts.language})` : ""}`,
+          `Read: ${facts.sources.length > 0 ? facts.sources.join(", ") : "repository layout only"}`,
+          `Target: ${result.targetDir}`,
+          `Files: ${result.files.length}`,
+          "",
+          `Next: search ${DEFAULT_TARGET_DIR}/ for "TODO:" and replace the drafts,`,
+          `then run "mind-ontology validate" to confirm the ontology is clean.`,
+          "",
+        ].join("\n"),
+      );
       process.exit(0);
     }
     const result = initAgentctx(options);

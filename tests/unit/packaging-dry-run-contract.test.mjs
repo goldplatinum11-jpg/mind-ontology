@@ -68,6 +68,14 @@ describe("npm pack --dry-run is non-publishing and fail-closed (M48)", () => {
     }
   });
 
+  it("ships the user-facing feature docs, including init --from-repo", () => {
+    const paths = filePaths();
+    for (const doc of ["docs/mind-ontology-quickstart.md", "docs/init-from-repo.md"]) {
+      expect(PKG.files, `package.json files allowlist is missing ${doc}`).toContain(doc);
+      expect(paths, `tarball is missing ${doc}`).toContain(doc);
+    }
+  });
+
   it("ships only the allowlisted product surface — tests, examples, and internal docs excluded", () => {
     const paths = filePaths();
     // The `files` allowlist is applied (release prep for 0.1.0); the tarball is

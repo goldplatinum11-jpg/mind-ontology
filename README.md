@@ -61,6 +61,11 @@ npm run mind-ontology -- init     # scaffold .agentctx/ from the template
 npm run mind-ontology -- emit     # compile the static artifacts
 ```
 
+Adopting Mind Ontology in an existing repository? `init --from-repo` drafts
+the ontology from what the repo already states — manifest, README, LICENSE,
+layout, an existing `CLAUDE.md`/`AGENTS.md`, and recent git history — instead
+of placeholders. See [docs/init-from-repo.md](docs/init-from-repo.md).
+
 ```text
 WROTE  AGENTS.md  (agents-md, profile default, 96 payload lines)
 WROTE  CLAUDE.md  (claude-md, profile default, 100 payload lines)

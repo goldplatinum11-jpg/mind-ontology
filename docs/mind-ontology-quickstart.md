@@ -74,6 +74,18 @@ npm run agentctx:init -- --cwd "C:/path/to/my-project"
 If `.agentctx/` already exists, the command stops instead of overwriting files.
 Use `--force` only when you intentionally want to overwrite template files.
 
+Adopting Mind Ontology in an **existing** repository? Add `--from-repo` to
+generate a populated draft from the repository's own artifacts (manifest,
+README, LICENSE, layout, an existing `CLAUDE.md`/`AGENTS.md`, recent git
+commit subjects) instead of placeholder files:
+
+```sh
+npm run agentctx:init -- --cwd "C:/path/to/my-project" --from-repo
+```
+
+See [init-from-repo.md](init-from-repo.md) for what is read, what is written,
+and the safety contract.
+
 ---
 
 ## Step 3 - Compile a context pack
