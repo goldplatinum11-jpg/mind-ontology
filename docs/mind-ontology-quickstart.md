@@ -4,7 +4,7 @@
 **Goal:** Get the local stdio MCP layer running from `.agentctx/` files.
 
 This quickstart is install-first. It assumes a user wants to prove the free OSS
-layer before caring about hosted SIRT, extraction, UI, or advanced schema work.
+layer before caring about a hosted backend, extraction, UI, or advanced schema work.
 
 ---
 
@@ -17,7 +17,7 @@ layer before caring about hosted SIRT, extraction, UI, or advanced schema work.
   -> get_context(task) and list_constraints()
 ```
 
-No hosted SIRT account, database, deploy, migration, or production write is
+No hosted account, database, deploy, migration, or production write is
 required.
 
 ---
@@ -234,7 +234,7 @@ included and should never be silently dropped.
 Add a narrower scope:
 
 ```sh
-npm run agentctx:compile -- --task "Write license boundary docs" --scope "license,oss,sirt"
+npm run agentctx:compile -- --task "Write license boundary docs" --scope "license,oss,boundary"
 ```
 
 ### The pack is missing important context
@@ -251,7 +251,7 @@ get_context
 list_constraints
 ```
 
-Do not add hosted SIRT writeback, graph, or retrieval tools until the adapter
+Do not add hosted writeback, graph, or retrieval tools until the adapter
 contract is explicitly scoped.
 
 ---
@@ -264,7 +264,7 @@ The quickstart is successful when:
 - the local MCP server starts;
 - the client can call `get_context(task)`;
 - the client can call `list_constraints()`;
-- no hosted SIRT dependency is required;
+- no hosted dependency is required;
 - no deploy, migration, or live write occurs.
 
 At that point the free layer has proven its core promise: one portable meaning

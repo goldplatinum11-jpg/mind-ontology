@@ -1,7 +1,7 @@
 # Mind Ontology `.agentctx/` Template
 
 This template gives a new user a neutral, self-contained starting point for
-Mind Ontology MCP. It needs no account, no network, and no hosted SIRT.
+Mind Ontology MCP. It needs no account, no network, and no hosted backend.
 
 Copy `.agentctx/` into the repo or folder where the local MCP server will run,
 then edit the files to match your own direction, projects, vocabulary, and

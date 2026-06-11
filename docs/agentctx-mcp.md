@@ -159,7 +159,7 @@ from the repo root. Protocol version: `2024-11-05`.
 - **Core is unchanged.** `compile.mjs` exports are called directly; no wrapper module between the server and the compiler.
 - **cwd scoping.** The server's default working directory resolves from `AGENTCTX_HOME` (if set) and otherwise falls back to `process.cwd()` at startup. Each tool call can override via the `cwd` parameter to point at a different repo.
 - **stderr is clean.** The server writes nothing to stderr during normal operation. JSON-RPC errors are returned as proper error responses on stdout.
-- **No SIRT dependency.** The MCP server is as dependency-free as the CLI.
+- **No hosted dependency.** The MCP server is as dependency-free as the CLI.
 
 ---
 

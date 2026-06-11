@@ -3,7 +3,7 @@
 A ready-to-adapt prompt for an autonomous worker agent (Codex, Claude Code, or any
 MCP client) wired onto Mind Ontology. Paste it into your agent's system/role
 prompt and edit the lane specifics. It embodies the reading protocol and the stop
-policy using only the two read-only tools — no secrets, no hosted SIRT.
+policy using only the two read-only tools — no secrets, no hosted backend.
 
 ---
 

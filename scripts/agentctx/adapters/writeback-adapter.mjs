@@ -1,4 +1,4 @@
-// Mind Ontology — SIRT writeback PROPOSAL contract (Phase 4 / P4-PR02).
+// Mind Ontology — hosted writeback PROPOSAL contract (Phase 4 / P4-PR02).
 //
 // PROPOSAL-ONLY. This module defines the contract for turning a durable decision
 // into a hosted-memory writeback *proposal*. It NEVER executes a write. A

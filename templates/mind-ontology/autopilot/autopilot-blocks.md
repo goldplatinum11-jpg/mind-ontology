@@ -6,7 +6,7 @@ plain `.agentctx`-style blocks (heading + `#tags`) — paste the ones you want i
 `constraints.md` and `agent-roles.md` and edit to fit your line.
 
 These blocks are portable and local-first: they reference only the two read-only
-tools and require no hosted SIRT, no account, and no network.
+tools and require no hosted backend, no account, and no network.
 
 ---
 
@@ -17,7 +17,7 @@ tools and require no hosted SIRT, no account, and no network.
 At task start, call `get_context(task)` with the task phrased in natural
 language, and reason on the returned task-scoped slice — not the whole ontology,
 and not as a memory store. If you need durable cross-session history, that is the
-hosted SIRT axis and is out of scope for this local line.
+hosted-backend axis and is out of scope for this local line.
 
 ## Re-read constraints before irreversible work #autopilot #safety #destructive
 

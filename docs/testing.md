@@ -1,7 +1,7 @@
 # Testing
 
 Mind Ontology ships its guarantees as tests. The suite is local-only — no
-network, no account, no hosted SIRT — and runs in a few seconds.
+network, no account, no hosted backend — and runs in a few seconds.
 
 ## The four gates (smallest → fullest)
 
@@ -114,8 +114,8 @@ On top of the per-kind checks, three sweeps run across **every** fixture:
   or OpenAPI `operationId`s) are `get_context` and `list_constraints`; the check
   also proves both are actually surfaced (non-vacuous).
 - **Placeholder-and-secret-free** — every `https://` host targets the reserved
-  `.example` TLD (no Workers/`sirtai.org`/production host), no bearer/token/key
-  value is embedded, and no fixture hard-codes `sirt-app-v2` or a private clone
+  `.example` TLD (no production or vendor-private host), no bearer/token/key
+  value is embedded, and no fixture hard-codes a private repository name or a private clone
   path.
 
 To extend coverage, add a row to `FIXTURES` with its `kind` (and a `toolsKey` for

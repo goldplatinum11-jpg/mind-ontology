@@ -2,7 +2,7 @@
 
 A small, copy-ready kit that wires an autonomous AI development line onto Mind
 Ontology. Everything here is **local-first**: no account, no network, no hosted
-SIRT. Every agent uses the same two read-only tools, `get_context` and
+backend. Every agent uses the same two read-only tools, `get_context` and
 `list_constraints`.
 
 ## What's in the kit
@@ -35,7 +35,7 @@ SIRT. Every agent uses the same two read-only tools, `get_context` and
 ## The promise
 
 - **No tool sprawl.** Only `get_context` and `list_constraints` are ever exposed.
-- **No hosted dependency.** The kit makes no network call; hosted SIRT, if ever
+- **No hosted dependency.** The kit makes no network call; a hosted backend, if ever
   enabled, is opt-in, fail-closed, and off by default.
 - **No secrets.** Never put credentials in `.agentctx/` or in these configs.
 

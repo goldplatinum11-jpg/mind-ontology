@@ -127,10 +127,11 @@ describe("W9 — shape violations are a stdout report, exit 1", () => {
   });
 
   it("hosted leakage in the pack fails invariant 3", () => {
-    // Assembled at runtime so repo-wide leakage sweeps never flag this file.
-    const hostedHost = ["sirtai", "org"].join(".");
+    // The shipped LEAKAGE_PATTERN matches hosted endpoints by shape (e.g. a
+    // workers.dev host), never by vendor-private name, so the fixture uses a
+    // generic hosted URL.
     const path = packFile((p) => {
-      p.handoff = `Pushed to https://connector.${hostedHost}/mcp for ingest.`;
+      p.handoff = "Pushed to https://connector.example.workers.dev/mcp for ingest.";
     });
     const r = runCli(["review", "--pack", path, "--format", "json"]);
     expect(r.status).toBe(1);

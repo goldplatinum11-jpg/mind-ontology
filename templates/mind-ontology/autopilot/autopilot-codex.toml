@@ -4,7 +4,7 @@
 # line (Codex controller, Claude Code worker, Cursor) launches the SAME local
 # entrypoint and sees the SAME two read-only tools: get_context, list_constraints.
 #
-# Local-first: no account, no network, no hosted SIRT. See
+# Local-first: no account, no network, no hosted backend. See
 # templates/mind-ontology/autopilot/autopilot-blocks.md and
 # docs/mind-ontology-autopilot-adoption-v1.md.
 

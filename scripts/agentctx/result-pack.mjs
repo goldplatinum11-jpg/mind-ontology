@@ -32,9 +32,11 @@ export const RESULT_PACK_REQUIRED_KEYS = {
 };
 
 export const GUARD_TEST_PATTERN = /tests\/unit\/.+\.test\.mjs$/;
-// Hosted endpoints, auth material, and the private clone path no pack may
-// embed (the leakage sweep the original guard test encoded).
-export const LEAKAGE_PATTERN = /sirtai\.org|workers\.dev|bearer |authorization|sirt-app-v2/;
+// Hosted endpoints and auth material no pack may embed (the leakage sweep the
+// original guard test encoded). Vendor-private hostnames and repository names
+// are enforced by the repo-side sweep tests rather than named here, so the
+// shipped engine itself carries no private identifiers.
+export const LEAKAGE_PATTERN = /workers\.dev|bearer |authorization|ghp_[0-9a-z]|github_pat_/;
 
 // The controller checklist (docs/mind-ontology-autopilot-controller-checklist
 // -v1.md) echoed with what shape validation actually covers: `machine` only

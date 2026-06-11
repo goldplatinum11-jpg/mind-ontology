@@ -1,4 +1,4 @@
-// Mind Ontology — SIRT memory retrieval adapter contract (Phase 4 / P4-PR01).
+// Mind Ontology — hosted memory retrieval adapter contract (Phase 4 / P4-PR01).
 //
 // OPTIONAL, HOSTED, READ-ONLY. This module defines the *contract* for an
 // optional hosted memory-retrieval adapter plus the LOCAL FAIL-CLOSED default.

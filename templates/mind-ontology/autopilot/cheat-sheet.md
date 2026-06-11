@@ -1,7 +1,7 @@
 # Autopilot cheat sheet (pin this)
 
 A one-screen reference for an autonomous line on Mind Ontology. Two read-only
-tools, local-first, no hosted SIRT.
+tools, local-first, no hosted backend.
 
 ## Triggers
 

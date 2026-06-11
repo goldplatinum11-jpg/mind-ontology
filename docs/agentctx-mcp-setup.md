@@ -78,7 +78,7 @@ claude mcp add agentctx --scope project -- node scripts/agentctx/mcp-server.mjs
 - `agentctx` — server name.
 - `--scope project` — writes to `.mcp.json` at the repo root (committed, shared).
   Use `--scope user` to register it for your account across all repos; in that
-  case add `--env AGENTCTX_HOME=/ABSOLUTE/PATH/TO/sirt-app-v2` and use the
+  case add `--env AGENTCTX_HOME=/ABSOLUTE/PATH/TO/mind-ontology` and use the
   absolute server path in args.
 - everything after `--` is the launch command: `node` + the server script.
 
@@ -133,13 +133,13 @@ paths and pin `AGENTCTX_HOME`:
 ```toml
 [mcp_servers.agentctx]
 command = "node"
-args = ["/ABSOLUTE/PATH/TO/sirt-app-v2/scripts/agentctx/mcp-server.mjs"]
+args = ["/ABSOLUTE/PATH/TO/mind-ontology/scripts/agentctx/mcp-server.mjs"]
 
 [mcp_servers.agentctx.env]
-AGENTCTX_HOME = "/ABSOLUTE/PATH/TO/sirt-app-v2"
+AGENTCTX_HOME = "/ABSOLUTE/PATH/TO/mind-ontology"
 ```
 
-Replace `/ABSOLUTE/PATH/TO/sirt-app-v2` with this repo's absolute path
+Replace `/ABSOLUTE/PATH/TO/mind-ontology` with this repo's absolute path
 (`pwd` from the repo root).
 
 ### Verify (Codex)
@@ -177,14 +177,14 @@ resolve this repo's `.agentctx/`:
 ```sh
 # bash / zsh — note: AGENTCTX_HOME binds to `node` (after the pipe), not printf
 cd /tmp && printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_constraints","arguments":{}}}' \
-  | AGENTCTX_HOME=/ABSOLUTE/PATH/TO/sirt-app-v2 node /ABSOLUTE/PATH/TO/sirt-app-v2/scripts/agentctx/mcp-server.mjs
+  | AGENTCTX_HOME=/ABSOLUTE/PATH/TO/mind-ontology node /ABSOLUTE/PATH/TO/mind-ontology/scripts/agentctx/mcp-server.mjs
 ```
 
 ```powershell
 # PowerShell
-$env:AGENTCTX_HOME = "C:\ABSOLUTE\PATH\TO\sirt-app-v2"
+$env:AGENTCTX_HOME = "C:\ABSOLUTE\PATH\TO\mind-ontology"
 '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_constraints","arguments":{}}}' |
-  node C:\ABSOLUTE\PATH\TO\sirt-app-v2\scripts\agentctx\mcp-server.mjs
+  node C:\ABSOLUTE\PATH\TO\mind-ontology\scripts\agentctx\mcp-server.mjs
 ```
 
 All three should print a single JSON-RPC response line on stdout with nothing on
