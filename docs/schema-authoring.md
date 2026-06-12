@@ -6,6 +6,10 @@ explains them in one place. Run `npm run agentctx:validate` to check your work.
 
 ## Block format (shared by every file)
 
+The skeleton below is illustrative only — angle-bracket placeholders, not a
+real source file — and is not validated. For validated minimal examples, see
+the per-file `*-schema-v0.md` reference docs.
+
 ```md
 # <File Title>
 

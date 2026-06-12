@@ -97,3 +97,81 @@ describe("guide per-file sections state every structural rule (M44 extension)", 
     }
   });
 });
+
+// Normalized for line-based fence parsing; the pins above use the raw text.
+const GUIDE_NORMALIZED = GUIDE.replace(/\r\n/g, "\n");
+
+// The only fence class the guide may contain, keyed by the ## heading the
+// fence sits under (the same classification scheme as the per-file reference
+// docs in schema-reference-docs.test.mjs). The guide carries no executable
+// fixture: its one fence is an angle-bracket placeholder skeleton, so there is
+// no schema entry to validate it against — the validated minimal examples live
+// in the per-file reference docs and run as fixtures there.
+const ILLUSTRATIVE_GUIDE_SECTION = "Block format (shared by every file)";
+
+// Every fenced code block in the guide with its info string, body, and the ##
+// section heading above it. Section tracking is fence-aware: the skeleton's
+// own "## <Block heading>" line is fence content, not a document section. ###
+// subheadings do not reset the section, so a fence added under a "Per-file
+// rules" entry is classified by that ## section and fails as unclassified.
+function guideFences() {
+  const fences = [];
+  let section = null;
+  let open = null;
+  for (const line of GUIDE_NORMALIZED.split("\n")) {
+    if (open === null && line.startsWith("## ")) section = line.slice(3);
+    if (line.startsWith("```")) {
+      if (open === null) {
+        open = { section, lang: line.slice(3).trim(), lines: [] };
+      } else {
+        fences.push({ section: open.section, lang: open.lang, body: `${open.lines.join("\n")}\n` });
+        open = null;
+      }
+    } else if (open !== null) {
+      open.lines.push(line);
+    }
+  }
+  expect(open, "schema-authoring.md has an unterminated fence").toBeNull();
+  return fences;
+}
+
+// schema-authoring-fence-classification-v1 — every fence in the guide has a
+// deterministic class. Today that is exactly one illustrative fence; a new
+// fence under any other heading is unclassified and fails here until it is
+// classified (and, if meant to be conformant, moved to a reference doc where
+// the fixture tests can execute it).
+describe("schema authoring guide fences are classified", () => {
+  it("every fence sits under the block-format heading — none unclassified", () => {
+    for (const fence of guideFences()) {
+      expect(
+        [ILLUSTRATIVE_GUIDE_SECTION],
+        `guide has an unclassified \`\`\`${fence.lang} fence under "## ${fence.section}"`,
+      ).toContain(fence.section);
+    }
+  });
+
+  it("the guide has exactly one fence: the ```md block-format skeleton", () => {
+    const fences = guideFences();
+    expect(fences.length, "guide fence inventory changed; classify the new fence").toBe(1);
+    expect(fences[0].lang, "block-format skeleton fence is not ```md").toBe("md");
+  });
+
+  it("the block-format intro labels its fence illustrative and not validated", () => {
+    const parts = GUIDE_NORMALIZED.split(/^## Block format \(shared by every file\)$/m);
+    expect(parts.length, 'guide has no "## Block format (shared by every file)" section').toBe(2);
+    const intro = parts[1].split("```")[0];
+    expect(intro, "guide does not label its skeleton fence illustrative").toMatch(/illustrative only/i);
+    expect(intro, "guide does not state its skeleton fence is not validated").toMatch(/not\s+validated/i);
+  });
+
+  it("the skeleton is placeholder-shaped, so validating it stays out of scope", () => {
+    const [fence] = guideFences();
+    expect(fence.body, "skeleton fence lost its angle-bracket placeholders").toMatch(/<[^>]+>/);
+  });
+
+  it("the guide never presents a fence as a conformant example", () => {
+    expect(GUIDE, "guide claims a conformant fence; that belongs in a reference doc").not.toMatch(
+      /\bconformant\b/i,
+    );
+  });
+});
