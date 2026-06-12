@@ -220,8 +220,17 @@ const CASES = [
     argv: ["validate", "--cwd", "{cwd}"],
     stream: "stdout",
     names: /empty-required|Required source is empty: \.agentctx\/constraints\.md/,
-    // No fix hint on this issue line today — candidate repair lane.
-    nextAction: null,
+    // Issue lines now carry an inline remedy plus a doc pointer
+    // (validate-remedy-hints-v1; closed candidate repair lane).
+    nextAction: /fix: Add at least one "## <title> #<tag>" block to constraints\.md\./,
+  },
+  {
+    id: "validate: failing report links the schema authoring doc",
+    project: "emptyConstraints",
+    argv: ["validate", "--cwd", "{cwd}"],
+    stream: "stdout",
+    names: /INVALID/,
+    nextAction: /See docs\/schema-authoring\.md for the block format and per-file rules\./,
   },
   // ── W3: `mind-ontology emit` rows (W2 §10, merged into docs/cli-errors.md
   //    in the same change) ──────────────────────────────────────────────────

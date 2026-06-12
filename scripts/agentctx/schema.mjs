@@ -58,6 +58,42 @@ export const ONTOLOGY_SCHEMA = {
   },
 };
 
+// Where the per-file authoring rules live; rendered once per failing report so
+// every remedy line can stay short.
+export const SCHEMA_AUTHORING_DOC = "docs/schema-authoring.md";
+
+// One concrete next action per rule. Builders receive the same context the
+// issue message was built from, so remedies stay specific ("add #style to
+// identity.md") without re-parsing message strings.
+export const RULE_REMEDIES = {
+  "missing-dir": () => 'Run "npm run agentctx:init" to scaffold starter files.',
+  "required-file": () =>
+    'Run "npm run agentctx:init" to scaffold it, or create the file with at least one "## <title> #<tag>" block.',
+  "empty-required": ({ file }) => `Add at least one "## <title> #<tag>" block to ${file}.`,
+  "no-credentials": () =>
+    'Remove the secret value and reference it indirectly instead (e.g. "stored in the team vault"); ontology files are compiled into prompts.',
+  "every-block-has-tag": () => 'Append at least one #tag to the block\'s "## <title>" heading line.',
+  "required-tag": ({ file, tag }) => `Add a block headed "## <title> #${tag}" to ${file}.`,
+  "recommended-tag": ({ file, tag }) =>
+    `Add a block headed "## <title> #${tag}" to ${file} (optional; clears this warning).`,
+  "required-field": ({ field }) => `Add a "${field}: <value>" line to the block body.`,
+  "enum-field": ({ name, allowed }) => `Change the ${name}: line to one of: ${allowed.join(", ")}.`,
+  "namespace-required": ({ namespace }) =>
+    `Tag each entry's heading with #${namespace}, e.g. "## <title> #${namespace} #<topic>".`,
+  "topic-tag": ({ namespace }) =>
+    `Add one topic tag after #${namespace}, e.g. "## <title> #${namespace} #<topic>".`,
+  "one-role-tag": ({ namespace }) =>
+    `Keep #${namespace} plus exactly one role tag on the heading; move extra roles into their own blocks.`,
+  "non-empty-body": () => "Write at least one line of content under the heading.",
+  "question-title": () => 'Rephrase the block title as a question ending in "?".',
+  "unique-titles": () => "Rename or merge the duplicate blocks so each title appears once.",
+};
+
+function makeIssue(file, level, rule, message, context = {}) {
+  const remedy = RULE_REMEDIES[rule]?.({ file, ...context }) ?? null;
+  return { file, level, rule, message, remedy };
+}
+
 function fieldValue(body, key) {
   const match = body.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
   return match ? match[1].trim() : null;
@@ -69,12 +105,12 @@ function namespaceBlocks(blocks, namespace) {
 
 /**
  * Validate one source file's blocks against its schema rule set.
- * @returns {Array<{file:string, level:"error"|"warning", rule:string, message:string}>}
+ * @returns {Array<{file:string, level:"error"|"warning", rule:string, message:string, remedy:string|null}>}
  */
 export function validateSource(file, raw, rule) {
   const issues = [];
-  const add = (level, ruleName, message) =>
-    issues.push({ file, level, rule: ruleName, message });
+  const add = (level, ruleName, message, context) =>
+    issues.push(makeIssue(file, level, ruleName, message, context));
   const blocks = parseMarkdownBlocks(raw, file);
 
   if (CREDENTIAL_PATTERN.test(raw)) {
@@ -93,7 +129,7 @@ export function validateSource(file, raw, rule) {
     const present = new Set(blocks.flatMap((block) => block.tags));
     for (const tag of rule.requiredTags) {
       if (!present.has(tag)) {
-        add("error", "required-tag", `${file} is missing a block tagged #${tag}`);
+        add("error", "required-tag", `${file} is missing a block tagged #${tag}`, { tag });
       }
     }
   }
@@ -102,7 +138,7 @@ export function validateSource(file, raw, rule) {
     const present = new Set(blocks.flatMap((block) => block.tags));
     for (const tag of rule.recommendedTags) {
       if (!present.has(tag)) {
-        add("warning", "recommended-tag", `${file} has no block tagged #${tag} (recommended)`);
+        add("warning", "recommended-tag", `${file} has no block tagged #${tag} (recommended)`, { tag });
       }
     }
   }
@@ -112,7 +148,7 @@ export function validateSource(file, raw, rule) {
       for (const block of blocks.filter((b) => b.tags.includes(tag))) {
         for (const field of fields) {
           if (!fieldValue(block.body, field)) {
-            add("error", "required-field", `${file} block "${block.title}" (#${tag}) is missing the "${field}:" field`);
+            add("error", "required-field", `${file} block "${block.title}" (#${tag}) is missing the "${field}:" field`, { field });
           }
         }
       }
@@ -124,7 +160,7 @@ export function validateSource(file, raw, rule) {
     for (const block of blocks) {
       const value = fieldValue(block.body, name);
       if (value !== null && !allowed.includes(value)) {
-        add("error", "enum-field", `${file} block "${block.title}" has ${name}: ${value} (allowed: ${allowed.join(", ")})`);
+        add("error", "enum-field", `${file} block "${block.title}" has ${name}: ${value} (allowed: ${allowed.join(", ")})`, { name, allowed });
       }
     }
   }
@@ -132,17 +168,17 @@ export function validateSource(file, raw, rule) {
   if (rule.namespace) {
     const nsBlocks = namespaceBlocks(blocks, rule.namespace);
     if (nsBlocks.length === 0) {
-      add("error", "namespace-required", `${file} has no #${rule.namespace} block`);
+      add("error", "namespace-required", `${file} has no #${rule.namespace} block`, { namespace: rule.namespace });
     }
 
     const per = rule.perBlock ?? {};
     for (const block of nsBlocks) {
       const extraTags = block.tags.filter((tag) => tag !== rule.namespace);
       if (per.requireExtraTopicTag && extraTags.length === 0) {
-        add("error", "topic-tag", `${file} block "${block.title}" has only #${rule.namespace}; add a topic tag`);
+        add("error", "topic-tag", `${file} block "${block.title}" has only #${rule.namespace}; add a topic tag`, { namespace: rule.namespace });
       }
       if (per.exactlyOneExtraTag && extraTags.length !== 1) {
-        add("error", "one-role-tag", `${file} block "${block.title}" must carry exactly one tag besides #${rule.namespace}, found ${extraTags.length}`);
+        add("error", "one-role-tag", `${file} block "${block.title}" must carry exactly one tag besides #${rule.namespace}, found ${extraTags.length}`, { namespace: rule.namespace });
       }
       if (per.nonEmptyBody && block.body.trim().length === 0) {
         add("error", "non-empty-body", `${file} block "${block.title}" has an empty body`);
@@ -176,12 +212,9 @@ export function validateOntology(cwd = process.cwd()) {
   const issues = [];
 
   if (!existsSync(dir)) {
-    issues.push({
-      file: DEFAULT_AGENTCTX_DIR,
-      level: "error",
-      rule: "missing-dir",
-      message: `Missing ${DEFAULT_AGENTCTX_DIR}/ in ${cwd}. Run "npm run agentctx:init" to scaffold starter files.`,
-    });
+    issues.push(
+      makeIssue(DEFAULT_AGENTCTX_DIR, "error", "missing-dir", `Missing ${DEFAULT_AGENTCTX_DIR}/ in ${cwd}`),
+    );
     return summarize(issues);
   }
 
@@ -194,14 +227,14 @@ export function validateOntology(cwd = process.cwd()) {
 
     if (!present) {
       if (rule.required) {
-        issues.push({ file, level: "error", rule: "required-file", message: `Missing required source: ${DEFAULT_AGENTCTX_DIR}/${file}` });
+        issues.push(makeIssue(file, "error", "required-file", `Missing required source: ${DEFAULT_AGENTCTX_DIR}/${file}`));
       }
       continue;
     }
 
     const raw = readFileSync(path, "utf8");
     if (rule.required && raw.trim().length === 0) {
-      issues.push({ file, level: "error", rule: "empty-required", message: `Required source is empty: ${DEFAULT_AGENTCTX_DIR}/${file}` });
+      issues.push(makeIssue(file, "error", "empty-required", `Required source is empty: ${DEFAULT_AGENTCTX_DIR}/${file}`));
       continue;
     }
 
@@ -224,12 +257,20 @@ export function renderReport(report) {
   } else {
     for (const issue of report.issues) {
       lines.push(`  ${issue.level.toUpperCase()}  [${issue.rule}] ${issue.message}`);
+      if (issue.remedy) {
+        // Continuation line aligned under the message, so each issue reads as
+        // "problem, then fix" without breaking one-issue-per-[rule]-line greps.
+        lines.push(`  ${" ".repeat(issue.level.length)}  fix: ${issue.remedy}`);
+      }
     }
   }
   lines.push("");
   lines.push(
     `${report.ok ? "VALID" : "INVALID"} — ${report.errors} error(s), ${report.warnings} warning(s)`,
   );
+  if (!report.ok) {
+    lines.push(`See ${SCHEMA_AUTHORING_DOC} for the block format and per-file rules.`);
+  }
   lines.push("");
   return lines.join("\n");
 }

@@ -64,23 +64,32 @@ to the operator, and apply the named fix. Do not retry verbatim.
 
 `validate` never throws on a clean tree; it prints a **report to stdout** and
 exits non-zero only when there are errors. So unlike compile/init, the message
-to act on is on **stdout**, prefixed by its severity and rule name, e.g.:
+to act on is on **stdout**, prefixed by its severity and rule name. Every issue
+line carries an indented `fix:` continuation line naming the concrete next
+action, and a failing report ends with a pointer to the authoring doc, e.g.:
 
 ```
-  ERROR  [missing-dir] Missing .agentctx/ in <cwd>. Run "npm run agentctx:init" to scaffold starter files.
-  ERROR  [empty-required] Required source is empty: .agentctx/constraints.md
-INVALID — 1 error(s), 0 warning(s)
+  ERROR  [missing-dir] Missing .agentctx/ in <cwd>
+         fix: Run "npm run agentctx:init" to scaffold starter files.
+  ERROR  [required-tag] identity.md is missing a block tagged #style
+         fix: Add a block headed "## <title> #style" to identity.md.
+INVALID — 2 error(s), 0 warning(s)
+See docs/schema-authoring.md for the block format and per-file rules.
 ```
 
-| Failure | Issue line (stdout) | Next safe action |
+| Failure | Issue line (stdout) | Next safe action (the `fix:` line) |
 |---|---|---|
-| No `.agentctx/` | `[missing-dir] Missing .agentctx/ …` | Run `agentctx:init`. |
-| Empty required source | `[empty-required] Required source is empty: .agentctx/<file>` | Add content to the named file. |
-| Schema violations | `[required-tag] / [enum-field] / [no-credentials] / …` naming the file, block, and rule | Fix the named block; see [schema validation](mind-ontology-schema-validation-v0.md). |
+| No `.agentctx/` | `[missing-dir] Missing .agentctx/ in <cwd>` | `Run "npm run agentctx:init" to scaffold starter files.` |
+| Missing required source | `[required-file] Missing required source: .agentctx/<file>` | `Run "npm run agentctx:init" to scaffold it, or create the file …` |
+| Empty required source | `[empty-required] Required source is empty: .agentctx/<file>` | `Add at least one "## <title> #<tag>" block to <file>.` |
+| Schema violations | `[required-tag] / [enum-field] / [no-credentials] / …` naming the file, block, and rule | per-rule remedy from `RULE_REMEDIES`, parameterized with the offending tag / field / allowed values |
 
-The `INVALID — N error(s)` summary plus a non-zero exit is the machine signal.
-See [schema validation](mind-ontology-schema-validation-v0.md) for the full rule
-list.
+The `INVALID — N error(s)` summary plus a non-zero exit is the machine signal;
+warnings also carry `fix:` lines but never flip the exit code. Programmatic
+consumers get the same hint as a `remedy` field on each issue. See
+[schema validation](mind-ontology-schema-validation-v0.md) for the full rule
+list and [schema authoring](schema-authoring.md) for the block format the
+remedies point at.
 
 ## `mind-ontology emit` (write mode)
 
@@ -238,14 +247,14 @@ but they do **not yet point to a next action**. They are usable today; improving
 them is a future *engine* change (out of scope for a docs/tests lane), tracked
 here so the gap is visible rather than silently accepted:
 
-- **`validate` issue lines** — name the file, block, and rule but carry no inline
-  fix hint or doc link. Candidate: attach a one-line remedy per rule.
+- **`review` unreadable `--pack` path** — names the path but suggests no check.
+- **`cq` out-of-range `--id`** — names the valid range but not how to list ids.
 
-Until then, fall back to the
-[schema validation](mind-ontology-schema-validation-v0.md) doc for validate
-rules.
-
-(Closed lanes: `Unknown argument: <arg>` now points at the command's own
+(Closed lanes: `validate` issue lines now carry an inline `fix:` remedy per
+rule (parameterized with the offending tag / field / allowed values) and the
+failing report links `docs/schema-authoring.md` — locked in the error-UX
+catalog test and the schema-messages remedy-coverage test.
+`Unknown argument: <arg>` now points at the command's own
 `--help` across every command — `Run "mind-ontology <command> --help" for the
 list of options.` — locked per command in the error-UX catalog test.
 `Template not found: <name>` (init) now lists the available templates and the
