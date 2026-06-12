@@ -189,6 +189,35 @@ path ([W2 §2.1](workbench-w2-cli-spec.md)).
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
 
+## `mind-ontology setup`
+
+`setup` wires an agent client (MCP config + startup bootstrap instruction,
+[agent-setup.md](agent-setup.md)). Exit `1` on every failure, nothing written
+on failure. Write mode is **create-only**: an existing config file is never
+overwritten or merged — `--print` gives the block to merge by hand. `--print`
+itself never touches the filesystem.
+
+| Failure | Message (stderr) | Next safe action |
+|---|---|---|
+| No `--target` | `Missing required --target argument (allowed: "claude-code", "codex")` | Pass `--target claude-code` or `--target codex`. |
+| Unknown target | `--target must be one of "claude-code", "codex", got: <x>` | Use a listed target id. |
+| Existing config in write mode | `Refusing to overwrite <path>: file already exists. Re-run with --print and merge the agentctx server block by hand.` | Re-run with `--print`, merge the block by hand. |
+| Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+
+Warnings (stderr, exit `0` — the plan is still printed/written; cataloged here
+so operators find them):
+
+| Warning | Message (stderr) |
+|---|---|
+| Server script not found | `warning: MCP server script not found under the project (looked for scripts/agentctx/mcp-server.mjs, node_modules/mind-ontology/scripts/agentctx/mcp-server.mjs); the config assumes "npm install mind-ontology" will provide it` |
+| Missing `.agentctx/` | `warning: .agentctx/ not found in the project; the MCP server fails closed (no invented context) until you scaffold sources with: mind-ontology init` |
+
+Missing `.agentctx/` is deliberately a *warning* here, not an error: wiring the
+client first and scaffolding sources second is a valid adoption order, and the
+MCP server itself fails closed (it never invents context) until the sources
+exist.
+
 ## `agentctx:mcp` (JSON-RPC error codes)
 
 | Failure | Code | Meaning |
@@ -236,3 +265,6 @@ them is a deliberate, reviewed UX change — not an accident:
 - [`tests/unit/emit-check.test.mjs`](../tests/unit/emit-check.test.mjs) —
   locks the `emit --check` classification matrix (every drift class, its
   detail sentence, and the three-way exit code) end-to-end.
+- [`tests/unit/setup-command.test.mjs`](../tests/unit/setup-command.test.mjs) —
+  locks the `setup` write/print contract end-to-end, including the exit-`0`
+  warning paths above (which the catalog's non-zero-exit shape cannot carry).
