@@ -62,7 +62,7 @@ Only files that are present are validated. A minimal project shipping only
 | `constraints.md` | Must exist and be non-empty. |
 | `identity.md` | Required `#identity` and `#style` blocks; every block tagged; `#operator` / `#collaboration` recommended. |
 | `projects.md` | Required `#active` block with `Name:` and `Status:` fields; any `Status:` must be one of `active`, `exploratory`, `paused`, `archived`. |
-| `glossary.md` | At least one `#term` block; each term has a topic tag, a non-empty body, and a unique title. |
+| `glossary.md` | At least one `#term` block; each term has a topic tag, a non-empty body, and a unique title (case-insensitive). |
 | `agent-roles.md` | At least one `#agent` block; each role has exactly one role tag and a non-empty body; required `#coding` and `#review` roles. |
 | `cq.md` | At least one `#cq` block; each is phrased as a question, has a topic tag, and a non-empty body; required `#context` and `#safety` topics. |
 | _all files_ | No credential-shaped `key: value` assignments (no-secrets rule). |
