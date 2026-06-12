@@ -43,3 +43,57 @@ describe("schema authoring guide matches ONTOLOGY_SCHEMA (M44)", () => {
     expect(GUIDE).toContain("Status:");
   });
 });
+
+// The guide's "Per-file rules" prose, sliced into one section per `### \`file\``
+// heading. Each section ends at the next ### or ## heading so a marker stated
+// for one file can't satisfy the check for another.
+const SECTION_FOR = new Map(
+  GUIDE.split(/^### /m)
+    .slice(1)
+    .map((part) => part.split(/\n##? /)[0])
+    .map((section) => [section.match(/`([^`]+)`/)?.[1], section]),
+);
+
+// schema-authoring-structural-rules-v1 — M44 pins tags and enums; this pins the
+// structural rule prose per file. Each marker maps an ONTOLOGY_SCHEMA switch to
+// the phrasing the guide must use, so enabling/disabling a structural rule (or
+// changing its semantics, e.g. case-insensitive titles) fails here.
+describe("guide per-file sections state every structural rule (M44 extension)", () => {
+  it("has a dedicated section for every schema-governed file", () => {
+    for (const file of Object.keys(ONTOLOGY_SCHEMA)) {
+      expect(SECTION_FOR.has(file), `guide has no ### section for ${file}`).toBe(true);
+    }
+  });
+
+  it("each section states the structural rules its schema entry enables", () => {
+    const MARKERS = [
+      ["required (exists, non-empty)", (rule) => rule.required, /non-empty/i],
+      ["every-block-has-tag", (rule) => rule.everyBlockHasTag, /at least one tag/i],
+      ["unique-titles (case-insensitive)", (rule) => rule.uniqueTitles, /unique[\s\S]*case-insensitive/i],
+      ["non-empty-body", (rule) => rule.perBlock?.nonEmptyBody, /non-empty body/i],
+      ["question-title", (rule) => rule.perBlock?.questionTitle, /question[\s\S]*\?/i],
+      ["one-role-tag", (rule) => rule.perBlock?.exactlyOneExtraTag, /exactly one/i],
+      ["topic-tag", (rule) => rule.perBlock?.requireExtraTopicTag, /topic tag/i],
+    ];
+    for (const [file, rule] of Object.entries(ONTOLOGY_SCHEMA)) {
+      const section = SECTION_FOR.get(file);
+      for (const [name, enabled, pattern] of MARKERS) {
+        if (enabled(rule)) {
+          expect(section, `${file} section omits the ${name} rule`).toMatch(pattern);
+        }
+      }
+    }
+  });
+
+  it("each section names its own namespace and required tags", () => {
+    for (const [file, rule] of Object.entries(ONTOLOGY_SCHEMA)) {
+      const section = SECTION_FOR.get(file);
+      if (rule.namespace) {
+        expect(section, `${file} section omits namespace #${rule.namespace}`).toContain(`#${rule.namespace}`);
+      }
+      for (const tag of rule.requiredTags ?? []) {
+        expect(section, `${file} section omits required tag #${tag}`).toContain(`#${tag}`);
+      }
+    }
+  });
+});
