@@ -21,6 +21,9 @@ Shared `.agentctx/` Markdown convention:
   tags and stripped from the rendered title.
 - The block body describes when to use the role.
 
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
+
 ```md
 # Agent Roles
 

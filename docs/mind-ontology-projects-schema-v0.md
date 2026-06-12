@@ -21,7 +21,9 @@ Shared `.agentctx/` Markdown convention:
   tags and stripped from the rendered title.
 - Block body is the prose beneath the heading.
 
-Project blocks additionally use two **field lines** at the top of the body:
+Project blocks additionally use two **field lines** at the top of the body.
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
 
 ```md
 ## Active project #project #active

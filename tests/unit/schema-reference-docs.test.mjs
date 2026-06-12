@@ -205,3 +205,105 @@ describe("per-file schema reference doc examples validate as fixtures", () => {
     }
   });
 });
+
+// The two fence classes a reference doc may contain, keyed by the ## heading
+// the fence sits under. Classification is by section, not by validation
+// outcome: an illustrative fence may coincidentally validate (glossary's
+// does), so only the heading is a deterministic signal.
+const ILLUSTRATIVE_SECTION = "Block model";
+const FIXTURE_SECTION = "Example (minimal conformant file)";
+
+// Every fenced code block in a doc with its info string, body, and the ## section
+// heading above it. Section tracking is fence-aware: "## " lines inside an open
+// fence are example block headings, not document sections.
+function fenceBlocks(file) {
+  const fences = [];
+  let section = null;
+  let open = null;
+  for (const line of DOC_FOR.get(file).split("\n")) {
+    if (open === null && line.startsWith("## ")) section = line.slice(3);
+    if (line.startsWith("```")) {
+      if (open === null) {
+        open = { section, lang: line.slice(3).trim(), lines: [] };
+      } else {
+        fences.push({ section: open.section, lang: open.lang, body: `${open.lines.join("\n")}\n` });
+        open = null;
+      }
+    } else if (open !== null) {
+      open.lines.push(line);
+    }
+  }
+  expect(open, `${file} doc has an unterminated fence`).toBeNull();
+  return fences;
+}
+
+// Prose between the "## Block model" heading and its fence opener.
+function blockModelIntro(file) {
+  const parts = DOC_FOR.get(file).split(/^## Block model$/m);
+  expect(parts.length, `${file} reference doc has no "## Block model" section`).toBe(2);
+  return parts[1].split("```")[0];
+}
+
+// schema-reference-fence-classification-v1 — every fence in the reference docs
+// has a deterministic class: the "Block model" fence is illustrative and never
+// validated; the example fence is the executable fixture validated above. A
+// fence under any other heading is unclassified and fails here, so future
+// fixture extraction cannot silently pick up (or skip) a fence.
+describe("per-file schema reference doc fences are classified", () => {
+  it("every fence sits under the Block model or example heading — none unclassified", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      for (const fence of fenceBlocks(file)) {
+        expect(
+          [ILLUSTRATIVE_SECTION, FIXTURE_SECTION],
+          `${file} doc has an unclassified \`\`\`${fence.lang} fence under "## ${fence.section}"`,
+        ).toContain(fence.section);
+      }
+    }
+  });
+
+  it("each doc has exactly one illustrative fence and one fixture fence, both ```md", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const fences = fenceBlocks(file);
+      for (const section of [ILLUSTRATIVE_SECTION, FIXTURE_SECTION]) {
+        expect(
+          fences.filter((fence) => fence.section === section).length,
+          `${file} doc must have exactly one fence under "## ${section}"`,
+        ).toBe(1);
+      }
+      for (const fence of fences) {
+        expect(fence.lang, `${file} doc fence under "## ${fence.section}" is not \`\`\`md`).toBe("md");
+      }
+    }
+  });
+
+  it("the executed fixture is exactly the example-section fence, never an illustrative one", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const fixture = fenceBlocks(file).find((fence) => fence.section === FIXTURE_SECTION);
+      expect(exampleFixture(file), `${file} fixture extractor disagrees with the fence inventory`).toBe(
+        fixture.body,
+      );
+    }
+  });
+
+  it("each Block model section labels its fence illustrative and not validated", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const intro = blockModelIntro(file);
+      expect(intro, `${file} doc does not label its Block model fence illustrative`).toMatch(
+        /illustrative only/i,
+      );
+      expect(intro, `${file} doc does not state its Block model fence is not validated`).toMatch(
+        /not\s+validated/i,
+      );
+    }
+  });
+
+  it("only the example heading claims a minimal conformant file", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const claims = DOC_FOR.get(file).match(/minimal conformant file/gi) ?? [];
+      expect(
+        claims.length,
+        `${file} doc claims "minimal conformant file" outside its example heading`,
+      ).toBe(1);
+    }
+  });
+});

@@ -23,6 +23,9 @@ Shared `.agentctx/` Markdown convention:
   extracted as tags and stripped from the rendered title.
 - The block body states which source(s) should answer the question.
 
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
+
 ```md
 # Competency Questions
 

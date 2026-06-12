@@ -22,6 +22,9 @@ Shared `.agentctx/` Markdown convention:
   stripped) is the term being defined.
 - The block body is the definition.
 
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
+
 ```md
 # Glossary
 

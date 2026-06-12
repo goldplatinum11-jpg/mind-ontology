@@ -23,6 +23,9 @@ work is going), and `projects.md` (what is being worked on).
   extracted as tags and stripped from the rendered title.
 - Block body is the prose beneath the heading, up to the next `##`.
 
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
+
 ```md
 # Identity
 
