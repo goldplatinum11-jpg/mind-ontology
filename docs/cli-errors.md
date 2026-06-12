@@ -42,7 +42,7 @@ to the operator, and apply the named fix. Do not retry verbatim.
 | Empty `constraints.md` | `Required Mind Ontology source is empty: .agentctx/constraints.md. Add at least one ## constraint block before compiling.` | Add at least one `## …` constraint block. |
 | Bad `--format` | `--format must be "markdown" or "json", got: <x>` | Use `markdown` or `json`. |
 | Bad `--risk` | `--risk must be "auto", "safe", or "risky", got: <x>` | Use `auto`, `safe`, or `risky`. |
-| Unknown flag | `Unknown argument: <arg>` | Remove the unknown flag (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology compile --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 | Unknown command | `Unknown command: <x>` | Use `compile`. |
 
 ## `agentctx:init`
@@ -51,7 +51,7 @@ to the operator, and apply the named fix. Do not retry verbatim.
 |---|---|---|
 | `.agentctx/` already exists | `.agentctx/ already exists. Re-run with --force to overwrite template files.` | Pass `--force` (preserves your own non-template files). |
 | Unknown template | `Template not found: <name>` | Use an existing template under `templates/` (default `mind-ontology`). |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology init --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `agentctx:metrics`
 
@@ -97,7 +97,7 @@ exist. Specs: [W1 emit targets](workbench-w1-emit-target-spec.md),
 | `--force` with `--check` | `--force cannot be combined with --check (--check never writes)` | Drop one flag. |
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Compile errors | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology emit --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 Warnings (stderr, exit `0`, artifacts still written — cataloged here so
 operators find them; they never change artifact bytes):
@@ -138,7 +138,7 @@ prevents producing any verdict) goes to stderr, with no partial report.
 | Any section unhealthy | **stdout report** | the per-section report; the summary line names the unhealthy sections (`UNHEALTHY - sections needing attention: …`) | Fix the named sections (re-emit for drift, answer the named CQs, fix schema errors). |
 | Broken ontology / missing `.agentctx/` | stderr | compile/validate pass-through (the `agentctx:compile` rows above) | per the compile section |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
-| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | stderr | `Unknown argument: <arg>. Run "mind-ontology status --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology preview`
 
@@ -153,7 +153,7 @@ Workbench `--format` vocabulary (`text|json`, not compile's `markdown|json`).
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Bad `--risk` | `--risk must be "auto", "safe", or "risky", got: <x>` | Use `auto`, `safe`, or `risky`. |
 | Broken ontology | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology preview --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology cq`
 
@@ -171,7 +171,7 @@ report), while `status` skips the section instead.
 | Unanswered required CQ(s) | **stdout report** | per-CQ `UNANSWERED … (required)` lines + `FAIL` summary | Add/extend the source blocks the CQ's topic tags point at. |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Broken ontology | stderr | compile pass-through (the `agentctx:compile` rows above) | per the compile section |
-| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | stderr | `Unknown argument: <arg>. Run "mind-ontology cq --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology review`
 
@@ -187,7 +187,7 @@ path ([W2 §2.1](workbench-w2-cli-spec.md)).
 | Not valid JSON | stderr | `Result Pack is not valid JSON: <path>` | Fix or regenerate the pack. |
 | Shape violations | **stdout report** | per-invariant `FAIL` lines + `INVALID` summary | Send back to the worker with the failed invariant. |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
-| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | stderr | `Unknown argument: <arg>. Run "mind-ontology review --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology setup`
 
@@ -203,7 +203,7 @@ itself never touches the filesystem.
 | Unknown target | `--target must be one of "claude-code", "codex", got: <x>` | Use a listed target id. |
 | Existing config in write mode | `Refusing to overwrite <path>: file already exists. Re-run with --print and merge the agentctx server block by hand.` | Re-run with `--print`, merge the block by hand. |
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology setup --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 Warnings (stderr, exit `0` — the plan is still printed/written; cataloged here
 so operators find them):
@@ -238,16 +238,18 @@ but they do **not yet point to a next action**. They are usable today; improving
 them is a future *engine* change (out of scope for a docs/tests lane), tracked
 here so the gap is visible rather than silently accepted:
 
-- **`Unknown argument: <arg>`** (compile & init) — names the offending flag but
-  does not point to `--help`. Candidate: append `(see --help)`.
 - **`Template not found: <name>`** (init) — names the bad template but does not
   list the available ones. Candidate: append `Available: <list>`.
 - **`validate` issue lines** — name the file, block, and rule but carry no inline
   fix hint or doc link. Candidate: attach a one-line remedy per rule.
 
-Until then, fall back to `--help` (for the flag/template cases) or the
+Until then, fall back to `--help` (for the template case) or the
 [schema validation](mind-ontology-schema-validation-v0.md) doc (for validate
 rules).
+
+(Closed lanes: `Unknown argument: <arg>` now points at the command's own
+`--help` across every command — `Run "mind-ontology <command> --help" for the
+list of options.` — locked per command in the error-UX catalog test.)
 
 ---
 

@@ -156,8 +156,7 @@ const CASES = [
     argv: ["compile", "--cwd", "{cwd}", "--task", "x", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    // No next-action hint today — see docs/cli-errors.md (candidate repair lane).
-    nextAction: null,
+    nextAction: /mind-ontology compile --help/,
   },
   {
     id: "compile: missing .agentctx/",
@@ -206,7 +205,7 @@ const CASES = [
     argv: ["init", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology init --help/,
   },
   {
     id: "validate: missing .agentctx/",
@@ -273,7 +272,7 @@ const CASES = [
     argv: ["emit", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology emit --help/,
   },
   {
     id: "emit: missing .agentctx/ (compile pass-through)",
@@ -307,7 +306,7 @@ const CASES = [
     argv: ["review", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology review --help/,
   },
   // ── W8: `mind-ontology cq` hard-error rows (W2 §10; the unanswered-report
   //    path and the required-only gate are locked in cq-command.test.mjs) ─────
@@ -341,7 +340,7 @@ const CASES = [
     argv: ["cq", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology cq --help/,
   },
   // ── W7: `mind-ontology status` hard-error rows (W2 §10; the unhealthy-report
   //    path is a multi-line stdout report, locked in status-command.test.mjs) ──
@@ -367,7 +366,7 @@ const CASES = [
     argv: ["status", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology status --help/,
   },
   // ── W6: `mind-ontology preview` rows (W2 §10: identical to compile's, plus
   //    the Workbench text|json --format vocabulary) ──────────────────────────
@@ -401,7 +400,7 @@ const CASES = [
     argv: ["preview", "--cwd", "{cwd}", "--task", "x", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology preview --help/,
   },
   {
     id: "preview: missing .agentctx/ (compile pass-through)",
@@ -462,7 +461,7 @@ const CASES = [
     argv: ["setup", "--cwd", "{cwd}", "--target", "codex", "--bogus", "--print"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology setup --help/,
   },
   {
     id: "setup: write mode refuses an existing config",

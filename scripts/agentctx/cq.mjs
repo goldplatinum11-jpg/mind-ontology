@@ -48,7 +48,7 @@ export function parseCqArgv(argv = process.argv.slice(2)) {
     } else if (arg === "-h" || arg === "--help") {
       parsed.help = true;
     } else {
-      throw new Error(`Unknown argument: ${arg}`);
+      throw new Error(`Unknown argument: ${arg}. Run "mind-ontology cq --help" for the list of options.`);
     }
   }
   return parsed;

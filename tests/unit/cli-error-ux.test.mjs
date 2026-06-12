@@ -28,8 +28,8 @@ describe("compile arg/source errors are actionable (M42)", () => {
   it("rejects a bad --risk with the allowed values", () => {
     expect(() => parseArgv(["compile", "--task", "x", "--risk", "nope"])).toThrow(/--risk must be "auto", "safe", or "risky"/);
   });
-  it("rejects an unknown flag by name", () => {
-    expect(() => parseArgv(["compile", "--task", "x", "--bogus"])).toThrow(/Unknown argument: --bogus/);
+  it("rejects an unknown flag by name and points at the command's --help", () => {
+    expect(() => parseArgv(["compile", "--task", "x", "--bogus"])).toThrow(/Unknown argument: --bogus.*mind-ontology compile --help/);
   });
   it("a missing .agentctx/ points the user at agentctx:init", () => {
     expect(() => validateAgentctxSources(tmp())).toThrow(/Missing \.agentctx\/.*agentctx:init/s);
@@ -50,8 +50,8 @@ describe("init errors are actionable (M42)", () => {
   it("names an unknown template", () => {
     expect(() => initAgentctx({ cwd: tmp(), template: "does-not-exist" })).toThrow(/Template not found: does-not-exist/);
   });
-  it("rejects an unknown init flag by name", () => {
-    expect(() => parseInitArgv(["--bogus"])).toThrow(/Unknown argument: --bogus/);
+  it("rejects an unknown init flag by name and points at the command's --help", () => {
+    expect(() => parseInitArgv(["--bogus"])).toThrow(/Unknown argument: --bogus.*mind-ontology init --help/);
   });
 });
 
