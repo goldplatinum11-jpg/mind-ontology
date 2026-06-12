@@ -89,6 +89,23 @@ Inherits the global ontology constraints:
 
 ---
 
+## Validator enforcement
+
+`npm run agentctx:validate` applies the `cq.md` entry of `ONTOLOGY_SCHEMA`
+(`scripts/agentctx/schema.mjs`). Rules apply only when the file is present; a
+project without `cq.md` still validates.
+
+| Rule | Level | What it checks |
+|---|---|---|
+| `namespace-required` | error | At least one block tagged `#cq` exists. |
+| `question-title` | error | Every `#cq` block title is a question ending in `?`. |
+| `topic-tag` | error | Every `#cq` block carries at least one topic tag besides `#cq`. |
+| `non-empty-body` | error | Every `#cq` block has a non-empty body. |
+| `required-tag` | error | Blocks tagged `#context` and `#safety` exist. |
+| `no-credentials` | error | No credential-shaped `key: value` line anywhere in the file. |
+
+---
+
 ## Conformance
 
 `tests/unit/agentctx-cq-schema.test.mjs` parses the shipped

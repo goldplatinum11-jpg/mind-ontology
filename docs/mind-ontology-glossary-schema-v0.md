@@ -38,9 +38,12 @@ an AI agent receives before acting.
 A conformant glossary term block:
 
 - carries the `#term` tag (the namespace tag that marks a glossary entry);
-- SHOULD carry at least one topic tag in addition to `#term` (e.g. `#context`,
-  `#constraint`) so scope queries can select related terms;
+- carries at least one topic tag in addition to `#term` (e.g. `#context`,
+  `#constraint`) so scope queries can select related terms — `agentctx:validate`
+  rejects a bare `#term` block (`topic-tag` error);
 - has a non-empty definition body;
+- has a title that is unique among `#term` blocks, compared case-insensitively
+  (`Foo` and `foo` count as duplicates);
 - defines exactly one term per block (the heading is the term).
 
 A conformant `glossary.md` MUST contain **at least one** `#term` block.
@@ -73,6 +76,22 @@ Inherits the global ontology constraints:
   pack small.
 - Wired into `SOURCE_FILES` by P2-PR06; until then the schema defines the
   authoring contract only.
+
+---
+
+## Validator enforcement
+
+`npm run agentctx:validate` applies the `glossary.md` entry of
+`ONTOLOGY_SCHEMA` (`scripts/agentctx/schema.mjs`). Rules apply only when the
+file is present; a project without `glossary.md` still validates.
+
+| Rule | Level | What it checks |
+|---|---|---|
+| `namespace-required` | error | At least one block tagged `#term` exists. |
+| `topic-tag` | error | Every `#term` block carries at least one topic tag besides `#term`. |
+| `non-empty-body` | error | Every `#term` block has a non-empty body. |
+| `unique-titles` | error | `#term` titles are unique, compared case-insensitively. |
+| `no-credentials` | error | No credential-shaped `key: value` line anywhere in the file. |
 
 ---
 

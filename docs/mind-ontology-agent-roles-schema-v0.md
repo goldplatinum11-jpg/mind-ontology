@@ -87,6 +87,22 @@ Inherits the global ontology constraints:
 
 ---
 
+## Validator enforcement
+
+`npm run agentctx:validate` applies the `agent-roles.md` entry of
+`ONTOLOGY_SCHEMA` (`scripts/agentctx/schema.mjs`). Rules apply only when the
+file is present; a project without `agent-roles.md` still validates.
+
+| Rule | Level | What it checks |
+|---|---|---|
+| `namespace-required` | error | At least one block tagged `#agent` exists. |
+| `one-role-tag` | error | Every `#agent` block carries exactly one tag besides `#agent`. |
+| `non-empty-body` | error | Every `#agent` block has a non-empty body. |
+| `required-tag` | error | Blocks tagged `#coding` and `#review` exist. |
+| `no-credentials` | error | No credential-shaped `key: value` line anywhere in the file. |
+
+---
+
 ## Conformance
 
 `tests/unit/agentctx-agent-roles-schema.test.mjs` parses the shipped

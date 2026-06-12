@@ -44,7 +44,9 @@ as ordinary body text by the compiler.
 |---|---|---|---|
 | Active project | `#active` | `Name`, `Status` | Non-empty description of the active project. |
 
-The active project block MUST also carry the `#project` namespace tag.
+The active project block MUST also carry the `#project` namespace tag (a
+template convention asserted by the conformance test; `agentctx:validate` does
+not enforce `#project`).
 
 `Status` for the active project SHOULD be `active`.
 
@@ -65,9 +67,9 @@ selected per task like other non-constraint sources.
 ## Field conventions
 
 - `Name:` — a short human-readable label, not a path or URL.
-- `Status:` — one of `active`, `exploratory`, `paused`, `archived`. Unknown
-  values are allowed but discouraged; `active` and `archived` carry the clearest
-  selection meaning.
+- `Status:` — one of `active`, `exploratory`, `paused`, `archived`. Any other
+  value fails validation (`enum-field` error), in every block that carries a
+  `Status:` line — optional project blocks included.
 - Field lines appear before the prose body and each on their own line.
 
 ---
@@ -89,6 +91,24 @@ Inherits the global ontology constraints:
   task mentioning a project name can surface its block.
 - Wired into `SOURCE_FILES` by P2-PR06; until then the schema defines the
   authoring contract only.
+
+---
+
+## Validator enforcement
+
+`npm run agentctx:validate` applies the `projects.md` entry of
+`ONTOLOGY_SCHEMA` (`scripts/agentctx/schema.mjs`). Rules apply only when the
+file is present; a project without `projects.md` still validates.
+
+| Rule | Level | What it checks |
+|---|---|---|
+| `required-tag` | error | A block tagged `#active` exists. |
+| `required-field` | error | Every `#active` block has `Name:` and `Status:` field lines. |
+| `enum-field` | error | Any block with a `Status:` line uses one of: `active`, `exploratory`, `paused`, `archived`. |
+| `no-credentials` | error | No credential-shaped `key: value` line anywhere in the file. |
+
+The validator does not require the `#project` namespace tag or non-empty
+bodies; those are template conventions pinned by the conformance test.
 
 ---
 
