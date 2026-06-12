@@ -24,15 +24,30 @@ npm run agentctx:validate -- --cwd "C:/path/to/project"
 ```
 
 Exit code is `0` when there are no errors, `1` otherwise — safe to wire into CI
-next to `agentctx:smoke`. Output lists one line per issue plus a summary, e.g.:
+next to `agentctx:smoke`. Each issue renders as a `LEVEL [rule] message` line
+followed by an aligned `fix:` continuation line with the concrete next action,
+and a failing report ends with a pointer to the authoring guide, e.g.:
 
 ```text
 Mind Ontology schema validation
 
+  ERROR  [required-tag] identity.md is missing a block tagged #style
+         fix: Add a block headed "## <title> #style" to identity.md.
   WARNING  [recommended-tag] identity.md has no block tagged #operator (recommended)
-  ERROR    [required-tag] identity.md is missing a block tagged #style
+           fix: Add a block headed "## <title> #operator" to identity.md (optional; clears this warning).
 
 INVALID — 1 error(s), 1 warning(s)
+See docs/schema-authoring.md for the block format and per-file rules.
+```
+
+A clean run stays clean — no `fix:` lines and no doc pointer:
+
+```text
+Mind Ontology schema validation
+
+  OK — every source conforms to its schema.
+
+VALID — 0 error(s), 0 warning(s)
 ```
 
 ---
@@ -80,9 +95,12 @@ const report = validateOntology(process.cwd());
 if (!report.ok) {
   for (const issue of report.issues) {
     console.error(`${issue.level} [${issue.rule}] ${issue.message}`);
+    if (issue.remedy) console.error(`  fix: ${issue.remedy}`);
   }
 }
 ```
 
 `report` is `{ ok, errors, warnings, issues }`, where each issue is
-`{ file, level, rule, message }`.
+`{ file, level, rule, message, remedy }`. `remedy` is the concrete next action
+for that rule (the same text the CLI renders on the `fix:` line), built from
+`RULE_REMEDIES` in `schema.mjs`; it is `null` only if a rule has no mapping.
