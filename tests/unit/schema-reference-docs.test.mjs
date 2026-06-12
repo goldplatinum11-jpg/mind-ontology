@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ONTOLOGY_SCHEMA, RULE_REMEDIES } from "../../scripts/agentctx/schema.mjs";
+import { ONTOLOGY_SCHEMA, RULE_REMEDIES, validateSource } from "../../scripts/agentctx/schema.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -155,6 +155,53 @@ describe("per-file schema reference docs are pinned to ONTOLOGY_SCHEMA", () => {
       const doc = DOC_FOR.get(file);
       expect(doc, `${file} doc must not soften the enum`).not.toMatch(/allowed but discouraged/i);
       expect(doc, `${file} doc must state out-of-enum values fail`).toMatch(/any\s+other\s+value\s+fails\s+validation/i);
+    }
+  });
+});
+
+// The ```md fence under each doc's "## Example (minimal conformant file)"
+// heading. The fence body contains "## " block headings of its own, so the
+// section cannot be ended at the next ## line; instead the anchor is that the
+// example heading leads directly into its fence, which keeps the docs'
+// illustrative "Block model" fences (all before this heading) out of reach.
+function exampleFixture(file) {
+  const parts = DOC_FOR.get(file).split(/^## Example \(minimal conformant file\)$/m);
+  expect(parts.length, `${file} reference doc has no "## Example (minimal conformant file)" section`).toBe(2);
+  const fence = parts[1].match(/^```md\n([\s\S]*?)^```$/m);
+  expect(fence, `${file} example section has no \`\`\`md fence`).toBeTruthy();
+  expect(
+    parts[1].slice(0, fence.index).trim(),
+    `${file} example heading must lead directly into its \`\`\`md fence`,
+  ).toBe("");
+  return fence[1];
+}
+
+// schema-reference-examples-fixture-v1 — execute each doc's minimal example as
+// a fixture through validateSource, so a schema change that stops accepting a
+// documented example fails here instead of the docs shipping a broken example.
+describe("per-file schema reference doc examples validate as fixtures", () => {
+  it("every example fence is a non-trivial ontology source", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const fixture = exampleFixture(file);
+      expect(fixture.trim().length, `${file} example fence is empty`).toBeGreaterThan(0);
+      expect(fixture, `${file} example fence has no "## " block heading`).toMatch(/^## /m);
+    }
+  });
+
+  it("every documented minimal example validates clean — no errors, no warnings", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const issues = validateSource(file, exampleFixture(file), ONTOLOGY_SCHEMA[file]);
+      expect(issues, `${file} documented minimal example no longer validates`).toEqual([]);
+    }
+  });
+
+  it("the fixture check is not vacuous: an emptied example fails every schema entry", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const issues = validateSource(file, "", ONTOLOGY_SCHEMA[file]);
+      expect(
+        issues.some((issue) => issue.level === "error"),
+        `${file} schema accepts an empty source, so the example fixture proves nothing`,
+      ).toBe(true);
     }
   });
 });
