@@ -567,7 +567,7 @@ pointed to, no stack trace, correct stream per section 2.3.
 | `--full` with `--check` | `--full cannot be combined with --check (--check verifies against the profile recorded in the artifact header)` | Drop one flag. |
 | `--force` with `--check` | `--force cannot be combined with --check (--check never writes)` | Drop one flag. |
 | Compile errors | unchanged pass-through of the `agentctx:compile` rows | per the existing catalog |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology emit --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 Warning (stderr, exit **0**, artifact still written — not an error row but
 cataloged with them so operators find it):
