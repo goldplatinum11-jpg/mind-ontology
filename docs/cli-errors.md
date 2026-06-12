@@ -50,7 +50,7 @@ to the operator, and apply the named fix. Do not retry verbatim.
 | Failure | Message (stderr) | Next safe action |
 |---|---|---|
 | `.agentctx/` already exists | `.agentctx/ already exists. Re-run with --force to overwrite template files.` | Pass `--force` (preserves your own non-template files). |
-| Unknown template | `Template not found: <name>` | Use an existing template under `templates/` (default `mind-ontology`). |
+| Unknown template | `Template not found: <name>. Available templates: <list>. Pass one with --template <name>.` | Use one of the listed templates (default `mind-ontology`). |
 | Unknown flag | `Unknown argument: <arg>. Run "mind-ontology init --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `agentctx:metrics`
@@ -238,18 +238,19 @@ but they do **not yet point to a next action**. They are usable today; improving
 them is a future *engine* change (out of scope for a docs/tests lane), tracked
 here so the gap is visible rather than silently accepted:
 
-- **`Template not found: <name>`** (init) — names the bad template but does not
-  list the available ones. Candidate: append `Available: <list>`.
 - **`validate` issue lines** — name the file, block, and rule but carry no inline
   fix hint or doc link. Candidate: attach a one-line remedy per rule.
 
-Until then, fall back to `--help` (for the template case) or the
-[schema validation](mind-ontology-schema-validation-v0.md) doc (for validate
-rules).
+Until then, fall back to the
+[schema validation](mind-ontology-schema-validation-v0.md) doc for validate
+rules.
 
 (Closed lanes: `Unknown argument: <arg>` now points at the command's own
 `--help` across every command — `Run "mind-ontology <command> --help" for the
-list of options.` — locked per command in the error-UX catalog test.)
+list of options.` — locked per command in the error-UX catalog test.
+`Template not found: <name>` (init) now lists the available templates and the
+`--template <name>` flag to pass one — locked in the error-UX catalog test
+and unit-tested down to the empty-templates edge case.)
 
 ---
 

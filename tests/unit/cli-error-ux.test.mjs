@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseArgv, validateAgentctxSources } from "../../scripts/agentctx/compile.mjs";
-import { initAgentctx, parseInitArgv } from "../../scripts/agentctx/init.mjs";
+import { initAgentctx, listAvailableTemplates, parseInitArgv } from "../../scripts/agentctx/init.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const COMPILE_CLI = resolve(REPO_ROOT, "scripts/agentctx/compile.mjs");
@@ -47,8 +47,27 @@ describe("init errors are actionable (M42)", () => {
     initAgentctx({ cwd });
     expect(() => initAgentctx({ cwd })).toThrow(/already exists\. Re-run with --force/);
   });
-  it("names an unknown template", () => {
-    expect(() => initAgentctx({ cwd: tmp(), template: "does-not-exist" })).toThrow(/Template not found: does-not-exist/);
+  it("names an unknown template and lists the available ones", () => {
+    expect(() => initAgentctx({ cwd: tmp(), template: "does-not-exist" })).toThrow(
+      /Template not found: does-not-exist\. Available templates: mind-ontology\. Pass one with --template <name>\./,
+    );
+  });
+  it("lists only directories that actually carry a .agentctx/ template", () => {
+    const templatesRoot = tmp();
+    mkdirSync(join(templatesRoot, "alpha", ".agentctx"), { recursive: true });
+    mkdirSync(join(templatesRoot, "beta", ".agentctx"), { recursive: true });
+    mkdirSync(join(templatesRoot, "not-a-template")); // no .agentctx/ inside
+    expect(listAvailableTemplates(templatesRoot)).toEqual(["alpha", "beta"]);
+    expect(() => initAgentctx({ cwd: tmp(), template: "nope", templatesRoot })).toThrow(
+      /Template not found: nope\. Available templates: alpha, beta\./,
+    );
+  });
+  it("still fails closed when no templates exist at all", () => {
+    const templatesRoot = join(tmp(), "missing-root");
+    expect(listAvailableTemplates(templatesRoot)).toEqual([]);
+    expect(() => initAgentctx({ cwd: tmp(), template: "nope", templatesRoot })).toThrow(
+      /Template not found: nope\. No templates found under /,
+    );
   });
   it("rejects an unknown init flag by name and points at the command's --help", () => {
     expect(() => parseInitArgv(["--bogus"])).toThrow(/Unknown argument: --bogus.*mind-ontology init --help/);

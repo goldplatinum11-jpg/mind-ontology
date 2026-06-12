@@ -196,8 +196,7 @@ const CASES = [
     argv: ["init", "--cwd", "{cwd}", "--template", "does-not-exist"],
     stream: "stderr",
     names: /Template not found: does-not-exist/,
-    // Names the bad template but does not list valid ones — candidate repair lane.
-    nextAction: null,
+    nextAction: /Available templates: mind-ontology.*--template <name>/,
   },
   {
     id: "init: unknown flag",
