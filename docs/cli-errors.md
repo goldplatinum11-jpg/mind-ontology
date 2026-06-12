@@ -68,7 +68,7 @@ to act on is on **stdout**, prefixed by its severity and rule name. Every issue
 line carries an indented `fix:` continuation line naming the concrete next
 action, and a failing report ends with a pointer to the authoring doc, e.g.:
 
-```
+```text
   ERROR  [missing-dir] Missing .agentctx/ in <cwd>
          fix: Run "npm run agentctx:init" to scaffold starter files.
   ERROR  [required-tag] identity.md is missing a block tagged #style

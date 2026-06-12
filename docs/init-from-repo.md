@@ -5,7 +5,7 @@ brand-new project, but a user adopting Mind Ontology inside an existing
 repository should not stare at nine empty templates: the repository already
 states most of the facts an ontology starts from.
 
-```
+```text
 mind-ontology init --from-repo [--cwd <path>] [--force]
 ```
 
