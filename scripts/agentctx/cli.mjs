@@ -22,6 +22,7 @@
  * not a growth surface):
  *
  *   mind-ontology emit [--check]          ->  scripts/agentctx/emit.mjs ...
+ *   mind-ontology setup --target <client> ->  scripts/agentctx/setup.mjs ...
  */
 
 import { spawnSync } from "node:child_process";
@@ -117,6 +118,13 @@ export const COMMANDS = {
     npmScript: null,
     group: "operator",
     summary: "Validate a worker Result Pack against its shape invariants.",
+  },
+  setup: {
+    script: "setup.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Wire an agent client (claude-code, codex): MCP config + startup bootstrap.",
   },
 };
 

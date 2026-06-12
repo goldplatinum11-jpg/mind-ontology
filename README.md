@@ -170,7 +170,16 @@ At task start, call get_context(task). Before destructive or structural
 changes, call list_constraints().
 ```
 
-See the [quickstart](docs/mind-ontology-quickstart.md) for the install-first
+One command produces this wiring per client — the MCP config plus a startup /
+first-action bootstrap instruction (deterministic, local-only, never
+overwrites an existing config):
+
+```sh
+npx mind-ontology setup --target claude-code --print   # or: codex
+```
+
+See [agent setup](docs/agent-setup.md) for the adoption-autoload flow, the
+[quickstart](docs/mind-ontology-quickstart.md) for the install-first
 flow and [client setup proofs](docs/mind-ontology.md#client-setup) for
 per-tool wiring. The engine's classic entry points keep working too:
 
