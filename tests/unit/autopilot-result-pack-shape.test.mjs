@@ -37,11 +37,13 @@ const RUNWAY_SUBKEYS = [
   "reason_for_continuation",
 ];
 
-// Each `validation` entry is a gate the worker ran: the doc calls the object
-// "the gates the worker ran and whether they passed". The doc carries no field
-// table for an entry, so this is a fixture-shape pin only — every entry must
-// name its `command`, its `result`, and a boolean `passed` verdict, so the
-// controller can re-run the gate rather than trust the summary.
+// Each `validation` entry is a gate the worker ran. The doc's key table now
+// names the entry fields inline (`command`, `result`, `passed`), mirroring the
+// adls_completed / uncommitted_changes rows, so this list is both a
+// fixture-shape pin and the doc-surface contract: every entry must name its
+// `command`, its `result`, and a boolean `passed` verdict, so the controller
+// can re-run the gate rather than trust the summary, and the doc can't silently
+// drop one of the three documented field names.
 const VALIDATION_ENTRY_FIELDS = ["command", "result", "passed"];
 
 // The doc's key table names `uncommitted_changes` as "`added` / `modified`
@@ -146,6 +148,12 @@ describe("autopilot result-pack shape guard (A14)", () => {
       expect(typeof entry.command, `validation.${gate}.command is not a string`).toBe("string");
       expect(typeof entry.result, `validation.${gate}.result is not a string`).toBe("string");
       expect(typeof entry.passed, `validation.${gate}.passed is not a boolean`).toBe("boolean");
+    }
+  });
+
+  it("the doc documents every validation entry field", () => {
+    for (const field of VALIDATION_ENTRY_FIELDS) {
+      expect(docText, `doc omits validation entry field: ${field}`).toContain(field);
     }
   });
 

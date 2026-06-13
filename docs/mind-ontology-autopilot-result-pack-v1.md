@@ -26,7 +26,7 @@ not a network call, not a hosted write, and not a SIRT control-plane object.
 | `write_scope_respected` | boolean | the worker stayed inside its allowed write scope |
 | `forbidden_scope_touched` | boolean | must be `false` for a clean handoff |
 | `adls_completed` | array | one entry per ADL: `id`, `title`, `artifact`, `guard_test` |
-| `validation` | object | the gates the worker ran and whether they passed |
+| `validation` | object | one entry per gate: `command`, `result`, `passed` — the gates the worker ran and whether they passed |
 | `uncommitted_changes` | object | `added` / `modified` file lists for controller review |
 | `handoff` | string | one-line summary of what the controller should do next |
 
