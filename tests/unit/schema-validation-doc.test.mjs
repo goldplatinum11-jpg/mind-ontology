@@ -128,3 +128,107 @@ describe("'What it checks' table is pinned to ONTOLOGY_SCHEMA", () => {
     expect(ROW_FOR.get("all files")).toContain("no-secrets");
   });
 });
+
+// schema-validation-vs-reference-docs-v1 — a DIRECT cross-document audit. The
+// central validation doc's "What it checks" table summarizes each source's
+// rules; every per-file docs/mind-ontology-*-schema-v0.md reference doc carries
+// its own "Validator enforcement" table. Both are independently pinned to
+// ONTOLOGY_SCHEMA elsewhere, but nothing pins them to EACH OTHER — so a wording
+// change that updates one doc's tags/fields/enum values and forgets the other
+// can still match the schema while the two public docs disagree. This compares
+// the two docs to each other, not to the schema, and fails on that drift.
+
+// constraints.md is documented by the authoring guide; every other schema entry
+// ships a per-file reference doc whose name mirrors the source file name.
+const CROSS_REFERENCE_DOCS = Object.keys(ONTOLOGY_SCHEMA)
+  .filter((file) => file !== "constraints.md")
+  .map((file) => [file, `docs/mind-ontology-${file.replace(/\.md$/, "")}-schema-v0.md`]);
+
+const REFERENCE_DOC_FOR = new Map(
+  CROSS_REFERENCE_DOCS.map(([file, path]) => [
+    file,
+    readFileSync(resolve(REPO_ROOT, path), "utf8").replace(/\r\n/g, "\n"),
+  ]),
+);
+
+// Concatenated text of a reference doc's "## Validator enforcement" rule rows
+// (lines that begin "| `"), ended at the next ## heading so prose elsewhere in
+// the doc — e.g. projects' "does not require the #project namespace tag" note —
+// cannot leak primitives into the comparison.
+function enforcementTableText(file) {
+  const parts = REFERENCE_DOC_FOR.get(file).split(/^## Validator enforcement$/m);
+  expect(parts.length, `${file} reference doc has no "## Validator enforcement" section`).toBe(2);
+  return parts[1]
+    .split(/\n## /)[0]
+    .split("\n")
+    .filter((line) => line.startsWith("| `"))
+    .join("\n");
+}
+
+// The schema primitives a doc fragment names, read straight from its text:
+//   tags  — #tag tokens (required, recommended, and namespace tags)
+//   fields — backticked `Name:`-style field-line names
+//   enums  — backticked lowercase enum/status values
+// Each is what a human reading that fragment would see, so equality across the
+// two docs means the two public summaries genuinely agree.
+function primitives(text) {
+  return {
+    tags: new Set([...text.matchAll(/#([a-z][a-z0-9-]*)/gi)].map((m) => m[1])),
+    fields: new Set([...text.matchAll(/`([A-Z][A-Za-z]*):`/g)].map((m) => m[1])),
+    enums: new Set([...text.matchAll(/`([a-z][a-z]+)`/g)].map((m) => m[1])),
+  };
+}
+
+const sortedArray = (set) => [...set].sort();
+
+describe("validation doc 'What it checks' rows agree with the per-file reference docs", () => {
+  it("every per-file reference doc has a matching row in the validation doc", () => {
+    for (const [file] of CROSS_REFERENCE_DOCS) {
+      expect(ROW_FOR.has(file), `validation doc has no "What it checks" row for ${file}`).toBe(true);
+    }
+  });
+
+  it("each validation-doc row names exactly the tags its reference doc's enforcement table names", () => {
+    for (const [file] of CROSS_REFERENCE_DOCS) {
+      const fromValidationDoc = primitives(ROW_FOR.get(file)).tags;
+      const fromReferenceDoc = primitives(enforcementTableText(file)).tags;
+      expect(
+        sortedArray(fromValidationDoc),
+        `${file}: validation doc row and reference enforcement table disagree on #tags`,
+      ).toEqual(sortedArray(fromReferenceDoc));
+    }
+  });
+
+  it("each row agrees with its reference doc on field-line names and enum values", () => {
+    for (const [file] of CROSS_REFERENCE_DOCS) {
+      const fromValidationDoc = primitives(ROW_FOR.get(file));
+      const fromReferenceDoc = primitives(enforcementTableText(file));
+      expect(
+        sortedArray(fromValidationDoc.fields),
+        `${file}: validation doc row and reference doc disagree on field-line names`,
+      ).toEqual(sortedArray(fromReferenceDoc.fields));
+      expect(
+        sortedArray(fromValidationDoc.enums),
+        `${file}: validation doc row and reference doc disagree on enum values`,
+      ).toEqual(sortedArray(fromReferenceDoc.enums));
+    }
+  });
+
+  it("is not vacuous: the audit exercises tag, field, and enum agreement on real sources", () => {
+    const everyTag = new Set();
+    const everyField = new Set();
+    const everyEnum = new Set();
+    for (const [file] of CROSS_REFERENCE_DOCS) {
+      const { tags, fields, enums } = primitives(ROW_FOR.get(file));
+      tags.forEach((tag) => everyTag.add(tag));
+      fields.forEach((field) => everyField.add(field));
+      enums.forEach((value) => everyEnum.add(value));
+    }
+    // projects.md contributes Name:/Status: fields and the Status enum values;
+    // every namespaced/required-tag source contributes #tags. If any class went
+    // empty the equality checks above would be trivially satisfiable.
+    expect(everyTag.size, "no #tags compared across the two docs").toBeGreaterThan(0);
+    expect(everyField.size, "no field-line names compared across the two docs").toBeGreaterThan(0);
+    expect(everyEnum.size, "no enum values compared across the two docs").toBeGreaterThan(0);
+  });
+});
