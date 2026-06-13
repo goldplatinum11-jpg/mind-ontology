@@ -110,6 +110,35 @@ describe("autopilot stop policy v1 (A3)", () => {
     expect(apply).toMatch(/the controller reviews and\s+commits/);
   });
 
+  // The closing paragraph of "How an agent applies it" mirrors the reading
+  // protocol: it couples the worker's get_context(task) read to the controller's
+  // list_constraints() + this-policy re-read, and gates continuation on a *valid*
+  // terminal condition. This coupling — not just the valid/invalid lists — is the
+  // load-bearing claim, and it must back-link to the reading-protocol doc so the
+  // two halves stay in sync. Pin the sentence structurally inside the section.
+  it("pins the reading-protocol mirror: worker get_context, controller list_constraints, continue-unless-valid", () => {
+    const t = text();
+    const applyIdx = t.indexOf("## how an agent applies it");
+    const next = t.indexOf("## boundary, not behavior change");
+    const apply = t.slice(applyIdx, next > applyIdx ? next : undefined);
+    // Back-link to the reading protocol keeps the mirror anchored to its source.
+    expect(apply).toMatch(
+      /this mirrors the \[reading protocol\]\(mind-ontology-autopilot-reading-protocol-v1\.md\)/,
+    );
+    // Worker side of the mirror: get_context(task) at each lane step.
+    const workerIdx = apply.search(/the worker calls `get_context\(task\)`/);
+    expect(workerIdx).toBeGreaterThanOrEqual(0);
+    // Controller side: re-reads list_constraints() *and this policy* before
+    // approving continuation — both halves, not just the constraints read.
+    const controllerIdx = apply.search(
+      /the controller re-reads `list_constraints\(\)` and this policy/,
+    );
+    expect(controllerIdx).toBeGreaterThan(workerIdx);
+    // Continuation is gated on a *valid* terminal condition — the same closure the
+    // valid list and the controller's reading-protocol step depend on.
+    expect(apply).toMatch(/continues unless a \*valid\* terminal condition is met/);
+  });
+
   it("guarantees continuation never crosses a forbidden boundary to stay busy", () => {
     const t = text();
     const boundaryIdx = t.indexOf("## boundary, not behavior change");
