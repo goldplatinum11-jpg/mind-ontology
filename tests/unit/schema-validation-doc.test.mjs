@@ -232,3 +232,75 @@ describe("validation doc 'What it checks' rows agree with the per-file reference
     expect(everyEnum.size, "no enum values compared across the two docs").toBeGreaterThan(0);
   });
 });
+
+// schema-validation-vs-reference-docs-structural-rules-v1 — the primitive audit
+// above ties the two public docs together on NAMED primitives (#tags, field
+// lines, enum values). But each schema source also enforces STRUCTURAL rules
+// that name no such primitive: every-block-has-tag, question-title, topic-tag,
+// non-empty-body, one-role-tag, unique-titles. The central validation doc states
+// these in prose ("each is phrased as a question", "a unique title
+// (case-insensitive)"); each per-file reference doc names them as rule-id markers
+// in its "Validator enforcement" Rule column (`question-title`, `unique-titles`).
+// Both sides are independently pinned to ONTOLOGY_SCHEMA elsewhere, but nothing
+// ties the central doc's structural PROSE to the reference doc's structural
+// MARKERS directly — so dropping "question" from one row while the `question-title`
+// marker stays in the other still reads as agreement. This audit links the two
+// docs by structural rule and fails on that drift.
+
+// Each structural rule: the rule id as it appears in a reference doc's
+// enforcement-table Rule column, and the prose pattern that must appear in the
+// central validation doc's row when the rule is enforced. Tag/field/enum rules
+// (required-tag, recommended-tag, namespace-required, required-field, enum-field)
+// are covered by the primitive audit above and are intentionally excluded here.
+const STRUCTURAL_RULE_MARKERS = [
+  ["every-block-has-tag", /every block/i],
+  ["question-title", /question/i],
+  ["topic-tag", /topic tag/i],
+  ["non-empty-body", /non-empty body/i],
+  ["one-role-tag", /exactly one/i],
+  ["unique-titles", /unique title/i],
+];
+
+// Whether a reference doc's enforcement table names a rule id, read the way a
+// human scanning its Rule column would: the id appears backticked in a row, e.g.
+// "| `question-title` | error | ...". enforcementTableText already restricts the
+// text to those rule rows, so prose elsewhere in the doc cannot satisfy this.
+function enforcementNamesRule(file, rule) {
+  return enforcementTableText(file).includes(`\`${rule}\``);
+}
+
+describe("validation doc rows and reference docs agree on structural-rule wording", () => {
+  it("each structural rule is stated on both docs or neither, per source", () => {
+    for (const [file] of CROSS_REFERENCE_DOCS) {
+      const row = ROW_FOR.get(file);
+      for (const [rule, prose] of STRUCTURAL_RULE_MARKERS) {
+        const inReferenceDoc = enforcementNamesRule(file, rule);
+        const inValidationDoc = prose.test(row);
+        expect(
+          inValidationDoc,
+          `${file}: reference doc ${inReferenceDoc ? "names" : "omits"} the ${rule} rule, ` +
+            `but the validation doc row ${inValidationDoc ? "states" : "omits"} its prose — ` +
+            "the two public docs disagree on a structural rule",
+        ).toBe(inReferenceDoc);
+      }
+    }
+  });
+
+  it("is not vacuous: real structural rules are exercised on both sides", () => {
+    // Some reference doc must actually name a structural rule (else the reference
+    // side is trivially false everywhere), and the matching prose must actually
+    // appear in the corresponding validation-doc row (else the validation side is
+    // trivially false everywhere) — otherwise the equality above proves nothing.
+    let namedInReference = 0;
+    let statedInValidation = 0;
+    for (const [file] of CROSS_REFERENCE_DOCS) {
+      const row = ROW_FOR.get(file);
+      for (const [rule, prose] of STRUCTURAL_RULE_MARKERS) {
+        if (enforcementNamesRule(file, rule)) namedInReference += 1;
+        if (prose.test(row)) statedInValidation += 1;
+      }
+    }
+    expect(namedInReference, "no structural rule named in any reference enforcement table").toBeGreaterThan(0);
+    expect(statedInValidation, "no structural-rule prose found in any validation doc row").toBeGreaterThan(0);
+  });
+});
