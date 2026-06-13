@@ -633,3 +633,148 @@ describe("cq.md reference doc states and shows the required #context and #safety
     }
   });
 });
+
+// schema-reference-cq-non-empty-body-v1 — non-empty-body (the perBlock.nonEmptyBody
+// rule) requires every #cq block to carry a body, not just a heading: a CQ with
+// only a question heading names what the ontology must answer but says nothing
+// about what answering it means. The cq.md reference doc states and shows that
+// requirement in four places — the "CQ block rules" prose, the "Validator
+// enforcement" non-empty-body row, the Block model illustration, and the minimal
+// example. The enforcement row is pinned to its rule semantics by the generic
+// "rows state each structural rule's semantics" test above, and the minimal
+// example runs through validateSource (so an emptied body fails the fixture suite
+// already). But the "CQ block rules" PROSE and the Block model ILLUSTRATION body
+// are otherwise unguarded: the prose bullet could drop the non-empty-body
+// requirement, or the illustration could show a body-less block, and silently
+// contradict the rule the doc documents. This audit pins every non-empty-body
+// surface in the cq.md doc, and self-guards so it fails loudly rather than passing
+// vacuously if cq.md ever stops enforcing non-empty-body. The central validation
+// doc's non-empty-body surface for cq.md is pinned separately by
+// schema-validation-doc.test.mjs (its structural-rule wording audits).
+describe("cq.md reference doc states and shows the non-empty-body requirement", () => {
+  const CQ_FILE = "cq.md";
+
+  it("cq.md still enforces non-empty-body (guard against a vacuous suite)", () => {
+    expect(
+      ONTOLOGY_SCHEMA[CQ_FILE]?.perBlock?.nonEmptyBody,
+      "cq.md no longer enforces non-empty-body — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the 'CQ block rules' prose states a #cq block needs a non-empty body", () => {
+    const parts = DOC_FOR.get(CQ_FILE).split(/^## CQ block rules$/m);
+    expect(parts.length, "cq.md reference doc has no '## CQ block rules' section").toBe(2);
+    const section = parts[1].split(/\n## /)[0];
+    expect(section, "CQ block rules prose omits the non-empty-body requirement").toMatch(
+      /non-empty body/i,
+    );
+  });
+
+  it("the enforcement-table non-empty-body row states the rule", () => {
+    const row = tableRows(enforcementSection(CQ_FILE)).get("non-empty-body");
+    expect(row, "cq.md enforcement table has no non-empty-body row").toBeTruthy();
+    expect(row.text, "non-empty-body row omits the 'non-empty body' wording").toMatch(
+      /non-empty body/i,
+    );
+  });
+
+  it("every Block model illustration block carries a non-empty body", () => {
+    const blocks = illustrativeBlocks(CQ_FILE);
+    expect(blocks.length, "cq.md Block model fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(
+        block.body.trim().length,
+        `Block model CQ "${block.title}" shows an empty body — contradicts non-empty-body`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("every minimal-example block carries a non-empty body", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(CQ_FILE), CQ_FILE);
+    expect(blocks.length, "cq.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(
+        block.body.trim().length,
+        `example CQ "${block.title}" shows an empty body — contradicts non-empty-body`,
+      ).toBeGreaterThan(0);
+    }
+  });
+});
+
+// schema-reference-agent-roles-required-coding-review-v1 — required-tag (the
+// requiredTags rule) forces agent-roles.md to define a #coding role AND a #review
+// role: together they are the minimum for a safe build-and-check loop, so the
+// schema requires a block tagged each. The agent-roles.md reference doc states and
+// shows that requirement in four places — the "Required roles" prose ("MUST define
+// at least these two roles"), the "Validator enforcement" required-tag row, the
+// Required-roles table's "Required tag" column, and the minimal example's two
+// #agent blocks. The enforcement row is pinned to ONTOLOGY_SCHEMA by the generic
+// "rows name every tag..." test above, and the minimal example runs through
+// validateSource (so dropping a required role fails the fixture suite). But the
+// "Required roles" PROSE and its TABLE are otherwise unguarded: the Required-roles
+// table could rename #coding -> #strategy (still a valid role tag, so the
+// one-role-tag fixture stays green) and silently contradict the rule the doc
+// documents one section below. This mirrors the cq.md required-#context/#safety
+// audit, pins every required-role surface to the schema's requiredTags, and
+// self-guards so it fails loudly rather than passing vacuously if agent-roles.md
+// ever stops requiring #coding and #review.
+describe("agent-roles.md reference doc states and shows the required #coding and #review roles", () => {
+  const ROLES_FILE = "agent-roles.md";
+  const NAMESPACE = "agent";
+  const REQUIRED = ONTOLOGY_SCHEMA[ROLES_FILE]?.requiredTags ?? [];
+
+  // The #tags named in every `| ... | #tag | ... |` row under a "## <heading>"
+  // table, ended at the next ## heading so later prose (e.g. the Recommended
+  // roles table) can't leak in.
+  function roleTagColumn(heading) {
+    const parts = DOC_FOR.get(ROLES_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `agent-roles.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1]
+      .split(/\n## /)[0]
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && line.includes("`#"))
+      .flatMap((line) => [...line.matchAll(/`(#[a-z][a-z0-9-]*)`/g)].map((m) => m[1]));
+  }
+
+  it("agent-roles.md still requires #coding and #review (guard against a vacuous suite)", () => {
+    expect(
+      [...REQUIRED].sort(),
+      "agent-roles.md no longer requires #coding and #review — retarget or retire this suite",
+    ).toEqual(["coding", "review"]);
+  });
+
+  it("the 'Required roles' prose states the roles are a mandatory baseline", () => {
+    const parts = DOC_FOR.get(ROLES_FILE).split(/^## Required roles$/m);
+    expect(parts.length, "agent-roles.md reference doc has no '## Required roles' section").toBe(2);
+    const section = parts[1].split(/\n## /)[0];
+    expect(section, "Required roles prose omits the MUST-define-at-least requirement").toMatch(
+      /MUST define at least these two roles/i,
+    );
+  });
+
+  it("the enforcement-table required-tag row names every required role tag", () => {
+    const row = tableRows(enforcementSection(ROLES_FILE)).get("required-tag");
+    expect(row, "agent-roles.md enforcement table has no required-tag row").toBeTruthy();
+    for (const tag of REQUIRED) {
+      expect(row.text, `required-tag row omits #${tag}`).toContain(`#${tag}`);
+    }
+  });
+
+  it("the Required-roles table's Required tag column lists exactly the schema's required tags", () => {
+    const tags = roleTagColumn("Required roles");
+    expect(
+      tags.map((tag) => tag.replace(/^#/, "")).sort(),
+      "Required-roles table tags drifted from the schema's requiredTags",
+    ).toEqual([...REQUIRED].sort());
+  });
+
+  it("the minimal example carries an #agent block for every required role", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(ROLES_FILE), ROLES_FILE);
+    expect(blocks.length, "agent-roles.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const tag of REQUIRED) {
+      const block = blocks.find((b) => b.tags.includes(tag));
+      expect(block, `minimal example omits a role tagged #${tag}`).toBeTruthy();
+      expect(block.tags, `example role for #${tag} omits the #agent namespace`).toContain(NAMESPACE);
+    }
+  });
+});
