@@ -110,6 +110,8 @@ export function parseArgv(argv = process.argv.slice(2)) {
       parsed.riskMode = m;
     } else if (arg === "--explain") {
       parsed.explain = true;
+    } else if (arg === "--rich-scoring") {
+      parsed.richScoring = true;
     } else if (arg === "-h" || arg === "--help") {
       parsed.command = "help";
     } else {
@@ -223,7 +225,7 @@ export function validateAgentctxSources(cwd = process.cwd()) {
   return { dir, required: REQUIRED_SOURCE_FILES };
 }
 
-export function scoreBlock(block, taskTokens, scopes = []) {
+export function scoreBlock(block, taskTokens, scopes = [], opts = {}) {
   const scopeSet = new Set(scopes.map((scope) => scope.toLowerCase()));
   const headingTokens = tokenize(`${block.title} ${block.tags.join(" ")}`);
   const bodyTokens = tokenize(block.body);
@@ -241,6 +243,21 @@ export function scoreBlock(block, taskTokens, scopes = []) {
     if (bodyTokens.includes(token)) score += 1;
   }
 
+  // Opt-in richer scoring (default OFF → identical to the legacy score above, so
+  // the minimal/safe-task behavior stays byte-for-byte). When enabled, a heading
+  // hit is treated as a stronger relevance signal than a body hit: matching the
+  // block's title/tags earns an extra boost so the block that *names* the topic
+  // breaks ties over one that only mentions it in passing. (Recency was scoped
+  // out: blocks carry no reliable per-block date signal to rank on.)
+  if (opts.richScoring) {
+    for (const scope of scopeSet) {
+      if (headingTokens.includes(scope)) score += 3;
+    }
+    for (const token of taskTokens) {
+      if (headingTokens.includes(token)) score += 2;
+    }
+  }
+
   return score;
 }
 
@@ -251,6 +268,7 @@ export function compileContext({
   maxBlocksPerFile = DEFAULT_MAX_BLOCKS_PER_FILE,
   minScore = DEFAULT_MIN_SCORE,
   riskMode = DEFAULT_RISK_MODE,
+  richScoring = false,
   now = new Date(),
 }) {
   const taskTokens = tokenize(`${task} ${scopes.join(" ")}`);
@@ -266,7 +284,7 @@ export function compileContext({
     }
 
     const scored = blocks
-      .map((block) => ({ ...block, score: scoreBlock(block, taskTokens, scopes) }))
+      .map((block) => ({ ...block, score: scoreBlock(block, taskTokens, scopes, { richScoring }) }))
       .sort((a, b) => b.score - a.score || a.index - b.index);
     const matches = scored.filter((block) => block.score >= minScore).slice(0, maxBlocksPerFile);
 
@@ -419,6 +437,7 @@ export function compileFromCwd(options) {
     maxBlocksPerFile: options.maxBlocksPerFile,
     minScore: options.minScore,
     riskMode: options.riskMode,
+    richScoring: options.richScoring === true,
   });
   const render = { explain: options.explain === true };
   if (options.format === "json") return renderContextPackJson(pack, render);
@@ -457,6 +476,9 @@ Options:
   --explain                     Add per-block provenance (sourceFile, heading, score,
                                 reason: constraint|scored|risk-forced) to the output.
                                 Without this flag the output is byte-identical to before.
+  --rich-scoring                Opt in to richer ranking signals: a task/scope hit in a
+                                block's heading/tags earns an extra boost over a body-only
+                                hit. Off by default; the default ranking is unchanged.
   -h, --help                    Show this help message.
 
 Source files (under .agentctx/):
