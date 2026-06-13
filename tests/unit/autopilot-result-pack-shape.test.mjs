@@ -44,6 +44,13 @@ const VALIDATION_ENTRY_FIELDS = ["command", "result", "passed"];
 // read the diff without re-running git.
 const UNCOMMITTED_CHANGES_SUBKEYS = ["added", "modified"];
 
+// The doc's key table documents each `adls_completed` entry as "`id`, `title`,
+// `artifact`, `guard_test`", so all four names are public surface. The existing
+// guard above only pins `id` and `guard_test` (the re-runnable proof); pinned
+// here as the full documented field list so the doc/fixture can't silently drop
+// `title` or `artifact`, which the controller reads to label each ADL.
+const ADLS_COMPLETED_ENTRY_FIELDS = ["id", "title", "artifact", "guard_test"];
+
 describe("autopilot result-pack shape guard (A14)", () => {
   it("the example pack passes every shared shape invariant", () => {
     const { ok, violations } = validateResultPack(pack);
@@ -76,6 +83,24 @@ describe("autopilot result-pack shape guard (A14)", () => {
       expect(adl).toHaveProperty("id");
       expect(adl).toHaveProperty("guard_test");
       expect(adl.guard_test).toMatch(GUARD_TEST_PATTERN);
+    }
+  });
+
+  it("the doc documents every adls_completed entry field", () => {
+    for (const field of ADLS_COMPLETED_ENTRY_FIELDS) {
+      expect(docText, `doc omits adls_completed entry field: ${field}`).toContain(field);
+    }
+  });
+
+  it("each adls_completed entry provides id, title, artifact, and guard_test", () => {
+    for (const adl of pack.adls_completed) {
+      for (const field of ADLS_COMPLETED_ENTRY_FIELDS) {
+        expect(adl, `adls_completed entry omits field: ${field}`).toHaveProperty(field);
+        expect(
+          typeof adl[field],
+          `adls_completed entry field ${field} is not a string`,
+        ).toBe("string");
+      }
     }
   });
 
