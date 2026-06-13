@@ -1397,3 +1397,113 @@ describe("projects.md reference doc states and proves field lines sit each on th
     );
   });
 });
+
+// schema-reference-projects-optional-blocks-fields-enum-v1 — projects.md's
+// "## Optional blocks" table documents the Secondary and Archived project blocks.
+// Unlike the Required-blocks table (pinned by
+// schema-reference-projects-required-tag-fields-enum-v1 above), the optional
+// blocks carry NO schema-enforced tag: #secondary/#archived/#project are template
+// conventions with no ONTOLOGY_SCHEMA anchor (the doc itself states
+// agentctx:validate does not enforce #project), so there is nothing in the schema
+// to pin those tag tokens to. What IS schema-anchored about the optional blocks is
+// the field/enum prose the table reuses from the active block: the Secondary row
+// reuses the "Name / Status" field set (the schema's fieldsByTag.active), and the
+// Archived row pins "Status: archived" — a Status value that, like every block
+// carrying a Status: line, must sit in the schema's Status enum (the enum-field
+// rule applies to optional blocks too, as the Field conventions prose states).
+// Those human-facing surfaces are otherwise unpinned: the Archived row could drift
+// to "Status: retired" (not in the enum), or the Secondary row could name a field
+// the schema does not define, and silently contradict the schema one section up.
+// This mirrors the Required-blocks-table audit, pins the Optional-blocks table's
+// Status values to the schema's enum and its field names to fieldsByTag.active,
+// pins the prose that makes optional-block Status values matter, and pins that no
+// optional row claims the required #active tag — self-guarding so it fails loudly
+// rather than passing vacuously if projects.md's fields/enum/required tag change.
+describe("projects.md reference doc Optional-blocks table pins the schema's fields, Status enum, and required tag", () => {
+  const PROJECTS_FILE = "projects.md";
+  const rule = ONTOLOGY_SCHEMA[PROJECTS_FILE];
+
+  function section(heading) {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `projects.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  // The `#tag`-bearing data rows of the Optional-blocks table, each as cells
+  // (the header and separator rows carry no `#tag token, so they drop out).
+  function optionalBlockRows() {
+    const rows = section("Optional blocks")
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && line.includes("`#"))
+      .map((line) => line.split("|").map((cell) => cell.trim()).filter(Boolean));
+    expect(rows.length, "projects.md Optional-blocks table has no #tag data rows").toBeGreaterThan(0);
+    return rows;
+  }
+
+  it("projects.md still requires #active with Name/Status fields and the Status enum (guard against a vacuous suite)", () => {
+    expect(
+      [...(rule.requiredTags ?? [])].sort(),
+      "projects.md required tags changed — retarget or retire this suite",
+    ).toEqual(["active"]);
+    expect(
+      [...(rule.fieldsByTag?.active ?? [])].sort(),
+      "projects.md required fields changed — retarget or retire this suite",
+    ).toEqual(["Name", "Status"]);
+    expect(rule.enumField?.name, "projects.md enum field changed — retarget this suite").toBe("Status");
+    expect((rule.enumField?.allowed ?? []).length, "projects.md enum has no values").toBeGreaterThan(0);
+  });
+
+  it("every field the Optional-blocks table names is exactly the schema's active-block field set", () => {
+    // Bare `Name` / `Status` backticked field tokens (capitalized, no trailing
+    // ": value"); the Archived row's `Status: archived` is a value reference
+    // handled by the enum test below, not a bare field token, so it does not
+    // match here.
+    const fields = [...new Set(
+      optionalBlockRows().flatMap((cells) =>
+        [...cells.join(" ").matchAll(/`([A-Z][A-Za-z]*)`/g)].map((m) => m[1]),
+      ),
+    )];
+    expect(fields.length, "Optional-blocks table names no Name/Status field tokens").toBeGreaterThan(0);
+    expect(
+      fields.sort(),
+      "projects Optional-blocks table field names drifted from the schema's fieldsByTag.active",
+    ).toEqual([...rule.fieldsByTag.active].sort());
+  });
+
+  it("every Status value the Optional-blocks table names sits in the schema's Status enum", () => {
+    const values = [...new Set(
+      [...section("Optional blocks").matchAll(/`Status:\s*([a-z]+)`/g)].map((m) => m[1]),
+    )];
+    expect(
+      values.length,
+      "Optional-blocks table names no `Status: <value>` reference — the Archived row should pin one",
+    ).toBeGreaterThan(0);
+    for (const value of values) {
+      expect(
+        rule.enumField.allowed,
+        `Optional-blocks table Status value "${value}" is not in the schema's Status enum`,
+      ).toContain(value);
+    }
+  });
+
+  it("no Optional-blocks row claims the required #active tag (optional blocks are not the active block)", () => {
+    for (const cells of optionalBlockRows()) {
+      const tags = [...cells.join(" ").matchAll(/#([a-z][a-z0-9-]*)/g)].map((m) => m[1]);
+      for (const required of rule.requiredTags) {
+        expect(
+          tags,
+          `Optional-blocks row "${cells[0]}" claims the required #${required} tag`,
+        ).not.toContain(required);
+      }
+    }
+  });
+
+  it("the Field conventions prose states the Status enum applies to optional blocks too", () => {
+    const conventions = section("Field conventions");
+    expect(conventions, "Field conventions omits the enum-field rule").toContain("enum-field");
+    expect(
+      conventions,
+      "Field conventions omits that the Status enum applies to optional project blocks",
+    ).toMatch(/optional project blocks included/i);
+  });
+});
