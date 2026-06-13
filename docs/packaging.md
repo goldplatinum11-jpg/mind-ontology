@@ -18,11 +18,13 @@ locally with a **dry-run only** — nothing here publishes anything.
 npm pack --dry-run    # lists would-be contents; writes no tarball, publishes nothing
 ```
 
-Before release prep this bundled **everything not gitignored** — a broad tree of
-~161 files including the whole test suite, the worked examples, and internal
-phase-closeout docs. The applied allowlist (below) narrows the tarball to the
-product surface: **47 files** — the engine, the init templates, and the
-user-facing docs.
+Before release prep this bundled **everything not gitignored** — a broad tree
+spanning the whole test suite, the worked examples, and internal phase-closeout
+docs. The applied allowlist (below) narrows the tarball to the product surface —
+the engine, the init templates, and the user-facing docs. Run the dry-run for
+the exact contents; that listing is the count of record (regressed by
+[`../tests/unit/packaging-dry-run-contract.test.mjs`](../tests/unit/packaging-dry-run-contract.test.mjs)),
+so this doc states no file total that could rot.
 
 ## Applied `files` allowlist
 
@@ -39,9 +41,11 @@ product, not the workshop:
   "NOTICE",
   "docs/mind-ontology-quickstart.md",
   "docs/mind-ontology-quickstart-examples-v0.md",
+  "docs/agent-setup.md",
   "docs/agentctx-mcp.md",
   "docs/agentctx-mcp-setup.md",
   "docs/cli-errors.md",
+  "docs/init-from-repo.md",
   "docs/schema-authoring.md",
   "docs/testing.md"
 ]
@@ -105,7 +109,8 @@ the package stays fail-closed until that decision is made.
    decision to run `npm publish`** (after the public GitHub repository exists
    and its URL is added to `package.json`).
 3. ~~`"files"` allowlist added; `npm pack --dry-run` shows only the intended
-   files~~ — **done** (47-file product tarball, regressed by test).
+   files~~ — **done** (product-surface tarball only, regressed by
+   `tests/unit/packaging-dry-run-contract.test.mjs`).
 4. Full suite green; `agentctx:smoke` `SMOKE PASS` (re-run before tagging).
 5. ~~Version bumped per semver~~ — **done: `0.1.0`** (first public release).
 

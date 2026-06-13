@@ -14,8 +14,8 @@ auditable compiler + MCP server over a folder of plain Markdown files you own.
 > account, no database, and no network. Hosted memory is an *optional*,
 > fail-closed on-ramp that is **off by default**.
 >
-> **License:** [Apache-2.0](LICENSE). The package is still `private`/pre-release,
-> so it is not published yet — see [Distribution & license boundary](#distribution--license-boundary).
+> **License:** [Apache-2.0](LICENSE). The package is publish-ready (`0.1.0`) but
+> not yet published — see [Distribution & license boundary](#distribution--license-boundary).
 
 ---
 

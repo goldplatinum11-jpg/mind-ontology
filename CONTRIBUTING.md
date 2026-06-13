@@ -7,8 +7,9 @@ lives in [`docs/mind-ontology-contribution-guide-plan-v0.md`](docs/mind-ontology
 > **License:** Mind Ontology is licensed under **Apache-2.0** (see
 > [`LICENSE`](LICENSE) and [`LICENSE-DECISION.md`](LICENSE-DECISION.md)). By
 > contributing you agree your contribution is released under the Apache-2.0
-> license. The package is still `private`/pre-release, so it is not published yet
-> — but the source license is settled.
+> license. The package is publish-ready (`0.1.0`) but not yet published —
+> publishing is a separate, explicit operator decision. The source license is
+> settled.
 
 ---
 
