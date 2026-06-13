@@ -58,6 +58,24 @@ describe("autopilot reading protocol v1 (A2)", () => {
     expect(anyClient.toLowerCase()).toMatch(/richer or narrower|portable/);
   });
 
+  it("couples controller continuation approval to a valid terminal stop condition", () => {
+    const text = readFileSync(DOC, "utf8");
+    const triggerSection = text.split("## Trigger points by role")[1] ?? "";
+    const controller =
+      triggerSection.split("### Controller / Planner / Reviewer")[1]?.split("###")[0] ?? "";
+    expect(controller).not.toBe("");
+
+    // The continuation coupling is the load-bearing claim: "approving
+    // continuation" must not be a bare "keep going". Step 3 re-checks the stop
+    // policy and continues only when no *valid* terminal stop condition is met,
+    // deferring the definition to the stop-policy doc instead of restating it.
+    // Whitespace is collapsed so the assertion survives prose re-wrapping.
+    const flat = controller.toLowerCase().replace(/\s+/g, " ");
+    expect(flat).toContain("re-check the stop policy");
+    expect(flat).toMatch(/continue only if no \*?valid\*? terminal stop condition is met/);
+    expect(flat).toContain("see the stop-policy doc");
+  });
+
   it("encodes the read-on-the-right-axis / no-wrong-axis rule", () => {
     const lower = readFileSync(DOC, "utf8").toLowerCase();
     expect(lower).toMatch(/wrong-axis|right.axis/);
