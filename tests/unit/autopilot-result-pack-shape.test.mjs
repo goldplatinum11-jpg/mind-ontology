@@ -240,4 +240,10 @@ describe("autopilot result-pack shape guard (A14)", () => {
     expect(lower).toContain("mind-ontology review");
     expect(lower).toContain("two consumers");
   });
+
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    expect(docText).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
 });

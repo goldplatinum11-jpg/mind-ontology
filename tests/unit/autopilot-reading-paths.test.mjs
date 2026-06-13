@@ -36,4 +36,9 @@ describe("autopilot reading paths v1 (A79)", () => {
     expect(t.toLowerCase()).toMatch(/in a hurry/);
     expect(t).toContain("mind-ontology-autopilot-pitch-v1.md");
   });
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    expect(text()).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
 });

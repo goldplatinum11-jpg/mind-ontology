@@ -35,4 +35,10 @@ describe("autopilot result-pack walkthrough v1 (A31)", () => {
     expect(t).toContain("mind-ontology-autopilot-result-pack-v1.md");
     expect(t.toLowerCase()).toMatch(/no hosted sirt\s+ingest|copy-paste is the transport/);
   });
+
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    expect(text()).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
 });

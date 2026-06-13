@@ -41,4 +41,10 @@ describe("autopilot quickstart run v1 (A18)", () => {
     expect(lower).toMatch(/no account/);
     expect(lower).toMatch(/no hosted|fail-closed|optional hosted/);
   });
+
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    expect(text()).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
 });

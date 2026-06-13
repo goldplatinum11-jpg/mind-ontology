@@ -97,10 +97,7 @@ const LIVE_PENDING = HEADER_DOCS.filter((doc) => !pinsHeader(doc)).sort();
 // (pin the exact link in the owner test, then delete the entry here). No entry
 // may be added without a real, pre-existing gap.
 const KNOWN_PENDING = [
-  "mind-ontology-autopilot-quickstart-run-v1.md",
-  "mind-ontology-autopilot-reading-paths-v1.md",
   "mind-ontology-autopilot-result-pack-v1.md",
-  "mind-ontology-autopilot-result-pack-walkthrough-v1.md",
   "mind-ontology-autopilot-reviewer-quickstart-v1.md",
   "mind-ontology-autopilot-risk-modes-v1.md",
   "mind-ontology-autopilot-safe-continuation-v1.md",
