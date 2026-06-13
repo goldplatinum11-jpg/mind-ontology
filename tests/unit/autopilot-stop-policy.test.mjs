@@ -152,5 +152,11 @@ describe("autopilot stop policy v1 (A3)", () => {
     // crossing a valid boundary to avoid stopping is unsafe.
     expect(boundary).toMatch(/mistakes an invalid condition for a valid one wastes a runway/);
     expect(boundary).toMatch(/crosses a valid boundary to avoid stopping is unsafe/);
+    // The boundary claim ("continue stays inside scope; risky work still gets
+    // safety context") is anchored to the task-risk-modes doc. That cross-link is
+    // the bridge between the stop policy and the compiler's force-safety-into-
+    // risky-packs behavior; pin it so the boundary section can't drift loose from
+    // its risk-modes companion.
+    expect(boundary).toMatch(/\[task risk modes\]\(mind-ontology-task-risk-modes-v0\.md\)/);
   });
 });
