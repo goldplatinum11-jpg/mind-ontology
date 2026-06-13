@@ -60,4 +60,16 @@ describe("autopilot pack v1 frame (A1)", () => {
       "compiles and ships without any SIRT package, endpoint, credential, or network call",
     );
   });
+
+  it("links the frame to BOTH the reading protocol and the stop policy as load-bearing A-series docs", () => {
+    // The frame is the A1 entry point that hands an autopilot line off to the
+    // two behavior docs: the reading protocol (when to read context) and the
+    // stop policy (when a stop is valid). The cross-artifact suite only matches
+    // `reading-protocol|stop-policy`, so dropping *one* of these two links would
+    // still pass there. Pin each link target in the frame's own owner test so
+    // neither load-bearing hand-off can silently vanish.
+    const text = readFileSync(DOC, "utf8");
+    expect(text).toContain("(mind-ontology-autopilot-reading-protocol-v1.md)");
+    expect(text).toContain("(mind-ontology-autopilot-stop-policy-v1.md)");
+  });
 });
