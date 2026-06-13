@@ -953,3 +953,137 @@ describe("glossary.md reference doc states and shows its term-namespace, non-emp
     }
   });
 });
+
+// schema-reference-identity-required-recommended-tags-v1 — required-tag forces
+// identity.md to carry an #identity block AND a #style block (who the agent
+// helps, and how it works with them); recommended-tag SHOULD-recommends an
+// #operator and a #collaboration block. The identity.md reference doc states and
+// shows these tags in two surfaces — the "Validator enforcement" required-tag and
+// recommended-tag rows, AND the human-facing "Required blocks" table's "Required
+// tag" / "Recommended tags" columns. The enforcement rows are pinned to
+// ONTOLOGY_SCHEMA by the generic "rows name every tag..." test above, but the
+// "Required blocks" TABLE is otherwise unpinned: its Required-tag column could
+// rename #identity -> #persona (still a tag, so nothing else fails) and silently
+// contradict the schema one section below. This mirrors the agent-roles
+// Required-roles-table audit, pins both columns of the identity Required-blocks
+// table to the schema, and self-guards so it fails loudly rather than passing
+// vacuously if identity.md ever stops requiring/recommending these tags.
+describe("identity.md reference doc Required-blocks table pins the schema's required and recommended tags", () => {
+  const IDENTITY_FILE = "identity.md";
+  const rule = ONTOLOGY_SCHEMA[IDENTITY_FILE];
+
+  // Cells of every `| ... |` data row under "## <heading>" that names a #tag,
+  // ended at the next ## heading so the Optional-blocks table can't leak in.
+  function tagRows(heading) {
+    const parts = DOC_FOR.get(IDENTITY_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `identity.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1]
+      .split(/\n## /)[0]
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && line.includes("`#"))
+      .map((line) => line.split("|").map((cell) => cell.trim()).filter(Boolean));
+  }
+
+  const tagsInColumn = (rows, index) =>
+    rows.flatMap((cells) => [...cells[index].matchAll(/`#([a-z][a-z0-9-]*)`/g)].map((m) => m[1]));
+
+  it("identity.md still requires #identity/#style and recommends #operator/#collaboration (guard against a vacuous suite)", () => {
+    expect(
+      [...(rule.requiredTags ?? [])].sort(),
+      "identity.md required tags changed — retarget or retire this suite",
+    ).toEqual(["identity", "style"]);
+    expect(
+      [...(rule.recommendedTags ?? [])].sort(),
+      "identity.md recommended tags changed — retarget or retire this suite",
+    ).toEqual(["collaboration", "operator"]);
+  });
+
+  it("the Required-blocks table's Required-tag column lists exactly the schema's required tags", () => {
+    const tags = tagsInColumn(tagRows("Required blocks"), 1);
+    expect(
+      [...new Set(tags)].sort(),
+      "identity Required-blocks table Required-tag column drifted from the schema's requiredTags",
+    ).toEqual([...rule.requiredTags].sort());
+  });
+
+  it("the Required-blocks table's Recommended-tags column lists exactly the schema's recommended tags", () => {
+    const tags = tagsInColumn(tagRows("Required blocks"), 2);
+    expect(
+      [...new Set(tags)].sort(),
+      "identity Required-blocks table Recommended-tags column drifted from the schema's recommendedTags",
+    ).toEqual([...rule.recommendedTags].sort());
+  });
+});
+
+// schema-reference-projects-required-tag-fields-enum-v1 — projects.md is the one
+// schema source with no namespace and no structural per-block rule; what it pins
+// instead is a required #active block carrying Name:/Status: field lines, with
+// Status: constrained to the STATUS_VALUES enum. The projects.md reference doc
+// states and shows these in two surfaces — the "Validator enforcement" rows
+// (pinned to ONTOLOGY_SCHEMA by the generic reference-doc tests above), AND the
+// human-facing "Required blocks" table ("Required tag" + "Required fields"
+// columns) plus the "Field conventions" prose that enumerates the allowed Status
+// values. The Required-blocks table and Field-conventions prose are otherwise
+// unpinned: the table could rename #active or drop Status:, or the prose could
+// omit an enum value, and silently contradict the schema. This audit pins those
+// human-facing surfaces to ONTOLOGY_SCHEMA and self-guards so it fails loudly
+// rather than passing vacuously if projects.md's tag/fields/enum ever change.
+describe("projects.md reference doc Required-blocks table and Field conventions pin the schema's tag, fields, and enum", () => {
+  const PROJECTS_FILE = "projects.md";
+  const rule = ONTOLOGY_SCHEMA[PROJECTS_FILE];
+
+  function section(heading) {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `projects.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  // The single `#active`-bearing data row of the Required-blocks table, as cells.
+  function requiredBlockCells() {
+    const row = section("Required blocks")
+      .split("\n")
+      .find((line) => line.startsWith("| ") && line.includes("`#"));
+    expect(row, "projects.md Required-blocks table has no #tag data row").toBeTruthy();
+    return row.split("|").map((cell) => cell.trim()).filter(Boolean);
+  }
+
+  it("projects.md still requires #active with Name/Status fields and the Status enum (guard against a vacuous suite)", () => {
+    expect(
+      [...(rule.requiredTags ?? [])].sort(),
+      "projects.md required tags changed — retarget or retire this suite",
+    ).toEqual(["active"]);
+    expect(
+      [...(rule.fieldsByTag?.active ?? [])].sort(),
+      "projects.md required fields changed — retarget or retire this suite",
+    ).toEqual(["Name", "Status"]);
+    expect(rule.enumField?.name, "projects.md enum field changed — retarget this suite").toBe("Status");
+    expect((rule.enumField?.allowed ?? []).length, "projects.md enum has no values").toBeGreaterThan(0);
+  });
+
+  it("the Required-blocks table's Required-tag column lists exactly the schema's required tag", () => {
+    const tags = [...requiredBlockCells()[1].matchAll(/`#([a-z][a-z0-9-]*)`/g)].map((m) => m[1]);
+    expect(
+      [...new Set(tags)].sort(),
+      "projects Required-blocks table Required-tag column drifted from the schema's requiredTags",
+    ).toEqual([...rule.requiredTags].sort());
+  });
+
+  it("the Required-blocks table's Required-fields column names every schema field", () => {
+    const fields = [...requiredBlockCells()[2].matchAll(/`([A-Z][A-Za-z]*)`/g)].map((m) => m[1]);
+    expect(
+      [...new Set(fields)].sort(),
+      "projects Required-blocks table Required-fields column drifted from the schema's fieldsByTag",
+    ).toEqual([...rule.fieldsByTag.active].sort());
+  });
+
+  it("the Field conventions section names the Status field and every allowed enum value", () => {
+    const conventions = section("Field conventions");
+    expect(conventions, "Field conventions omits the Status: field line").toContain(
+      `\`${rule.enumField.name}:\``,
+    );
+    for (const value of rule.enumField.allowed) {
+      expect(conventions, `Field conventions omits Status enum value ${value}`).toContain(`\`${value}\``);
+    }
+    expect(conventions, "Field conventions omits the enum-field failure rule").toContain("enum-field");
+  });
+});
