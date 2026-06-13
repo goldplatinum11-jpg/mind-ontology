@@ -158,5 +158,10 @@ describe("autopilot stop policy v1 (A3)", () => {
     // risky-packs behavior; pin it so the boundary section can't drift loose from
     // its risk-modes companion.
     expect(boundary).toMatch(/\[task risk modes\]\(mind-ontology-task-risk-modes-v0\.md\)/);
+    // The same closing "See the …" line also back-links to the autopilot pack
+    // frame — the parent doc that scopes this policy. It is the companion of the
+    // task-risk-modes link above; pinning only one let the pack-frame half drift
+    // loose. Pin it inside the boundary section so both cross-references stay live.
+    expect(boundary).toMatch(/\[autopilot pack frame\]\(mind-ontology-autopilot-pack-v1\.md\)/);
   });
 });
