@@ -98,10 +98,6 @@ const LIVE_PENDING = HEADER_DOCS.filter((doc) => !pinsHeader(doc)).sort();
 // may be added without a real, pre-existing gap.
 const KNOWN_PENDING = [
   "mind-ontology-autopilot-result-pack-v1.md",
-  "mind-ontology-autopilot-vs-instruction-files-v1.md",
-  "mind-ontology-autopilot-vs-single-shot-v1.md",
-  "mind-ontology-autopilot-when-not-to-use-v1.md",
-  "mind-ontology-autopilot-worker-selfcheck-v1.md",
 ].sort();
 
 describe("autopilot top-of-doc header — aggregate owner-test coverage (A25)", () => {
