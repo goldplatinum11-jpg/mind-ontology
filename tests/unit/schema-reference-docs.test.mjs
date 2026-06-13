@@ -556,3 +556,80 @@ describe("cq.md reference doc states and shows the topic-tag (besides #cq) requi
     }
   });
 });
+
+// schema-reference-cq-required-context-safety-topics-v1 — required-tag (the
+// requiredTags rule) is what forces cq.md to carry a #context CQ AND a #safety
+// CQ: those two topics are the baseline an agent needs before acting, so the
+// schema requires a block tagged each. The cq.md reference doc states and shows
+// that requirement in four places — the "Required competency questions" prose
+// ("MUST cover at least these two topics"), the "Validator enforcement"
+// required-tag row, the Required-CQ table's "Topic tag" column, and the minimal
+// example's two #cq blocks. The enforcement row is pinned to ONTOLOGY_SCHEMA by
+// the "rows name every tag..." test above, and the minimal example runs through
+// validateSource (so dropping a required block fails the fixture suite). But the
+// "Required competency questions" PROSE and its TABLE are otherwise unguarded:
+// the Required-CQ table could rename #context -> #decision (still a valid topic
+// tag, so the topic-tag audit above stays green) and silently contradict the
+// rule the doc itself documents one section below. This audit pins every
+// required-topic surface to the schema's requiredTags, and self-guards so it
+// fails loudly rather than passing vacuously if cq.md ever stops requiring
+// #context and #safety.
+describe("cq.md reference doc states and shows the required #context and #safety topics", () => {
+  const CQ_FILE = "cq.md";
+  const NAMESPACE = "cq";
+  const REQUIRED = ONTOLOGY_SCHEMA[CQ_FILE]?.requiredTags ?? [];
+
+  // The first ("Topic tag") cell of every `| #tag | ... |` row under a
+  // "## <heading>" table, ended at the next ## heading so later prose can't leak.
+  function topicTagColumn(heading) {
+    const parts = DOC_FOR.get(CQ_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `cq.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1]
+      .split(/\n## /)[0]
+      .split("\n")
+      .filter((line) => line.startsWith("| `#"))
+      .map((line) => line.split("|").map((cell) => cell.trim()).filter(Boolean)[0].replace(/`/g, ""));
+  }
+
+  it("cq.md still requires #context and #safety (guard against a vacuous suite)", () => {
+    expect(
+      [...REQUIRED].sort(),
+      "cq.md no longer requires #context and #safety — retarget or retire this suite",
+    ).toEqual(["context", "safety"]);
+  });
+
+  it("the 'Required competency questions' prose states the topics are a mandatory baseline", () => {
+    const parts = DOC_FOR.get(CQ_FILE).split(/^## Required competency questions$/m);
+    expect(parts.length, "cq.md reference doc has no '## Required competency questions' section").toBe(2);
+    const section = parts[1].split(/\n## /)[0];
+    expect(section, "Required CQ prose omits the MUST-cover-at-least requirement").toMatch(
+      /MUST cover at least these two topics/i,
+    );
+  });
+
+  it("the enforcement-table required-tag row names every required topic", () => {
+    const row = tableRows(enforcementSection(CQ_FILE)).get("required-tag");
+    expect(row, "cq.md enforcement table has no required-tag row").toBeTruthy();
+    for (const tag of REQUIRED) {
+      expect(row.text, `required-tag row omits #${tag}`).toContain(`#${tag}`);
+    }
+  });
+
+  it("the Required-CQ table's Topic tag column lists exactly the schema's required topics", () => {
+    const topicTags = topicTagColumn("Required competency questions");
+    expect(
+      topicTags.map((tag) => tag.replace(/^#/, "")).sort(),
+      "Required-CQ table topic tags drifted from the schema's requiredTags",
+    ).toEqual([...REQUIRED].sort());
+  });
+
+  it("the minimal example carries a #cq block for every required topic", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(CQ_FILE), CQ_FILE);
+    expect(blocks.length, "cq.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const tag of REQUIRED) {
+      const block = blocks.find((b) => b.tags.includes(tag));
+      expect(block, `minimal example omits a CQ tagged #${tag}`).toBeTruthy();
+      expect(block.tags, `example CQ for #${tag} omits the #cq namespace`).toContain(NAMESPACE);
+    }
+  });
+});
