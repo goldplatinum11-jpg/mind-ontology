@@ -1087,3 +1087,94 @@ describe("projects.md reference doc Required-blocks table and Field conventions 
     expect(conventions, "Field conventions omits the enum-field failure rule").toContain("enum-field");
   });
 });
+
+// schema-reference-identity-tag-conventions-every-block-tagged-v1 — identity.md is
+// the one schema source whose every-block-has-tag rule is enforced by a flag
+// (everyBlockHasTag) rather than a namespace. The "Validator enforcement" table
+// row is pinned to ONTOLOGY_SCHEMA by the generic reference-doc tests above, and
+// its "at least one tag" semantics by the "rows state each structural rule's
+// semantics" marker test. But the human-facing "## Tag conventions" PROSE — the
+// bullet that tells an author "Every block MUST carry at least one tag;
+// agentctx:validate rejects an untagged block (every-block-has-tag error)" — is
+// otherwise unguarded: it could drop the requirement or stop naming the
+// every-block-has-tag rule and silently contradict the schema the doc documents.
+// This pins that prose to the schema's everyBlockHasTag flag and the real rule id,
+// self-guarding so it fails loudly rather than passing vacuously if identity.md
+// ever stops enforcing every-block-has-tag.
+describe("identity.md reference doc Tag conventions prose states the every-block-has-tag requirement", () => {
+  const IDENTITY_FILE = "identity.md";
+  const RULE = "every-block-has-tag";
+
+  // The "## Tag conventions" section, ended at the next ## heading so prose
+  // elsewhere in the doc cannot satisfy a marker.
+  function tagConventions() {
+    const parts = DOC_FOR.get(IDENTITY_FILE).split(/^## Tag conventions$/m);
+    expect(parts.length, "identity.md reference doc has no '## Tag conventions' section").toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  it("identity.md still enforces every-block-has-tag (guard against a vacuous suite)", () => {
+    expect(
+      ONTOLOGY_SCHEMA[IDENTITY_FILE]?.everyBlockHasTag,
+      "identity.md no longer enforces every-block-has-tag — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the Tag conventions prose states every block must carry at least one tag", () => {
+    expect(
+      tagConventions(),
+      "Tag conventions prose omits the every-block-has-tag requirement",
+    ).toMatch(/every block\b[\s\S]*\bat least one tag/i);
+  });
+
+  it("the Tag conventions prose names the every-block-has-tag rule id", () => {
+    expect(tagConventions(), "Tag conventions prose omits the every-block-has-tag rule id").toContain(
+      `\`${RULE}\``,
+    );
+    expect(RULE_REMEDIES, `Tag conventions prose names unknown rule "${RULE}"`).toHaveProperty(RULE);
+  });
+});
+
+// schema-reference-projects-block-model-status-placeholder-enum-v1 — projects.md's
+// Block model fence shows the canonical project block shape, including a
+// "Status: <active | exploratory | paused | archived>" placeholder that
+// enumerates the Status enum inside its angle-bracket placeholder. That fence is
+// the illustrative one, deliberately NOT run through validateSource (the
+// angle-bracket placeholder would fail enum-field), so the fixture suite above
+// leaves its Status enumeration unchecked. The Field-conventions PROSE enum is
+// pinned by the Required-blocks/Field-conventions audit above, and the
+// enforcement row by the generic reference-doc tests — but the Block model fence's
+// placeholder enumeration is otherwise unguarded: it could drop "archived" or list
+// a stale value and silently disagree with the schema it is meant to illustrate.
+// This pins the placeholder to ONTOLOGY_SCHEMA's enumField by exact set equality,
+// self-guarding so it fails loudly rather than passing vacuously if projects.md's
+// Status enum ever changes.
+describe("projects.md reference doc Block model fence enumerates the Status enum in its placeholder", () => {
+  const PROJECTS_FILE = "projects.md";
+  const rule = ONTOLOGY_SCHEMA[PROJECTS_FILE];
+
+  // The "Status:" placeholder line of the illustrative Block model fence.
+  function statusPlaceholder() {
+    const fence = fenceBlocks(PROJECTS_FILE).find((f) => f.section === ILLUSTRATIVE_SECTION);
+    expect(fence, "projects.md doc has no Block model fence").toBeTruthy();
+    const line = fence.body.split("\n").find((l) => l.trimStart().startsWith("Status:"));
+    expect(line, "projects.md Block model fence has no Status: placeholder line").toBeTruthy();
+    return line;
+  }
+
+  it("projects.md still constrains Status to an enum (guard against a vacuous suite)", () => {
+    expect(rule.enumField?.name, "projects.md enum field changed — retarget this suite").toBe("Status");
+    expect((rule.enumField?.allowed ?? []).length, "projects.md enum has no values").toBeGreaterThan(0);
+  });
+
+  it("the Block model fence's Status placeholder lists exactly the schema's enum values", () => {
+    // "Status: <a | b | c>" -> ["a", "b", "c"]; strip the field name and the
+    // angle-bracket placeholder, then split the enumeration.
+    const inner = statusPlaceholder().replace(/^.*Status:\s*/, "").replace(/[<>]/g, "");
+    const shown = inner.split("|").map((value) => value.trim()).filter(Boolean);
+    expect(
+      [...new Set(shown)].sort(),
+      "projects.md Block model Status placeholder drifted from the schema's Status enum",
+    ).toEqual([...rule.enumField.allowed].sort());
+  });
+});
