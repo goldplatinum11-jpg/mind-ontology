@@ -37,6 +37,13 @@ const RUNWAY_SUBKEYS = [
 // controller can re-run the gate rather than trust the summary.
 const VALIDATION_ENTRY_FIELDS = ["command", "result", "passed"];
 
+// The doc's key table names `uncommitted_changes` as "`added` / `modified`
+// file lists for controller review", so both names are public surface. Pinned
+// as a sub-key list (like RUNWAY_SUBKEYS) so the doc/fixture can't silently
+// drop one, plus the fixture must carry both as arrays for the controller to
+// read the diff without re-running git.
+const UNCOMMITTED_CHANGES_SUBKEYS = ["added", "modified"];
+
 describe("autopilot result-pack shape guard (A14)", () => {
   it("the example pack passes every shared shape invariant", () => {
     const { ok, violations } = validateResultPack(pack);
@@ -106,6 +113,24 @@ describe("autopilot result-pack shape guard (A14)", () => {
       }
       expect(typeof entry.command, `validation.${gate}.command is not a string`).toBe("string");
       expect(typeof entry.passed, `validation.${gate}.passed is not a boolean`).toBe("boolean");
+    }
+  });
+
+  it("the doc documents every uncommitted_changes sub-key", () => {
+    for (const key of UNCOMMITTED_CHANGES_SUBKEYS) {
+      expect(docText, `doc omits uncommitted_changes sub-key: ${key}`).toContain(key);
+    }
+  });
+
+  it("the example pack's uncommitted_changes provides added and modified as arrays", () => {
+    expect(typeof pack.uncommitted_changes).toBe("object");
+    expect(pack.uncommitted_changes).not.toBeNull();
+    for (const key of UNCOMMITTED_CHANGES_SUBKEYS) {
+      expect(pack.uncommitted_changes, `uncommitted_changes omits sub-key: ${key}`).toHaveProperty(key);
+      expect(
+        Array.isArray(pack.uncommitted_changes[key]),
+        `uncommitted_changes.${key} is not an array`,
+      ).toBe(true);
     }
   });
 
