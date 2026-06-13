@@ -208,4 +208,21 @@ describe("autopilot result-pack shape guard (A14)", () => {
     expect(typeof pack.branch).toBe("string");
     expect(pack.branch.trim().length).toBeGreaterThan(0);
   });
+
+  // Many assertions above pin doc surface that the runtime guard
+  // (validateResultPack) does not enforce — the schema literal, the table
+  // sub-key names, non-empty branch/handoff. The doc now carries an explicit
+  // note distinguishing the five runtime invariants from this test-pinned
+  // documented surface, so a reader knows why those extra pins are load-bearing.
+  // Pin the note's three load-bearing references (the engine module that holds
+  // the runtime invariants, this shape test that holds the documented surface,
+  // and the "test-pinned documented surface" concept) rather than its full
+  // prose, so the distinction can't be dropped without this test failing while
+  // leaving the wording free to change.
+  it("the doc distinguishes runtime invariants from the test-pinned documented surface", () => {
+    const lower = docText.toLowerCase();
+    expect(lower).toContain("scripts/agentctx/result-pack.mjs");
+    expect(lower).toContain("tests/unit/autopilot-result-pack-shape.test.mjs");
+    expect(lower).toContain("test-pinned documented surface");
+  });
 });

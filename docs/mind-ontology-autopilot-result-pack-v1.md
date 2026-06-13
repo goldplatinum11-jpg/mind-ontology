@@ -54,6 +54,34 @@ not a network call, not a hosted write, and not a SIRT control-plane object.
 
 ---
 
+## Runtime invariants vs. test-pinned documented surface
+
+The five invariants above are what the **runtime guard** checks on *every* pack:
+`validateResultPack` in `scripts/agentctx/result-pack.mjs`, shared with the
+`mind-ontology review` command so one rule set has two consumers. Those five are
+the engine's contract.
+
+Separately, the shape test (`tests/unit/autopilot-result-pack-shape.test.mjs`)
+pins more than the five invariants — it holds this doc's **documented public
+surface** against the example fixture. These extra pins are *not* runtime
+invariants; they are documentation contracts that keep prose, fixture, and engine
+from drifting apart:
+
+- the `schema` shape literal `sirt.result-pack/v1`;
+- the field names in the key tables — the `runway`, `uncommitted_changes`,
+  `adls_completed`, and `validation` sub-keys, beyond the bare types the runtime
+  guard pins;
+- a non-empty `branch` and `handoff` (the runtime guard only requires the type).
+
+They are load-bearing because the controller keys on the documented names and the
+literal, not just the types: if the doc, the fixture, or the engine renamed a
+field or changed the literal, the others must follow or the test fails. So a
+reader can trust that anything *named* in the tables above is enforced somewhere —
+the runtime guard for the five invariants, the shape test for the documented
+surface around them.
+
+---
+
 ## Why local-checkable matters
 
 The whole pack philosophy is that the *meaning* lives in files the controller can
