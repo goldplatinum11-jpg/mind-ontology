@@ -29,6 +29,23 @@ describe("autopilot stop policy v1 (A3)", () => {
     expect(t).toMatch(/same hard blocker repeats three times|repeats three times/);
   });
 
+  it("pins the valid terminal definition as a closed, categorized set", () => {
+    const t = text();
+    // The valid list is exhaustive ("only"), not a set of examples. This
+    // closure is what lets the controller "continue unless a valid terminal
+    // condition is met" — drop the "only" and any reason becomes terminal.
+    expect(t).toMatch(/may stop only when one of these is true/);
+    expect(t).toMatch(/the only legitimate reasons to end a runway early/);
+    // Every valid condition reduces to one of exactly three categories.
+    for (const category of [
+      "safety boundary",
+      "budget boundary",
+      "genuine dead end",
+    ]) {
+      expect(t).toContain(category);
+    }
+  });
+
   it("marks completed-work signals as invalid stop conditions", () => {
     const t = text();
     for (const phrase of [
