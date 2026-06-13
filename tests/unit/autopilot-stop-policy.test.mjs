@@ -13,6 +13,22 @@ describe("autopilot stop policy v1 (A3)", () => {
     expect(existsSync(DOC)).toBe(true);
   });
 
+  // The top-of-doc header carries the "Part of the [Autopilot Integration Pack]"
+  // back-link that frames this policy as one artifact inside the parent pack. The
+  // boundary section's pack-frame link (pinned below) is the *closing* cross-
+  // reference; this is the *opening* one. An unpinned header link can silently
+  // drift or drop, detaching the doc from its pack. Pin it structurally in the
+  // top-of-doc area, before the first section heading.
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    const t = text();
+    const firstSection = t.indexOf("## valid terminal stop conditions");
+    expect(firstSection).toBeGreaterThan(0);
+    const header = t.slice(0, firstSection);
+    expect(header).toMatch(
+      /part of the \[autopilot integration pack\]\(mind-ontology-autopilot-pack-v1\.md\)/,
+    );
+  });
+
   it("enumerates the valid terminal stop conditions", () => {
     const t = text();
     for (const phrase of [
