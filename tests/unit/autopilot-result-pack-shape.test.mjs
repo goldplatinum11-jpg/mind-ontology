@@ -191,4 +191,13 @@ describe("autopilot result-pack shape guard (A14)", () => {
     expect(typeof pack.handoff).toBe("string");
     expect(pack.handoff.trim().length).toBeGreaterThan(0);
   });
+
+  // The doc documents `branch` as "the git branch the work landed on"; the
+  // required-key guard only pins it as type string, so an empty string would
+  // pass while naming no branch. Pin it as a non-empty string (mirroring the
+  // handoff pin above) — the controller keys off this value to find the work.
+  it("the example pack's branch is a non-empty string", () => {
+    expect(typeof pack.branch).toBe("string");
+    expect(pack.branch.trim().length).toBeGreaterThan(0);
+  });
 });
