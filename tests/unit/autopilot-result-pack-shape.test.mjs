@@ -21,6 +21,15 @@ const EXAMPLE = resolve(REPO_ROOT, "tests/fixtures/autopilot-result-pack.example
 const pack = JSON.parse(readFileSync(EXAMPLE, "utf8"));
 const docText = readFileSync(DOC, "utf8");
 
+// The runway sub-keys the doc's `runway` table documents and the fixture must
+// carry. Pinned as a field list so the doc/fixture surface can't silently drop
+// one — prose self-consistency (below) only guards the stop-state semantics.
+const RUNWAY_SUBKEYS = [
+  "checkpoint",
+  "valid_terminal_stop_reached",
+  "reason_for_continuation",
+];
+
 describe("autopilot result-pack shape guard (A14)", () => {
   it("the example pack passes every shared shape invariant", () => {
     const { ok, violations } = validateResultPack(pack);
@@ -53,6 +62,18 @@ describe("autopilot result-pack shape guard (A14)", () => {
       expect(adl).toHaveProperty("id");
       expect(adl).toHaveProperty("guard_test");
       expect(adl.guard_test).toMatch(GUARD_TEST_PATTERN);
+    }
+  });
+
+  it("the doc documents every runway sub-key", () => {
+    for (const key of RUNWAY_SUBKEYS) {
+      expect(docText, `doc omits runway sub-key: ${key}`).toContain(key);
+    }
+  });
+
+  it("the example pack's runway object provides every runway sub-key", () => {
+    for (const key of RUNWAY_SUBKEYS) {
+      expect(pack.runway, `runway omits sub-key: ${key}`).toHaveProperty(key);
     }
   });
 
