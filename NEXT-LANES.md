@@ -68,13 +68,23 @@ Follow-on autopilot lanes — all shipped (docs/tests only):
   (`tests/unit/cq-regression-deep.test.mjs`) and the multi-client example's scoping
   and isolation assertions.
 
-## Needs an engine lane (out of scope for docs/tests hardening)
+## Engine lanes — shipped / status
 
-- **[engine]** `--format` extensions (e.g. a compact pack) — additive, semver-minor.
-- **[engine]** richer scoring signals (heading weight, recency) — must keep the
-  minimal/safe-task behavior byte-for-byte and ship backward-compat tests.
-- **[engine]** a `mind-ontology` CLI wrapper renaming `agentctx:*` per the
-  extraction map — a packaging lane, still local.
+- **[engine]** `--format` compact pack — shipped. `--format compact` renders the
+  answer blocks only (no metadata/omitted), guarded by
+  `tests/unit/compile-format-compact.test.mjs`; markdown/json paths unchanged.
+- **[engine]** richer scoring signals — heading weight **shipped** as opt-in
+  `--rich-scoring` (default-off, byte-for-byte legacy ranking otherwise), guarded by
+  `tests/unit/compile-rich-scoring.test.mjs`. **Recency is still open** and parked:
+  blocks carry no reliable per-block date signal to rank on, so it needs a data
+  decision before it can ship without guesswork.
+- **[engine]** the `mind-ontology` CLI wrapper — shipped. `scripts/agentctx/cli.mjs`
+  is the product `bin`, a thin verbatim dispatcher over the `agentctx:*` scripts
+  (which stay intact, backward compatible), guarded by `tests/unit/cli-wrapper.test.mjs`.
+  The new compile flags above flow through it verbatim.
+
+Genuinely open after this campaign: scoring **recency** (needs a date-signal design),
+and any further additive `--format`/scoring extensions as the product grows.
 
 ## Never in this product (hosted/closed boundary)
 
