@@ -1178,3 +1178,120 @@ describe("projects.md reference doc Block model fence enumerates the Status enum
     ).toEqual([...rule.enumField.allowed].sort());
   });
 });
+
+// schema-reference-projects-block-model-name-placeholder-label-v1 — projects.md's
+// Block model fence shows the canonical project block shape, including a
+// "Name: <short project name>" line. The companion Status placeholder one line
+// down is pinned to the enum by the audit above, but the Name placeholder is
+// otherwise unguarded: the Block model fence is the illustrative one, never run
+// through validateSource (the angle-bracket placeholder body would fail other
+// rules), so the fixture suite leaves its Name line unchecked. The "Field
+// conventions" prose states Name is "a short human-readable label, not a path or
+// URL"; the Block model placeholder is meant to illustrate exactly that shape,
+// yet nothing stops it from being rewritten as a path/URL (e.g.
+// "Name: /repos/foo" or "Name: https://...") and silently contradicting the
+// convention the doc documents one section down. This pins the Block model Name
+// placeholder to the label-not-path-or-URL shape AND pins the Field-conventions
+// prose that states it, self-guarding so it fails loudly rather than passing
+// vacuously if projects.md ever stops requiring a Name field.
+describe("projects.md reference doc Block model fence shows Name as a label placeholder, not a path or URL", () => {
+  const PROJECTS_FILE = "projects.md";
+  const rule = ONTOLOGY_SCHEMA[PROJECTS_FILE];
+
+  // The "Name:" placeholder line of the illustrative Block model fence.
+  function namePlaceholder() {
+    const fence = fenceBlocks(PROJECTS_FILE).find((f) => f.section === ILLUSTRATIVE_SECTION);
+    expect(fence, "projects.md doc has no Block model fence").toBeTruthy();
+    const line = fence.body.split("\n").find((l) => l.trimStart().startsWith("Name:"));
+    expect(line, "projects.md Block model fence has no Name: placeholder line").toBeTruthy();
+    return line;
+  }
+
+  // The "## Field conventions" section, ended at the next ## heading so prose
+  // elsewhere in the doc cannot satisfy a marker.
+  function fieldConventions() {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(/^## Field conventions$/m);
+    expect(parts.length, "projects.md reference doc has no '## Field conventions' section").toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  it("projects.md still requires a Name field on #active (guard against a vacuous suite)", () => {
+    expect(
+      [...(rule.fieldsByTag?.active ?? [])],
+      "projects.md no longer requires a Name field — retarget or retire this suite",
+    ).toContain("Name");
+  });
+
+  it("the Block model fence's Name line is an angle-bracket label placeholder", () => {
+    const inner = namePlaceholder().replace(/^.*Name:\s*/, "").trim();
+    expect(
+      inner,
+      "projects.md Block model Name line is not an angle-bracket placeholder",
+    ).toMatch(/^<[^<>]+>$/);
+    // the placeholder names a label/name, not a path or URL.
+    expect(
+      inner,
+      "projects.md Block model Name placeholder does not describe a name/label",
+    ).toMatch(/\b(?:name|label)\b/i);
+    const bare = inner.replace(/[<>]/g, "");
+    expect(
+      bare,
+      "projects.md Block model Name placeholder looks like a path or URL, not a label",
+    ).not.toMatch(/[/\\]|:\/\//);
+  });
+
+  it("the Field conventions prose states Name is a label, not a path or URL", () => {
+    const conventions = fieldConventions();
+    expect(conventions, "Field conventions omits the Name: field line").toContain("`Name:`");
+    expect(
+      conventions,
+      "Field conventions omits the label-not-a-path-or-URL convention for Name",
+    ).toMatch(/label[\s\S]*?not a path or URL/i);
+  });
+});
+
+// schema-reference-agent-roles-role-block-rules-one-role-tag-v1 — one-role-tag
+// (the perBlock.exactlyOneExtraTag rule) is what stops an #agent block from
+// carrying two role tags at once: every role block must declare exactly one role
+// (besides the #agent namespace), so the hat the agent wears is unambiguous. The
+// agent-roles.md reference doc states that requirement in its "Role block rules"
+// prose ("carries exactly one **role tag** identifying the role"). The
+// enforcement-table one-role-tag row is pinned to its /exactly one/ semantics by
+// the generic "rows state each structural rule's semantics" test above, and the
+// central validation doc + authoring guide pin their own one-role-tag surfaces in
+// their suites. But the "Role block rules" PROSE one-role-tag bullet is otherwise
+// unguarded — the sibling non-empty-body bullet has a dedicated audit, this one
+// does not — so the prose could drop "exactly one" (or the #agent namespace
+// pairing) and silently contradict the rule the doc documents. This mirrors the
+// identity.md Tag-conventions prose audit and the agent-roles non-empty-body
+// audit, pins the prose to the schema's exactlyOneExtraTag flag, and self-guards
+// so it fails loudly rather than passing vacuously if agent-roles.md ever stops
+// enforcing one-role-tag.
+describe("agent-roles.md reference doc Role block rules prose states the one-role-tag requirement", () => {
+  const ROLES_FILE = "agent-roles.md";
+
+  // The "## Role block rules" section, ended at the next ## heading so prose
+  // elsewhere in the doc cannot satisfy a marker.
+  function roleBlockRules() {
+    const parts = DOC_FOR.get(ROLES_FILE).split(/^## Role block rules$/m);
+    expect(parts.length, "agent-roles.md reference doc has no '## Role block rules' section").toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  it("agent-roles.md still enforces one-role-tag (guard against a vacuous suite)", () => {
+    expect(
+      ONTOLOGY_SCHEMA[ROLES_FILE]?.perBlock?.exactlyOneExtraTag,
+      "agent-roles.md no longer enforces one-role-tag — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the Role block rules prose pairs the #agent namespace with exactly one role tag", () => {
+    const section = roleBlockRules();
+    expect(section, "Role block rules prose omits the #agent namespace tag").toMatch(
+      /`#agent` namespace tag/i,
+    );
+    expect(section, "Role block rules prose omits the one-role-tag requirement").toMatch(
+      /exactly one\s+\*{0,2}role tag/i,
+    );
+  });
+});
