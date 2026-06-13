@@ -19,6 +19,17 @@ describe("autopilot minimal vs full ontology v1 (A27)", () => {
     expect(existsSync(resolve(MINIMAL, ".agentctx/constraints.md"))).toBe(true);
   });
 
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    // The pack header back-link lives in the doc header, above the first
+    // horizontal rule. Pin it structurally (scoped to the header, with the
+    // exact link target) so the A-series pack frame can't silently drop off
+    // the top of this doc without its owning public-surface test failing.
+    const header = readFileSync(DOC, "utf8").split("\n---")[0];
+    expect(header).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
+
   it("a constraints-only line still compiles a valid pack with the safety floor", () => {
     const p = pack(MINIMAL, "Plan the next docs PR");
     const files = p.selected.map((b) => b.file);
