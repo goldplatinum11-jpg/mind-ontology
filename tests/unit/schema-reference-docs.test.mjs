@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ONTOLOGY_SCHEMA, RULE_REMEDIES, validateSource } from "../../scripts/agentctx/schema.mjs";
+import { parseMarkdownBlocks } from "../../scripts/agentctx/compile.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -305,5 +306,70 @@ describe("per-file schema reference doc fences are classified", () => {
         `${file} doc claims "minimal conformant file" outside its example heading`,
       ).toBe(1);
     }
+  });
+});
+
+// The illustrative "Block model" fence is deliberately NOT run through
+// validateSource: it may be a placeholder skeleton (projects' angle-bracket
+// `Status: <active | ...>` would fail enum-field; identity's `<prose...>` body),
+// so the fixture suite above leaves its CONTENT unchecked. But the fence's whole
+// stated job is to show the canonical block SHAPE, and the defining part of that
+// shape is the schema's namespace and required tags. We parse the illustrative
+// fence with the real compiler parser (parseMarkdownBlocks — the same tag
+// extraction the validator sees) and pin those tags to ONTOLOGY_SCHEMA. A
+// namespace rename or required-tag change in the schema then fails here until
+// the illustration is updated, without forcing the placeholder fence to fully
+// validate.
+function illustrativeBlocks(file) {
+  const fence = fenceBlocks(file).find((f) => f.section === ILLUSTRATIVE_SECTION);
+  expect(fence, `${file} doc has no Block model fence`).toBeTruthy();
+  return parseMarkdownBlocks(fence.body, file);
+}
+
+describe("schema-reference-illustrative-tags-v1 — Block model fences illustrate the schema's tags", () => {
+  it("each illustrative fence parses into at least one block, every block tagged", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const blocks = illustrativeBlocks(file);
+      expect(blocks.length, `${file} Block model fence has no "## " block`).toBeGreaterThan(0);
+      for (const block of blocks) {
+        expect(
+          block.tags.length,
+          `${file} Block model block "${block.title}" illustrates no tags`,
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("namespaced docs illustrate the namespace tag on every shown block", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const rule = ONTOLOGY_SCHEMA[file];
+      if (!rule.namespace) continue;
+      for (const block of illustrativeBlocks(file)) {
+        expect(
+          block.tags,
+          `${file} Block model block "${block.title}" omits namespace #${rule.namespace}`,
+        ).toContain(rule.namespace);
+      }
+    }
+  });
+
+  it("docs with required tags illustrate at least one of them", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const rule = ONTOLOGY_SCHEMA[file];
+      if (!rule.requiredTags?.length) continue;
+      const shown = new Set(illustrativeBlocks(file).flatMap((block) => block.tags));
+      const named = rule.requiredTags.map((tag) => `#${tag}`).join(", ");
+      expect(
+        rule.requiredTags.some((tag) => shown.has(tag)),
+        `${file} Block model fence shows none of its required tags (${named})`,
+      ).toBe(true);
+    }
+  });
+
+  it("is not vacuous: a namespaced doc names a namespace its illustration carries", () => {
+    // At least one reference doc must exercise the namespace assertion above,
+    // otherwise the check could pass simply because no doc is namespaced.
+    const namespaced = REFERENCE_DOCS.filter(([file]) => ONTOLOGY_SCHEMA[file].namespace);
+    expect(namespaced.length, "no namespaced reference doc exercises the namespace pin").toBeGreaterThan(0);
   });
 });
