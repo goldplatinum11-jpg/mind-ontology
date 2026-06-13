@@ -778,3 +778,178 @@ describe("agent-roles.md reference doc states and shows the required #coding and
     }
   });
 });
+
+// schema-reference-agent-roles-non-empty-body-v1 — non-empty-body (the
+// perBlock.nonEmptyBody rule) requires every #agent block to carry a body, not
+// just a heading: a role with only a "## Coding agent #agent #coding" line names
+// the role but says nothing about WHEN to adopt it, which is the role-routing
+// signal the source exists to provide. The agent-roles.md reference doc states
+// and shows that requirement in four places — the "Role block rules" prose, the
+// "Validator enforcement" non-empty-body row, the Block model illustration, and
+// the minimal example. The enforcement row is pinned to its rule semantics by
+// the generic "rows state each structural rule's semantics" test above, and the
+// minimal example runs through validateSource (so an emptied body fails the
+// fixture suite already). But the "Role block rules" PROSE and the Block model
+// ILLUSTRATION body are otherwise unguarded: the prose bullet could drop the
+// non-empty-body requirement, or the illustration could show a body-less block,
+// and silently contradict the rule the doc documents. This mirrors the cq.md
+// non-empty-body audit, pins every non-empty-body surface in the agent-roles.md
+// doc, and self-guards so it fails loudly rather than passing vacuously if
+// agent-roles.md ever stops enforcing non-empty-body. The central validation
+// doc's non-empty-body surface for agent-roles.md is pinned separately by
+// schema-validation-doc.test.mjs (its structural-rule wording audits).
+describe("agent-roles.md reference doc states and shows the non-empty-body requirement", () => {
+  const ROLES_FILE = "agent-roles.md";
+
+  it("agent-roles.md still enforces non-empty-body (guard against a vacuous suite)", () => {
+    expect(
+      ONTOLOGY_SCHEMA[ROLES_FILE]?.perBlock?.nonEmptyBody,
+      "agent-roles.md no longer enforces non-empty-body — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the 'Role block rules' prose states a role block needs a non-empty body", () => {
+    const parts = DOC_FOR.get(ROLES_FILE).split(/^## Role block rules$/m);
+    expect(parts.length, "agent-roles.md reference doc has no '## Role block rules' section").toBe(2);
+    const section = parts[1].split(/\n## /)[0];
+    expect(section, "Role block rules prose omits the non-empty-body requirement").toMatch(
+      /non-empty body/i,
+    );
+  });
+
+  it("the enforcement-table non-empty-body row states the rule", () => {
+    const row = tableRows(enforcementSection(ROLES_FILE)).get("non-empty-body");
+    expect(row, "agent-roles.md enforcement table has no non-empty-body row").toBeTruthy();
+    expect(row.text, "non-empty-body row omits the 'non-empty body' wording").toMatch(
+      /non-empty body/i,
+    );
+  });
+
+  it("every Block model illustration block carries a non-empty body", () => {
+    const blocks = illustrativeBlocks(ROLES_FILE);
+    expect(blocks.length, "agent-roles.md Block model fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(
+        block.body.trim().length,
+        `Block model role "${block.title}" shows an empty body — contradicts non-empty-body`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("every minimal-example block carries a non-empty body", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(ROLES_FILE), ROLES_FILE);
+    expect(blocks.length, "agent-roles.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(
+        block.body.trim().length,
+        `example role "${block.title}" shows an empty body — contradicts non-empty-body`,
+      ).toBeGreaterThan(0);
+    }
+  });
+});
+
+// schema-reference-glossary-structural-surfaces-v1 — glossary.md carries three
+// structural rules beyond its #term namespace that shape how a term block is
+// authored: non-empty-body (a term must be defined, not just named), and
+// unique-titles (two blocks cannot define the same term, compared
+// case-insensitively). The glossary.md reference doc states and shows these in
+// the "Term block rules" prose, the "Validator enforcement" rows, the Block
+// model illustration, and the minimal example. The enforcement rows are pinned
+// to ONTOLOGY_SCHEMA and their semantics by the generic reference-doc tests
+// above, and the minimal example runs through validateSource. But the "Term
+// block rules" PROSE and the Block model ILLUSTRATION are otherwise unguarded:
+// the prose could drop the non-empty-body or unique-title requirement, or the
+// illustration could show a body-less or duplicate-titled block, and silently
+// contradict the rules the doc documents. This mirrors the cq.md/agent-roles.md
+// non-empty-body audits, pins glossary's structural surfaces, and self-guards so
+// it fails loudly rather than passing vacuously if glossary.md ever stops
+// enforcing these rules. The central validation doc's glossary surfaces are
+// pinned separately by schema-validation-doc.test.mjs.
+describe("glossary.md reference doc states and shows its term-namespace, non-empty-body, and unique-title rules", () => {
+  const GLOSSARY_FILE = "glossary.md";
+  const NAMESPACE = "term";
+
+  function termBlockRules() {
+    const parts = DOC_FOR.get(GLOSSARY_FILE).split(/^## Term block rules$/m);
+    expect(parts.length, "glossary.md reference doc has no '## Term block rules' section").toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  it("glossary.md still enforces the #term namespace, non-empty-body, and unique-titles (guard against a vacuous suite)", () => {
+    const rule = ONTOLOGY_SCHEMA[GLOSSARY_FILE];
+    expect(rule?.namespace, "glossary.md namespace changed — retarget or retire this suite").toBe(
+      NAMESPACE,
+    );
+    expect(
+      rule?.perBlock?.nonEmptyBody,
+      "glossary.md no longer enforces non-empty-body — retarget or retire this suite",
+    ).toBe(true);
+    expect(
+      rule?.uniqueTitles,
+      "glossary.md no longer enforces unique-titles — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the 'Term block rules' prose states the #term namespace, a non-empty body, and unique case-insensitive titles", () => {
+    const section = termBlockRules();
+    expect(section, "Term block rules prose omits the #term namespace tag").toMatch(/`#term` tag/i);
+    expect(section, "Term block rules prose omits the non-empty-body requirement").toMatch(
+      /non-empty (?:definition )?body/i,
+    );
+    expect(section, "Term block rules prose omits the unique-title requirement").toMatch(
+      /unique[\s\S]*case-insensitive/i,
+    );
+  });
+
+  it("the enforcement table names the namespace and states the non-empty-body and unique-title rules", () => {
+    const rows = tableRows(enforcementSection(GLOSSARY_FILE));
+    expect(
+      rows.get("namespace-required")?.text,
+      "glossary.md enforcement table omits the #term namespace",
+    ).toContain(`#${NAMESPACE}`);
+    expect(
+      rows.get("non-empty-body")?.text,
+      "glossary.md enforcement table non-empty-body row omits the wording",
+    ).toMatch(/non-empty body/i);
+    expect(
+      rows.get("unique-titles")?.text,
+      "glossary.md enforcement table unique-titles row omits the wording",
+    ).toMatch(/unique[\s\S]*case-insensitive/i);
+  });
+
+  it("every Block model illustration block carries the #term namespace and a non-empty body", () => {
+    const blocks = illustrativeBlocks(GLOSSARY_FILE);
+    expect(blocks.length, "glossary.md Block model fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(block.tags, `Block model term "${block.title}" omits the #term namespace`).toContain(
+        NAMESPACE,
+      );
+      expect(
+        block.body.trim().length,
+        `Block model term "${block.title}" shows an empty body — contradicts non-empty-body`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("Block model illustration titles are unique compared case-insensitively", () => {
+    const titles = illustrativeBlocks(GLOSSARY_FILE).map((block) => block.title.trim().toLowerCase());
+    expect(
+      new Set(titles).size,
+      "glossary.md Block model fence shows duplicate term titles — contradicts unique-titles",
+    ).toBe(titles.length);
+  });
+
+  it("every minimal-example block carries the #term namespace and a non-empty body", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(GLOSSARY_FILE), GLOSSARY_FILE);
+    expect(blocks.length, "glossary.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(block.tags, `example term "${block.title}" omits the #term namespace`).toContain(
+        NAMESPACE,
+      );
+      expect(
+        block.body.trim().length,
+        `example term "${block.title}" shows an empty body — contradicts non-empty-body`,
+      ).toBeGreaterThan(0);
+    }
+  });
+});
