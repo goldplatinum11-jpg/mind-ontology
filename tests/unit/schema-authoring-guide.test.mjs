@@ -253,3 +253,146 @@ describe("schema-authoring-illustrative-tags-v1 — skeleton illustrates the blo
     expect(prose, "block-format prose drops the non-empty-body rule").toContain("non-empty body");
   });
 });
+
+// The five per-file reference docs the authoring guide cross-references: every
+// schema-governed file except constraints.md (which the guide documents itself).
+const REFERENCE_DOCS = Object.keys(ONTOLOGY_SCHEMA)
+  .filter((file) => file !== "constraints.md")
+  .map((file) => [file, `docs/mind-ontology-${file.replace(/\.md$/, "")}-schema-v0.md`]);
+
+const REFERENCE_DOC_FOR = new Map(
+  REFERENCE_DOCS.map(([file, path]) => [
+    file,
+    readFileSync(resolve(REPO_ROOT, path), "utf8").replace(/\r\n/g, "\n"),
+  ]),
+);
+
+// A reference doc's "## Validator enforcement" section, ended at the next ##
+// heading so prose elsewhere in the doc cannot satisfy a marker. Mirrors the
+// extractor in schema-reference-docs.test.mjs.
+function refEnforcementSection(file) {
+  const parts = REFERENCE_DOC_FOR.get(file).split(/^## Validator enforcement$/m);
+  expect(parts.length, `${file} reference doc has no "## Validator enforcement" section`).toBe(2);
+  return parts[1].split(/\n## /)[0];
+}
+
+// The enforcement table's rule rows: rule id -> the "what it checks" cell text.
+function refTableRows(file) {
+  return new Map(
+    refEnforcementSection(file)
+      .split("\n")
+      .filter((line) => line.startsWith("| `"))
+      .map((line) => {
+        const cells = line.split("|").map((cell) => cell.trim()).filter(Boolean);
+        return [cells[0].replace(/`/g, ""), cells[2]];
+      }),
+  );
+}
+
+const hashtagsIn = (text) => [...text.matchAll(/#([a-z][a-z0-9_-]*)/g)].map((m) => m[1]);
+const backtickedLowerWordsIn = (text) => [...text.matchAll(/`([a-z]+)`/g)].map((m) => m[1]);
+
+// schema-authoring-reference-rule-sync-v1 — the authoring guide's per-file rule
+// sections and the per-file `*-schema-v0.md` reference docs describe the SAME
+// validator rules from two surfaces. M44 (above) and schema-reference-structural-pins-v1
+// each pin one surface to ONTOLOGY_SCHEMA independently, but nothing pins the two
+// documents to EACH OTHER: a tag rename, namespace change, enum edit, dropped
+// field, or a structural-rule phrasing removed from one document but not the
+// other can still satisfy both lenient `toContain` schema pins. This audit takes
+// the reference doc's enforcement table as the source of truth and requires the
+// guide's matching `### \`file\`` section to mirror every tag, namespace, enum
+// value, required field, and structural rule the table names — so cross-document
+// drift fails here instead of shipping inconsistent docs.
+describe("schema-authoring-reference-rule-sync-v1 — guide sections track their reference docs", () => {
+  it("every reference-doc file has a guide section to cross-check", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      expect(SECTION_FOR.has(file), `guide has no ### section for ${file}`).toBe(true);
+    }
+  });
+
+  it("each tag the reference doc's enforcement table names appears in the guide section", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const section = SECTION_FOR.get(file);
+      const rows = refTableRows(file);
+      for (const rule of ["namespace-required", "required-tag", "recommended-tag"]) {
+        if (!rows.has(rule)) continue;
+        const tags = hashtagsIn(rows.get(rule));
+        expect(tags.length, `${file} reference doc ${rule} row names no #tag`).toBeGreaterThan(0);
+        for (const tag of tags) {
+          expect(
+            section,
+            `${file} guide section omits #${tag} the reference doc ${rule} row enforces`,
+          ).toContain(`#${tag}`);
+        }
+      }
+    }
+  });
+
+  it("the guide section names every required field the reference doc's table enforces", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const rows = refTableRows(file);
+      if (!rows.has("required-field")) continue;
+      const section = SECTION_FOR.get(file);
+      const fields = [...rows.get("required-field").matchAll(/`([A-Z][A-Za-z]+):`/g)].map((m) => m[1]);
+      expect(fields.length, `${file} reference doc required-field row names no Field:`).toBeGreaterThan(0);
+      for (const field of fields) {
+        expect(
+          section,
+          `${file} guide section omits the ${field}: field the reference doc requires`,
+        ).toContain(`${field}:`);
+      }
+    }
+  });
+
+  it("the guide and reference doc agree on the enum values", () => {
+    for (const [file] of REFERENCE_DOCS) {
+      const rows = refTableRows(file);
+      if (!rows.has("enum-field")) continue;
+      const section = SECTION_FOR.get(file);
+      const values = backtickedLowerWordsIn(rows.get("enum-field"));
+      expect(values.length, `${file} reference doc enum-field row names no values`).toBeGreaterThan(0);
+      for (const value of values) {
+        expect(
+          section,
+          `${file} guide section omits enum value "${value}" the reference doc allows`,
+        ).toContain(value);
+      }
+    }
+  });
+
+  it("the guide section states each structural rule the reference doc's table enforces", () => {
+    // Keyed by the rule id the reference doc table may carry; the pattern is the
+    // phrasing the guide section must use. no-credentials is intentionally absent:
+    // the guide documents it once in the constraints.md section, not per file.
+    const MARKERS = {
+      "every-block-has-tag": /at least one tag/i,
+      "unique-titles": /unique[\s\S]*case-insensitive/i,
+      "non-empty-body": /non-empty body/i,
+      "question-title": /question[\s\S]*\?/,
+      "one-role-tag": /exactly one/i,
+      "topic-tag": /topic tag/i,
+    };
+    for (const [file] of REFERENCE_DOCS) {
+      const section = SECTION_FOR.get(file);
+      const rows = refTableRows(file);
+      for (const [rule, pattern] of Object.entries(MARKERS)) {
+        if (rows.has(rule)) {
+          expect(
+            section,
+            `${file} guide section omits the ${rule} rule the reference doc enforces`,
+          ).toMatch(pattern);
+        }
+      }
+    }
+  });
+
+  it("is not vacuous: at least one reference doc exercises each cross-check arm", () => {
+    const rowsByFile = REFERENCE_DOCS.map(([file]) => refTableRows(file));
+    expect(
+      rowsByFile.some((rows) => rows.has("namespace-required") || rows.has("required-tag")),
+      "no reference doc exercises the tag cross-check",
+    ).toBe(true);
+    expect(rowsByFile.some((rows) => rows.has("required-field")), "no reference doc exercises the field cross-check").toBe(true);
+    expect(rowsByFile.some((rows) => rows.has("enum-field")), "no reference doc exercises the enum cross-check").toBe(true);
+  });
+});
