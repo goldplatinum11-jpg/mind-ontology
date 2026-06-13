@@ -1508,6 +1508,41 @@ describe("projects.md reference doc Optional-blocks table pins the schema's fiel
   });
 });
 
+// schema-reference-projects-scoring-prose-surface-v1 — projects.md's
+// "## Optional blocks" section closes with a public sentence stating the
+// compiler treatment of optional project blocks: "There is no upper limit on
+// optional project blocks; they are scored and selected per task like other
+// non-constraint sources." Earlier reference-doc suites left this prose unpinned
+// because its claim was unwired compiler runtime with no non-runtime anchor (see
+// the note in schema-reference-projects-template-convention-tags-v1 below). That
+// anchor now exists: project-scoring-anchor-batch-v1 added behavior anchors —
+// the "compile scores and selects project blocks per task with no
+// project-specific cap" suite in agentctx-compile.test.mjs and the "surfaces a
+// scored project block per task, never force-included" test in
+// agentctx-source-list.test.mjs — proving projects.md is scored and selected per
+// task and carries no project-specific optional-block cap. With the behavior
+// anchored, this audit pins the public sentence verbatim so the doc prose cannot
+// drift away from the behavior its companion tests now prove.
+describe("projects.md reference doc Optional-blocks prose pins the per-task scoring sentence", () => {
+  const PROJECTS_FILE = "projects.md";
+
+  function section(heading) {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `projects.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  it("the Optional-blocks section states optional project blocks are scored and selected per task with no upper limit", () => {
+    // Collapse the doc's line-wrapping so the single public sentence compares as
+    // one line regardless of where the prose happens to wrap.
+    const prose = section("Optional blocks").replace(/\s+/g, " ").trim();
+    expect(prose, "Optional-blocks prose dropped the public per-task scoring sentence").toContain(
+      "There is no upper limit on optional project blocks; they are scored and " +
+        "selected per task like other non-constraint sources.",
+    );
+  });
+});
+
 // schema-reference-projects-template-convention-tags-v1 — the project tag tokens
 // #project / #secondary / #archived carry NO ONTOLOGY_SCHEMA anchor:
 // agentctx:validate enforces only #active (the projects.md schema entry has no
@@ -1530,9 +1565,14 @@ describe("projects.md reference doc Optional-blocks table pins the schema's fiel
 // out of scope: the template ships no archived block, so that row has no template
 // anchor (asserted below so the skip stays honest if an archived block is ever
 // added). The compiler-treatment prose ("no upper limit on optional project
-// blocks", "scored and selected per task") is likewise NOT pinned here: the
-// template ships a single optional block (which cannot prove "no upper limit") and
-// scoring is unwired compiler runtime, so neither claim has a non-runtime anchor.
+// blocks", "scored and selected per task") is NOT pinned in THIS template-anchor
+// suite: the template ships a single optional block, which cannot prove "no upper
+// limit", so there is no template surface to anchor it to. The behavior those
+// claims describe is now anchored by project-scoring-anchor-batch-v1 (behavior
+// anchors in agentctx-compile.test.mjs and agentctx-source-list.test.mjs proving
+// projects.md is scored and selected per task with no project-specific
+// optional-block cap), and the public sentence itself is pinned as a doc surface
+// by schema-reference-projects-scoring-prose-surface-v1 above.
 describe("projects.md reference doc template-convention tags match the shipped template", () => {
   const PROJECTS_FILE = "projects.md";
   const TEMPLATE_PATH = resolve(REPO_ROOT, "templates/mind-ontology/.agentctx/projects.md");
