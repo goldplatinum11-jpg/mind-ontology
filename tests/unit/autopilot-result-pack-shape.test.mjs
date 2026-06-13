@@ -21,6 +21,13 @@ const EXAMPLE = resolve(REPO_ROOT, "tests/fixtures/autopilot-result-pack.example
 const pack = JSON.parse(readFileSync(EXAMPLE, "utf8"));
 const docText = readFileSync(DOC, "utf8");
 
+// The doc's key table names the schema shape identifier `sirt.result-pack/v1`
+// (the `e.g.` literal under the `schema` row). The required-key guard only
+// pins `schema` as a string; this literal is the actual contract the
+// controller keys on, so pin it as a constant the doc and fixture must both
+// carry — neither can rename the shape without the other following.
+const DOCUMENTED_SCHEMA_LITERAL = "sirt.result-pack/v1";
+
 // The runway sub-keys the doc's `runway` table documents and the fixture must
 // carry. Pinned as a field list so the doc/fixture surface can't silently drop
 // one — prose self-consistency (below) only guards the stop-state semantics.
@@ -168,5 +175,20 @@ describe("autopilot result-pack shape guard (A14)", () => {
     const lower = docText.toLowerCase();
     expect(lower).toMatch(/no hosted sirt ingest|without.*hosted|copy-paste is the transport/);
     expect(lower).toMatch(/fail-closed|optional/);
+  });
+
+  it("the example pack's schema equals the documented shape literal", () => {
+    expect(pack.schema).toBe(DOCUMENTED_SCHEMA_LITERAL);
+  });
+
+  it("the doc documents the schema shape literal", () => {
+    expect(docText, `doc omits schema literal: ${DOCUMENTED_SCHEMA_LITERAL}`).toContain(
+      DOCUMENTED_SCHEMA_LITERAL,
+    );
+  });
+
+  it("the example pack's handoff is a non-empty string", () => {
+    expect(typeof pack.handoff).toBe("string");
+    expect(pack.handoff.trim().length).toBeGreaterThan(0);
   });
 });
