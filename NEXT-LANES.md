@@ -82,6 +82,12 @@ Follow-on autopilot lanes — all shipped (docs/tests only):
   is the product `bin`, a thin verbatim dispatcher over the `agentctx:*` scripts
   (which stay intact, backward compatible), guarded by `tests/unit/cli-wrapper.test.mjs`.
   The new compile flags above flow through it verbatim.
+- **[engine]** budget-aware compaction — shipped. `--max-tokens <n>` fits the pack
+  inside a rough token budget by principled selection (constraints always kept,
+  risk-forced safety next, then a source-priority order), not truncation; over-budget
+  blocks move to omitted with reason `budget`, and the mandatory-only-overrun case is
+  flagged. Opt-in/additive (unset = byte-for-byte legacy), guarded by
+  `tests/unit/compile-budget.test.mjs`.
 
 Genuinely open after this campaign: scoring **recency** (needs a date-signal design),
 and any further additive `--format`/scoring extensions as the product grows.

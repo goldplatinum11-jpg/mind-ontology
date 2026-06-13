@@ -112,6 +112,13 @@ export function parseArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--rich-scoring") {
       parsed.richScoring = true;
+    } else if (arg === "--max-tokens") {
+      const raw = args[++i];
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n <= 0) {
+        throw new Error(`--max-tokens must be a positive integer, got: ${raw ?? ""}`);
+      }
+      parsed.maxTokens = n;
     } else if (arg === "-h" || arg === "--help") {
       parsed.command = "help";
     } else {
@@ -261,6 +268,92 @@ export function scoreBlock(block, taskTokens, scopes = [], opts = {}) {
   return score;
 }
 
+// Dependency-free token estimate. ~4 chars/token is the rough GPT-family ratio;
+// good enough to keep a pack inside a budget without pulling in a tokenizer.
+export function estimateTokens(text) {
+  return Math.ceil(String(text).length / 4);
+}
+// Estimate a block's cost as its compact rendering (`## file / title` + body) — the
+// agent-facing context the budget is meant to bound. This is exact for `--format
+// compact`; markdown/json add human-facing display overhead (headers, per-block
+// Source/Reason/Tags, the Omitted list) that the budget intentionally does not count.
+export function estimateBlockTokens(block) {
+  return estimateTokens(`## ${block.file} / ${block.title}\n${block.body}`);
+}
+
+// Retention priority when a token budget forces a choice. constraints (always) and
+// risk-forced safety blocks are mandatory (never dropped, only counted); everything
+// else is ranked so the most decision-critical sources survive a tight budget.
+const BUDGET_PRIORITY = {
+  "cq.md": 2,
+  "direction.md": 3,
+  "decisions.md": 4,
+  "projects.md": 5,
+  "architecture.md": 6,
+  "identity.md": 7,
+  "agent-roles.md": 8,
+  "glossary.md": 9,
+};
+function isSafetyBlock(block) {
+  return block.tags.some((tag) => SAFETY_TAGS.has(tag));
+}
+function blockBudgetPriority(block, risky) {
+  if (block.reason === "always") return 0;
+  // On a risky task every safety block ranks with the risk-forced ones — the risk
+  // mode exists to keep safety guidance, so a tight budget must not demote it.
+  if (block.reason === "risk-forced" || (risky && isSafetyBlock(block))) return 1;
+  return BUDGET_PRIORITY[block.file] ?? 10;
+}
+function isMandatoryBlock(block, risky) {
+  if (block.reason === "always" || block.reason === "risk-forced") return true;
+  // A safety block that surfaced on a risky task (even via normal scoring) is never
+  // dropped to fit a budget; that would defeat the risk mode's safety guarantee.
+  return risky && isSafetyBlock(block);
+}
+
+// Reduce `selected` to fit `maxTokens`, block-by-block (never mid-block truncation).
+// Mandatory blocks are always kept; over-budget non-mandatory blocks move to omitted
+// with reason "budget". If the mandatory blocks alone exceed the budget, constraints
+// are still kept and overBudget is flagged (the one allowed budget overrun). Returns
+// the survivors in their original selected order plus budget metadata.
+export function applyTokenBudget(selected, omitted, maxTokens, risky = false) {
+  const ordered = [...selected].sort((a, b) => {
+    const pa = blockBudgetPriority(a, risky);
+    const pb = blockBudgetPriority(b, risky);
+    if (pa !== pb) return pa - pb;
+    const sa = a.score === Infinity ? Number.MAX_SAFE_INTEGER : a.score;
+    const sb = b.score === Infinity ? Number.MAX_SAFE_INTEGER : b.score;
+    if (sb !== sa) return sb - sa;
+    return a.index - b.index;
+  });
+
+  const keptRefs = new Set();
+  const dropped = [];
+  let used = 0;
+  let overBudget = false;
+
+  for (const block of ordered) {
+    const cost = estimateBlockTokens(block);
+    if (isMandatoryBlock(block, risky)) {
+      keptRefs.add(block);
+      used += cost;
+      if (used > maxTokens) overBudget = true;
+    } else if (used + cost <= maxTokens) {
+      keptRefs.add(block);
+      used += cost;
+    } else {
+      dropped.push({ ...block, reason: "budget" });
+    }
+  }
+
+  return {
+    selected: selected.filter((block) => keptRefs.has(block)),
+    omitted: [...omitted, ...dropped],
+    estimatedTokens: used,
+    overBudget,
+  };
+}
+
 export function compileContext({
   sources,
   task,
@@ -269,6 +362,7 @@ export function compileContext({
   minScore = DEFAULT_MIN_SCORE,
   riskMode = DEFAULT_RISK_MODE,
   richScoring = false,
+  maxTokens = null,
   now = new Date(),
 }) {
   const taskTokens = tokenize(`${task} ${scopes.join(" ")}`);
@@ -304,14 +398,26 @@ export function compileContext({
     }
   }
 
+  // Token budget (opt-in): only when maxTokens is set do we touch selected/omitted,
+  // so an unset budget leaves the pack byte-for-byte identical to before.
+  let budget = null;
+  let finalSelected = selected;
+  if (maxTokens !== null && maxTokens !== undefined) {
+    const result = applyTokenBudget(selected, omitted, maxTokens, risk.level === "risky");
+    finalSelected = result.selected;
+    omitted = result.omitted;
+    budget = { maxTokens, estimatedTokens: result.estimatedTokens, overBudget: result.overBudget };
+  }
+
   return {
     task,
     scopes,
     generatedAt: now.toISOString(),
-    selected,
+    selected: finalSelected,
     omitted,
     sourceFiles: SOURCE_FILES,
     risk,
+    ...(budget ? { budget } : {}),
   };
 }
 
@@ -352,9 +458,16 @@ export function renderContextPack(pack, options = {}) {
     }`,
     `Generated: ${pack.generatedAt}`,
     "",
-    "## Included Context",
-    "",
   ];
+  if (pack.budget) {
+    lines.push(
+      `Budget: ${pack.budget.estimatedTokens}/${pack.budget.maxTokens} tokens${
+        pack.budget.overBudget ? " (over budget — mandatory blocks exceed the limit)" : ""
+      }`,
+      "",
+    );
+  }
+  lines.push("## Included Context", "");
 
   for (const block of pack.selected) {
     const reason = block.reason === "always" ? "always included" : `${block.reason}; score=${block.score}`;
@@ -376,7 +489,8 @@ export function renderContextPack(pack, options = {}) {
     lines.push("No positive-scoring blocks were omitted.");
   } else {
     for (const block of omitted.slice(0, 10)) {
-      lines.push(`- ${block.file} / ${block.title} (score=${block.score})`);
+      const why = block.reason === "budget" ? ", omitted: budget" : "";
+      lines.push(`- ${block.file} / ${block.title} (score=${block.score}${why})`);
     }
   }
 
@@ -402,6 +516,18 @@ export function renderContextPackJson(pack, options = {}) {
         omittedCount: pack.omitted.length,
         sourceFiles: pack.sourceFiles,
         risk: pack.risk ?? { level: "safe", mode: "auto", signals: [] },
+        ...(pack.budget
+          ? {
+              budget: pack.budget,
+              budgetOmitted: pack.omitted
+                .filter((b) => b.reason === "budget")
+                .map((b) => ({
+                  file: b.file,
+                  title: b.title,
+                  score: b.score === Infinity ? "always" : b.score,
+                })),
+            }
+          : {}),
       },
       null,
       2,
@@ -438,6 +564,7 @@ export function compileFromCwd(options) {
     minScore: options.minScore,
     riskMode: options.riskMode,
     richScoring: options.richScoring === true,
+    maxTokens: options.maxTokens ?? null,
   });
   const render = { explain: options.explain === true };
   if (options.format === "json") return renderContextPackJson(pack, render);
@@ -479,6 +606,12 @@ Options:
   --rich-scoring                Opt in to richer ranking signals: a task/scope hit in a
                                 block's heading/tags earns an extra boost over a body-only
                                 hit. Off by default; the default ranking is unchanged.
+  --max-tokens <n>              Fit the pack inside a rough token budget. constraints and
+                                risk-forced safety blocks are always kept; lower-priority
+                                blocks are dropped (reason: budget) to fit. The budget counts
+                                the context content (exact for --format compact); markdown
+                                and json add human-facing display overhead. Off by default;
+                                without it the pack is unchanged.
   -h, --help                    Show this help message.
 
 Source files (under .agentctx/):
