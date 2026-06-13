@@ -42,6 +42,7 @@ to the operator, and apply the named fix. Do not retry verbatim.
 | Empty `constraints.md` | `Required Mind Ontology source is empty: .agentctx/constraints.md. Add at least one ## constraint block before compiling.` | Add at least one `## …` constraint block. |
 | Bad `--format` | `--format must be "markdown", "json", or "compact", got: <x>` | Use `markdown`, `json`, or `compact`. |
 | Bad `--risk` | `--risk must be "auto", "safe", or "risky", got: <x>` | Use `auto`, `safe`, or `risky`. |
+| Bad `--max-tokens` | `--max-tokens must be a positive integer, got: <x>` | Pass a positive integer, e.g. `--max-tokens 400`. |
 | Unknown flag | `Unknown argument: <arg>` | Remove the unknown flag (see `--help`). |
 | Unknown command | `Unknown command: <x>` | Use `compile`. |
 
