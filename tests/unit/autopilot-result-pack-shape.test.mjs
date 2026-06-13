@@ -30,6 +30,13 @@ const RUNWAY_SUBKEYS = [
   "reason_for_continuation",
 ];
 
+// Each `validation` entry is a gate the worker ran: the doc calls the object
+// "the gates the worker ran and whether they passed". The doc carries no field
+// table for an entry, so this is a fixture-shape pin only — every entry must
+// name its `command`, its `result`, and a boolean `passed` verdict, so the
+// controller can re-run the gate rather than trust the summary.
+const VALIDATION_ENTRY_FIELDS = ["command", "result", "passed"];
+
 describe("autopilot result-pack shape guard (A14)", () => {
   it("the example pack passes every shared shape invariant", () => {
     const { ok, violations } = validateResultPack(pack);
@@ -84,6 +91,21 @@ describe("autopilot result-pack shape guard (A14)", () => {
       expect(pack.status).toBe("in-progress");
       expect(typeof pack.runway.reason_for_continuation).toBe("string");
       expect(pack.runway.reason_for_continuation.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("each validation entry names a command, a result, and a boolean passed", () => {
+    expect(typeof pack.validation).toBe("object");
+    expect(pack.validation).not.toBeNull();
+    const entries = Object.entries(pack.validation);
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [gate, entry] of entries) {
+      expect(typeof entry, `validation.${gate} is not an object`).toBe("object");
+      for (const field of VALIDATION_ENTRY_FIELDS) {
+        expect(entry, `validation.${gate} omits ${field}`).toHaveProperty(field);
+      }
+      expect(typeof entry.command, `validation.${gate}.command is not a string`).toBe("string");
+      expect(typeof entry.passed, `validation.${gate}.passed is not a boolean`).toBe("boolean");
     }
   });
 
