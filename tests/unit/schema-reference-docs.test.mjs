@@ -373,3 +373,88 @@ describe("schema-reference-illustrative-tags-v1 — Block model fences illustrat
     expect(namespaced.length, "no namespaced reference doc exercises the namespace pin").toBeGreaterThan(0);
   });
 });
+
+// schema-reference-cq-question-title-terminator-v1 — question-title is the only
+// structural rule that constrains a block's TITLE text: each #cq title must end
+// with "?". The cq.md reference doc states and shows that terminator in five
+// places — the "CQ block rules" prose, the "Validator enforcement" row, the
+// Block model illustration, the minimal example, and the Required/Recommended
+// CQ tables. Only the example fence is executed through validateSource (above),
+// so the prose, the illustration title, and the CQ-table questions are otherwise
+// unguarded: any of them could drop the "?" and silently contradict the rule the
+// doc itself documents. This audit pins every CQ-title surface in the doc to the
+// "?" terminator, and self-guards so it fails loudly rather than passing
+// vacuously if cq.md ever stops enforcing question-title.
+describe("cq.md reference doc states and shows the question-title '?' terminator", () => {
+  const CQ_FILE = "cq.md";
+
+  // The last ("Question it tests") cell of every `| #tag | ... |` row under a
+  // "## <heading>" table, ended at the next ## heading so later prose can't leak.
+  function questionColumn(heading) {
+    const parts = DOC_FOR.get(CQ_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `cq.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1]
+      .split(/\n## /)[0]
+      .split("\n")
+      .filter((line) => line.startsWith("| `#"))
+      .map((line) => line.split("|").map((cell) => cell.trim()).filter(Boolean).at(-1));
+  }
+
+  it("cq.md still enforces question-title (guard against a vacuous suite)", () => {
+    expect(
+      ONTOLOGY_SCHEMA[CQ_FILE]?.perBlock?.questionTitle,
+      "cq.md no longer enforces question-title — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the 'CQ block rules' prose states the title ends with '?'", () => {
+    const parts = DOC_FOR.get(CQ_FILE).split(/^## CQ block rules$/m);
+    expect(parts.length, "cq.md reference doc has no '## CQ block rules' section").toBe(2);
+    const section = parts[1].split(/\n## /)[0];
+    expect(section, "CQ block rules prose omits the question-title '?' terminator").toMatch(
+      /title ends with `\?`/i,
+    );
+  });
+
+  it("the enforcement-table question-title row requires a '?' terminator", () => {
+    const row = tableRows(enforcementSection(CQ_FILE)).get("question-title");
+    expect(row, "cq.md enforcement table has no question-title row").toBeTruthy();
+    expect(row.text, "question-title row omits the '?' terminator").toMatch(
+      /end(?:s|ing)? (?:in|with) `\?`/i,
+    );
+  });
+
+  it("every Block model illustration title ends with '?'", () => {
+    for (const block of illustrativeBlocks(CQ_FILE)) {
+      expect(
+        block.title.trim().endsWith("?"),
+        `Block model CQ "${block.title}" contradicts the question-title rule`,
+      ).toBe(true);
+    }
+  });
+
+  it("every minimal-example title ends with '?'", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(CQ_FILE), CQ_FILE);
+    expect(blocks.length, "cq.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(
+        block.title.trim().endsWith("?"),
+        `example CQ "${block.title}" contradicts the question-title rule`,
+      ).toBe(true);
+    }
+  });
+
+  it("every Required/Recommended CQ-table question ends with '?'", () => {
+    const questions = [
+      ...questionColumn("Required competency questions"),
+      ...questionColumn("Recommended competency questions"),
+    ];
+    expect(questions.length, "cq.md CQ tables yielded no questions").toBeGreaterThan(0);
+    for (const question of questions) {
+      expect(
+        question.endsWith("?"),
+        `CQ-table entry "${question}" is not phrased as a question`,
+      ).toBe(true);
+    }
+  });
+});

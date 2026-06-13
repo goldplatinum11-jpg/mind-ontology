@@ -304,3 +304,37 @@ describe("validation doc rows and reference docs agree on structural-rule wordin
     expect(statedInValidation, "no structural-rule prose found in any validation doc row").toBeGreaterThan(0);
   });
 });
+
+// schema-validation-vs-reference-docs-question-title-terminator-v1 — question-title
+// is unique among the structural rules in constraining a block's TITLE: each #cq
+// title must end with "?". The structural-rule wording audit above ties the two
+// public docs together only on the WORD "question" (/question/i) — a pattern both
+// docs would still satisfy even if one dropped the "?" terminator. This pins the
+// terminator itself: the central validation doc's cq.md row and the cq.md
+// reference doc's question-title enforcement row must BOTH state the "?", so the
+// two public surfaces cannot disagree on whether a CQ title must end in "?".
+describe("validation doc and cq reference doc agree on the question-title '?' terminator", () => {
+  const CQ_FILE = "cq.md";
+  const TERMINATOR = /`\?`/;
+
+  it("is not vacuous: cq.md actually enforces question-title", () => {
+    expect(
+      ONTOLOGY_SCHEMA[CQ_FILE]?.perBlock?.questionTitle,
+      "cq.md no longer enforces question-title — retarget this audit",
+    ).toBe(true);
+  });
+
+  it("the central validation doc's cq.md row states the '?' terminator", () => {
+    const row = ROW_FOR.get(CQ_FILE);
+    expect(row, "validation doc has no cq.md row").toBeTruthy();
+    expect(row, "cq.md validation-doc row omits the question-title '?' terminator").toMatch(TERMINATOR);
+  });
+
+  it("the cq.md reference doc's question-title enforcement row states the '?' terminator", () => {
+    const row = enforcementTableText(CQ_FILE)
+      .split("\n")
+      .find((line) => line.includes("`question-title`"));
+    expect(row, "cq.md reference enforcement table has no question-title row").toBeTruthy();
+    expect(row, "cq.md reference question-title row omits the '?' terminator").toMatch(TERMINATOR);
+  });
+});
