@@ -60,3 +60,37 @@ node scripts/agentctx/compile.mjs compile --cwd docs/examples/solo-founder-ai-os
 
 This example is exercised by `tests/unit/example-solo-founder-ontology.test.mjs`,
 so it stays valid and in sync with the compiler.
+
+## `studio-multi-client/`
+
+A third worked example for the **multi-client** case: a small AI product studio,
+**Northstar**, running several concurrent client engagements. Where the others
+show one operator's projects, this one stresses **isolation** — the AI must scope
+to one client and never leak another's context:
+
+- multiple active client engagements (`client-acme`, `client-northwind`,
+  `client-globex`) plus a shared `studio-platform` and an archived pilot;
+- a hard **per-client isolation boundary** — scoping to one client surfaces that
+  client's project and direction and *not* another client's;
+- decisions and constraints that make cross-client data mixing the studio's
+  number-one forbidden action;
+- competency questions that include "which client and project does this task
+  belong to?", pointing at the files that answer it.
+
+```sh
+# Validate it
+node scripts/agentctx/schema.mjs --cwd docs/examples/studio-multi-client
+
+# Scoping to one client surfaces only that client's slice
+node scripts/agentctx/compile.mjs compile --cwd docs/examples/studio-multi-client \
+  --task "work on the storefront product search" --scope client-acme
+node scripts/agentctx/compile.mjs compile --cwd docs/examples/studio-multi-client \
+  --task "work on the patient scheduling flow" --scope client-northwind
+
+# A cross-client destructive task fails closed: safety context is forced in
+node scripts/agentctx/compile.mjs compile --cwd docs/examples/studio-multi-client \
+  --task "delete one client's records and copy them into another client's workspace" --format json
+```
+
+This example is exercised by `tests/unit/example-studio-multi-client.test.mjs`,
+so it stays valid and in sync with the compiler.
