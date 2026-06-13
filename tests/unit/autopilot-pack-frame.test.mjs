@@ -39,4 +39,25 @@ describe("autopilot pack v1 frame (A1)", () => {
     expect(text).toContain("get_context");
     expect(text).toContain("list_constraints");
   });
+
+  it("pins the load-bearing in-scope / hosted-SIRT scoping rule", () => {
+    // Whitespace-normalized so the rule survives the doc's line wrapping.
+    const text = readFileSync(DOC, "utf8").replace(/\s+/g, " ");
+    // Local + file-based is in scope; the four hosted criteria stay out. The
+    // loose `stays out` match elsewhere would survive a weakening of these
+    // criteria — this pins each one so the boundary cannot quietly soften.
+    expect(text).toContain("anything local and file-based is in scope");
+    expect(text).toContain(
+      "running a service, storing data, executing writes, or isolating tenants",
+    );
+    expect(text).toContain("hosted SIRT and stays out");
+  });
+
+  it("pins the no-SIRT-dependency portability guarantee", () => {
+    const text = readFileSync(DOC, "utf8").replace(/\s+/g, " ");
+    // The pack must compile and ship with zero hosted coupling.
+    expect(text).toContain(
+      "compiles and ships without any SIRT package, endpoint, credential, or network call",
+    );
+  });
 });
