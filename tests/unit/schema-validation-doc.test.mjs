@@ -338,3 +338,39 @@ describe("validation doc and cq reference doc agree on the question-title '?' te
     expect(row, "cq.md reference question-title row omits the '?' terminator").toMatch(TERMINATOR);
   });
 });
+
+// schema-validation-vs-reference-docs-topic-tag-besides-namespace-v1 — topic-tag
+// (the requireExtraTopicTag rule) requires every #cq block to carry at least one
+// topic tag besides the #cq namespace. The structural-rule wording audit above
+// ties the two public docs together only on the WORDS "topic tag" (/topic tag/i)
+// — a pattern both docs satisfy even if neither states that the topic tag must be
+// IN ADDITION to #cq. This pins the cross-doc agreement on that "besides #cq"
+// detail: the central validation doc's cq.md row must state the topic-tag
+// requirement, and the cq.md reference doc's topic-tag enforcement row must state
+// the "besides #cq" qualifier — so the two public surfaces cannot disagree on
+// whether a #cq block needs a tag beyond #cq itself.
+describe("validation doc and cq reference doc agree on the topic-tag (besides #cq) requirement", () => {
+  const CQ_FILE = "cq.md";
+  const BESIDES_CQ = /(?:besides|in addition to)\s+`#cq`/i;
+
+  it("is not vacuous: cq.md actually enforces topic-tag", () => {
+    expect(
+      ONTOLOGY_SCHEMA[CQ_FILE]?.perBlock?.requireExtraTopicTag,
+      "cq.md no longer enforces topic-tag — retarget this audit",
+    ).toBe(true);
+  });
+
+  it("the central validation doc's cq.md row states the topic-tag requirement", () => {
+    const row = ROW_FOR.get(CQ_FILE);
+    expect(row, "validation doc has no cq.md row").toBeTruthy();
+    expect(row, "cq.md validation-doc row omits the topic-tag requirement").toMatch(/topic tag/i);
+  });
+
+  it("the cq.md reference doc's topic-tag enforcement row states the 'besides #cq' qualifier", () => {
+    const row = enforcementTableText(CQ_FILE)
+      .split("\n")
+      .find((line) => line.includes("`topic-tag`"));
+    expect(row, "cq.md reference enforcement table has no topic-tag row").toBeTruthy();
+    expect(row, "cq.md reference topic-tag row omits the 'besides #cq' qualifier").toMatch(BESIDES_CQ);
+  });
+});

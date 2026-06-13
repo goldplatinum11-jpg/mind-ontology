@@ -458,3 +458,101 @@ describe("cq.md reference doc states and shows the question-title '?' terminator
     }
   });
 });
+
+// schema-reference-cq-topic-tag-besides-namespace-v1 — topic-tag (the
+// requireExtraTopicTag rule) is what stops a #cq block from carrying ONLY the
+// #cq namespace tag: every CQ must also carry a real topic tag (#context,
+// #safety, ...) that maps it to the source area it tests. The cq.md reference
+// doc states and shows that requirement in five places — the "CQ block rules"
+// prose (a #cq bullet AND a separate topic-tag bullet), the "Validator
+// enforcement" topic-tag row, the Block model illustration, the minimal
+// example, and the Required/Recommended CQ tables' "Topic tag" column. Only the
+// example fence runs through validateSource (above), so the prose, the
+// enforcement row's "besides #cq" phrasing, the illustration's tag pairing, and
+// the CQ-table topic tags are otherwise unguarded: any could drop the topic tag
+// (or pair the table row with #cq itself) and silently contradict the rule the
+// doc documents. This audit pins every topic-tag surface to "at least one topic
+// tag besides #cq", and self-guards so it fails loudly rather than passing
+// vacuously if cq.md ever stops enforcing topic-tag.
+describe("cq.md reference doc states and shows the topic-tag (besides #cq) requirement", () => {
+  const CQ_FILE = "cq.md";
+  const NAMESPACE = "cq";
+
+  // The first ("Topic tag") cell of every `| #tag | ... |` row under a
+  // "## <heading>" table, ended at the next ## heading so later prose can't leak.
+  function topicTagColumn(heading) {
+    const parts = DOC_FOR.get(CQ_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `cq.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1]
+      .split(/\n## /)[0]
+      .split("\n")
+      .filter((line) => line.startsWith("| `#"))
+      .map((line) => line.split("|").map((cell) => cell.trim()).filter(Boolean)[0].replace(/`/g, ""));
+  }
+
+  it("cq.md still enforces topic-tag (guard against a vacuous suite)", () => {
+    expect(
+      ONTOLOGY_SCHEMA[CQ_FILE]?.perBlock?.requireExtraTopicTag,
+      "cq.md no longer enforces topic-tag — retarget or retire this suite",
+    ).toBe(true);
+  });
+
+  it("the 'CQ block rules' prose requires a topic tag in addition to the #cq namespace", () => {
+    const parts = DOC_FOR.get(CQ_FILE).split(/^## CQ block rules$/m);
+    expect(parts.length, "cq.md reference doc has no '## CQ block rules' section").toBe(2);
+    const section = parts[1].split(/\n## /)[0];
+    expect(section, "CQ block rules prose omits the #cq namespace tag bullet").toMatch(
+      /`#cq` namespace tag/i,
+    );
+    expect(section, "CQ block rules prose omits the 'at least one topic tag' requirement").toMatch(
+      /at least one\s+\*{0,2}topic tag/i,
+    );
+  });
+
+  it("the enforcement-table topic-tag row requires a topic tag besides #cq", () => {
+    const row = tableRows(enforcementSection(CQ_FILE)).get("topic-tag");
+    expect(row, "cq.md enforcement table has no topic-tag row").toBeTruthy();
+    expect(row.text, "topic-tag row omits the 'topic tag' wording").toMatch(/topic tag/i);
+    expect(row.text, "topic-tag row omits the 'besides #cq' requirement").toMatch(
+      /(?:besides|in addition to)\s+`#cq`/i,
+    );
+  });
+
+  it("every Block model illustration block pairs #cq with at least one topic tag", () => {
+    const blocks = illustrativeBlocks(CQ_FILE);
+    expect(blocks.length, "cq.md Block model fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(block.tags, `Block model CQ "${block.title}" omits the #cq namespace`).toContain(NAMESPACE);
+      expect(
+        block.tags.filter((tag) => tag !== NAMESPACE).length,
+        `Block model CQ "${block.title}" carries only #cq — no topic tag`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("every minimal-example block pairs #cq with at least one topic tag", () => {
+    const blocks = parseMarkdownBlocks(exampleFixture(CQ_FILE), CQ_FILE);
+    expect(blocks.length, "cq.md example fence parsed into no blocks").toBeGreaterThan(0);
+    for (const block of blocks) {
+      expect(block.tags, `example CQ "${block.title}" omits the #cq namespace`).toContain(NAMESPACE);
+      expect(
+        block.tags.filter((tag) => tag !== NAMESPACE).length,
+        `example CQ "${block.title}" carries only #cq — no topic tag`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("every Required/Recommended CQ-table entry pairs a real topic tag, never #cq itself", () => {
+    const topicTags = [
+      ...topicTagColumn("Required competency questions"),
+      ...topicTagColumn("Recommended competency questions"),
+    ];
+    expect(topicTags.length, "cq.md CQ tables yielded no topic tags").toBeGreaterThan(0);
+    for (const tag of topicTags) {
+      expect(tag, `CQ-table topic tag "${tag}" is not a #tag token`).toMatch(/^#[a-z][a-z0-9-]*$/);
+      expect(tag, `CQ-table topic tag "${tag}" is the #cq namespace, not a topic tag`).not.toBe(
+        `#${NAMESPACE}`,
+      );
+    }
+  });
+});
