@@ -23,7 +23,9 @@ afterEach(() => {
 // M42 — every CLI failure mode is actionable and stable.
 describe("compile arg/source errors are actionable (M42)", () => {
   it("rejects a bad --format with the allowed values", () => {
-    expect(() => parseArgv(["compile", "--task", "x", "--format", "xml"])).toThrow(/--format must be "markdown" or "json"/);
+    expect(() => parseArgv(["compile", "--task", "x", "--format", "xml"])).toThrow(
+      /--format must be "markdown", "json", or "compact"/,
+    );
   });
   it("rejects a bad --risk with the allowed values", () => {
     expect(() => parseArgv(["compile", "--task", "x", "--risk", "nope"])).toThrow(/--risk must be "auto", "safe", or "risky"/);
@@ -70,7 +72,7 @@ describe("the catalog doc stays in sync with the real messages (M42)", () => {
     for (const needle of [
       "Missing required --task argument",
       "Re-run with --force",
-      'must be "markdown" or "json"',
+      'must be "markdown", "json", or "compact"',
       "-32700",
       "-32602",
     ]) {
