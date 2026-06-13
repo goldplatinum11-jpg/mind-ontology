@@ -132,7 +132,7 @@ const CASES = [
     project: "initialized",
     argv: ["compile", "--cwd", "{cwd}", "--task", "x", "--format", "xml"],
     stream: "stderr",
-    names: /--format must be "markdown" or "json"/,
+    names: /--format must be "markdown", "json", or "compact"/,
     nextAction: /markdown|json/,
   },
   {

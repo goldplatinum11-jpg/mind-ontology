@@ -98,8 +98,8 @@ export function parseArgv(argv = process.argv.slice(2)) {
       if (Number.isFinite(n) && n >= 0) parsed.minScore = n;
     } else if (arg === "--format") {
       const f = args[++i] ?? "";
-      if (f !== "markdown" && f !== "json") {
-        throw new Error(`--format must be "markdown" or "json", got: ${f}`);
+      if (f !== "markdown" && f !== "json" && f !== "compact") {
+        throw new Error(`--format must be "markdown", "json", or "compact", got: ${f}`);
       }
       parsed.format = f;
     } else if (arg === "--risk") {
@@ -391,6 +391,24 @@ export function renderContextPackJson(pack, options = {}) {
   );
 }
 
+// Compact rendering: the answer blocks and nothing else. No generated timestamp,
+// no per-block Source/Reason/Tags metadata, no Omitted section — just the task, a
+// one-line risk note when the task is risky, and each included block's heading +
+// body. Built for token-tight prompt budgets where the markdown ceremony is waste.
+export function renderContextPackCompact(pack) {
+  const lines = [`# context pack: ${pack.task || "(none)"}`];
+  if (pack.risk && pack.risk.level === "risky") {
+    lines.push(`Risk: risky${pack.risk.signals.length > 0 ? ` (${pack.risk.signals.join(", ")})` : ""}`);
+  }
+  lines.push("");
+  for (const block of pack.selected) {
+    lines.push(`## ${block.file} / ${block.title}`);
+    lines.push(block.body);
+    lines.push("");
+  }
+  return `${lines.join("\n").trim()}\n`;
+}
+
 export function compileFromCwd(options) {
   validateAgentctxSources(options.cwd);
   const sources = readAgentctx(options.cwd);
@@ -403,9 +421,9 @@ export function compileFromCwd(options) {
     riskMode: options.riskMode,
   });
   const render = { explain: options.explain === true };
-  return options.format === "json"
-    ? renderContextPackJson(pack, render)
-    : renderContextPack(pack, render);
+  if (options.format === "json") return renderContextPackJson(pack, render);
+  if (options.format === "compact") return renderContextPackCompact(pack);
+  return renderContextPack(pack, render);
 }
 
 function splitCsv(value) {
@@ -426,8 +444,10 @@ Options:
   --task <text>                 Required. Task description to compile context for.
   --scope <csv>                 Explicit scopes (comma-separated), e.g. auth,frontend.
                                 Scope tokens are weighted higher than task tokens.
-  --format markdown|json        Output format. Default: markdown.
-                                Use --format json for machine-readable output.
+  --format markdown|json|compact
+                                Output format. Default: markdown.
+                                json = machine-readable; compact = answer blocks
+                                only (no metadata/omitted), for tight token budgets.
   --cwd <path>                  Directory containing .agentctx/. Default: cwd.
   --max-blocks-per-file <n>     Max blocks selected from each scored file. Default: ${DEFAULT_MAX_BLOCKS_PER_FILE}.
   --min-score <n>               Minimum relevance score for block selection. Default: ${DEFAULT_MIN_SCORE}.
