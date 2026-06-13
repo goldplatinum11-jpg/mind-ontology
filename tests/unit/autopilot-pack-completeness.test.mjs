@@ -99,10 +99,7 @@ const LIVE_PENDING = HEADER_DOCS.filter((doc) => !pinsHeader(doc)).sort();
 const KNOWN_PENDING = [
   "mind-ontology-autopilot-maturity-audit-v1.md",
   "mind-ontology-autopilot-operator-faq-v1.md",
-  "mind-ontology-autopilot-pitch-v1.md",
   "mind-ontology-autopilot-portability-v1.md",
-  "mind-ontology-autopilot-principles-applied-v1.md",
-  "mind-ontology-autopilot-principles-v1.md",
   "mind-ontology-autopilot-quality-bar-v1.md",
   "mind-ontology-autopilot-quickstart-run-v1.md",
   "mind-ontology-autopilot-reading-paths-v1.md",
@@ -123,7 +120,6 @@ const KNOWN_PENDING = [
   "mind-ontology-autopilot-vs-instruction-files-v1.md",
   "mind-ontology-autopilot-vs-single-shot-v1.md",
   "mind-ontology-autopilot-when-not-to-use-v1.md",
-  "mind-ontology-autopilot-why-local-first-v1.md",
   "mind-ontology-autopilot-worker-selfcheck-v1.md",
 ].sort();
 
