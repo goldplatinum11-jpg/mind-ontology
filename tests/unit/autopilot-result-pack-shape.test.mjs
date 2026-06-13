@@ -137,6 +137,7 @@ describe("autopilot result-pack shape guard (A14)", () => {
         expect(entry, `validation.${gate} omits ${field}`).toHaveProperty(field);
       }
       expect(typeof entry.command, `validation.${gate}.command is not a string`).toBe("string");
+      expect(typeof entry.result, `validation.${gate}.result is not a string`).toBe("string");
       expect(typeof entry.passed, `validation.${gate}.passed is not a boolean`).toBe("boolean");
     }
   });
