@@ -66,6 +66,37 @@ describe("compiler source-list expansion (P2-PR06)", () => {
     );
   });
 
+  it("surfaces a scored project block per task, never force-included (projects.md)", () => {
+    // Anchors docs/mind-ontology-projects-schema-v0.md: projects.md blocks "are
+    // scored and selected per task like other non-constraint sources." The
+    // shipped template's project block must reach the pack by matching a task,
+    // carrying reason "matched" with a numeric score — never reason "always".
+    const cwd = makeTempRoot();
+    initAgentctx({ cwd });
+
+    const output = compileFromCwd({
+      cwd,
+      task: "Decide which project the agent should focus on",
+      scopes: ["project"],
+      format: "json",
+      maxBlocksPerFile: 1,
+      minScore: 2,
+    });
+    const pack = JSON.parse(output);
+    const projectBlocks = pack.selected.filter((b) => b.file === "projects.md");
+
+    expect(ALWAYS_INCLUDE_FILES.has("projects.md")).toBe(false);
+    expect(
+      projectBlocks.length,
+      "expected a projects.md block to be selected",
+    ).toBeGreaterThanOrEqual(1);
+    for (const block of projectBlocks) {
+      expect(block.reason).toBe("matched");
+      expect(typeof block.score).toBe("number");
+      expect(block.score).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it("still compiles a minimal project that ships only constraints.md", () => {
     const cwd = makeTempRoot();
     initAgentctx({ cwd });
