@@ -1507,3 +1507,91 @@ describe("projects.md reference doc Optional-blocks table pins the schema's fiel
     ).toMatch(/optional project blocks included/i);
   });
 });
+
+// schema-reference-projects-template-convention-tags-v1 — the project tag tokens
+// #project / #secondary / #archived carry NO ONTOLOGY_SCHEMA anchor:
+// agentctx:validate enforces only #active (the projects.md schema entry has no
+// namespace), as the reference doc itself states ("the validator does not require
+// the #project namespace tag... those are template conventions"). So the sibling
+// schema-reference-projects-optional-blocks-fields-enum-v1 suite above deliberately
+// pins only the optional blocks' FIELDS and Status enum to the schema, leaving the
+// #project/#secondary tag TOKENS unpinned — there was nothing in the schema to pin
+// them to. But those tokens are not free-floating: they are TEMPLATE conventions,
+// and the shipped template (templates/mind-ontology/.agentctx/projects.md) is their
+// real anchor. The reference doc presents two of them as conventions the template
+// embodies — the Required-blocks prose calls #project a "template convention" the
+// active block "MUST also carry", and the Optional-blocks table recommends
+// "#project #secondary" for the secondary block — yet nothing pins the doc's tokens
+// to what the template actually ships: the Optional-blocks row could rename
+// #secondary, or the prose could drop #project, and silently diverge from the
+// template the conformance test (agentctx-projects-schema) validates. This audit
+// pins the doc's template-convention tag language to the template's actual block
+// tags, and self-guards against a vacuous suite. The #archived row is intentionally
+// out of scope: the template ships no archived block, so that row has no template
+// anchor (asserted below so the skip stays honest if an archived block is ever
+// added). The compiler-treatment prose ("no upper limit on optional project
+// blocks", "scored and selected per task") is likewise NOT pinned here: the
+// template ships a single optional block (which cannot prove "no upper limit") and
+// scoring is unwired compiler runtime, so neither claim has a non-runtime anchor.
+describe("projects.md reference doc template-convention tags match the shipped template", () => {
+  const PROJECTS_FILE = "projects.md";
+  const TEMPLATE_PATH = resolve(REPO_ROOT, "templates/mind-ontology/.agentctx/projects.md");
+  const templateBlocks = parseMarkdownBlocks(
+    readFileSync(TEMPLATE_PATH, "utf8").replace(/\r\n/g, "\n"),
+    PROJECTS_FILE,
+  );
+
+  const blockWithTags = (...tags) =>
+    templateBlocks.find((block) => tags.every((tag) => block.tags.includes(tag)));
+
+  function section(heading) {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(new RegExp(`^## ${heading}$`, "m"));
+    expect(parts.length, `projects.md reference doc has no "## ${heading}" section`).toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  it("the template still ships #project #active and #project #secondary blocks (guard against a vacuous suite)", () => {
+    expect(blockWithTags("project", "active"), "template lost its #project #active block").toBeTruthy();
+    expect(
+      blockWithTags("project", "secondary"),
+      "template lost its #project #secondary block",
+    ).toBeTruthy();
+  });
+
+  it("the Required-blocks prose calls #project a template convention the active block carries", () => {
+    const active = blockWithTags("project", "active");
+    expect(active.tags, "template active block dropped the #project namespace tag").toContain("project");
+    const required = section("Required blocks");
+    expect(required, "Required-blocks prose stopped naming the #project tag").toMatch(
+      /`#project` namespace tag/i,
+    );
+    expect(required, "Required-blocks prose stopped calling #project a template convention").toMatch(
+      /template convention/i,
+    );
+  });
+
+  it("the Optional-blocks Secondary row names exactly the tags the template's secondary block ships", () => {
+    const shipped = [...blockWithTags("project", "secondary").tags].sort();
+    const row = section("Optional blocks")
+      .split("\n")
+      .find((line) => line.startsWith("| ") && line.includes("#secondary"));
+    expect(row, "Optional-blocks table has no #secondary row").toBeTruthy();
+    const docTags = [...new Set([...row.matchAll(/#([a-z][a-z0-9-]*)/g)].map((m) => m[1]))].sort();
+    expect(
+      docTags,
+      "Optional-blocks Secondary row tags drifted from the template's secondary block",
+    ).toEqual(shipped);
+  });
+
+  it("records that #archived has no template anchor — the template ships no archived block", () => {
+    // The Optional-blocks Archived row (#project #archived) is a documented
+    // convention, but the shipped template embodies no archived block, so this
+    // suite has nothing to pin it to. Asserting the absence keeps the skip honest:
+    // if an archived block is later added to the template, this guard fires and the
+    // Archived row should be pinned the way the #secondary row is above.
+    expect(
+      blockWithTags("archived"),
+      "template now ships an archived block — pin the Optional-blocks Archived row to it",
+    ).toBeFalsy();
+  });
+});
