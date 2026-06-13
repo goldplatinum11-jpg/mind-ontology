@@ -26,6 +26,38 @@ describe("autopilot reading protocol v1 (A2)", () => {
     expect(lower).toMatch(/controller|planner|reviewer/);
   });
 
+  it("pins each role's trigger points to the two tools, not just the role name", () => {
+    const text = readFileSync(DOC, "utf8");
+    // Split the "Trigger points by role" section into its per-role subsections so
+    // each role's get_context / list_constraints bindings are pinned structurally,
+    // not merely by the role word appearing somewhere in the prose.
+    const triggerSection = text.split("## Trigger points by role")[1] ?? "";
+    expect(triggerSection).not.toBe("");
+
+    const worker = triggerSection.split("### Worker")[1]?.split("###")[0] ?? "";
+    const controller =
+      triggerSection.split("### Controller / Planner / Reviewer")[1]?.split("###")[0] ?? "";
+    const anyClient = triggerSection.split("### Any MCP client")[1]?.split("###")[0] ?? "";
+
+    // Worker: get_context at lane/task start, list_constraints before the risky
+    // write, and a completion check that stays inside the surfaced constraints.
+    expect(worker).toContain("get_context(task)");
+    expect(worker).toContain("list_constraints()");
+    expect(worker.toLowerCase()).toMatch(/lane \/ task start|task start/);
+    expect(worker.toLowerCase()).toMatch(/before reporting completion/);
+
+    // Controller: anchors with the task-scoped get_context("plan ...") form and
+    // re-reads list_constraints both before planning and when reviewing a result.
+    expect(controller).toContain('get_context("plan');
+    expect(controller.split("list_constraints()").length - 1).toBeGreaterThanOrEqual(2);
+    expect(controller.toLowerCase()).toMatch(/reviewing a worker result/);
+    expect(controller.toLowerCase()).toMatch(/approving continuation/);
+
+    // Any MCP client: identical surface — same two triggers, no richer/narrower.
+    expect(anyClient.toLowerCase()).toMatch(/same two triggers/);
+    expect(anyClient.toLowerCase()).toMatch(/richer or narrower|portable/);
+  });
+
   it("encodes the read-on-the-right-axis / no-wrong-axis rule", () => {
     const lower = readFileSync(DOC, "utf8").toLowerCase();
     expect(lower).toMatch(/wrong-axis|right.axis/);
