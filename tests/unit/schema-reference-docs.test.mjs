@@ -1295,3 +1295,105 @@ describe("agent-roles.md reference doc Role block rules prose states the one-rol
     );
   });
 });
+
+// schema-reference-projects-field-line-own-line-shape-v1 — projects.md is the one
+// schema source whose blocks carry field lines (Name:/Status:), and the doc tells
+// authors the SHAPE of those lines twice: the Block model prose ("A field line is
+// `Key: value` on its own line") and the "Field conventions" bullet ("Field lines
+// appear before the prose body and each on their own line"). The validator never
+// sees that prose: it reads each field with `^Key:\s*(.+)$` under the multiline
+// flag (schema.mjs fieldValue), so a field is only seen when it starts its OWN
+// line — exactly what the prose claims. The Name and Status field NAMES, the enum
+// values, and the enforcement rows are all pinned by the audits above, but the
+// "each on their own line" SHAPE prose is otherwise unguarded: it could drop the
+// "on its own line" requirement (or claim fields may share a line) and silently
+// contradict the line-anchored parser the doc documents. This pins both prose
+// surfaces AND proves the contract behaviorally through validateSource — collapsing
+// two fields onto one line masks the second from the validator — self-guarding so
+// it fails loudly rather than passing vacuously if projects.md ever stops requiring
+// per-block fields.
+describe("projects.md reference doc states and proves field lines sit each on their own line", () => {
+  const PROJECTS_FILE = "projects.md";
+  const rule = ONTOLOGY_SCHEMA[PROJECTS_FILE];
+
+  // The "## Field conventions" section, ended at the next ## heading so prose
+  // elsewhere in the doc cannot satisfy a marker.
+  function fieldConventions() {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(/^## Field conventions$/m);
+    expect(parts.length, "projects.md reference doc has no '## Field conventions' section").toBe(2);
+    return parts[1].split(/\n## /)[0];
+  }
+
+  // The whole "## Block model" section, ended at the next real top-level heading
+  // ("## Required blocks"). The intro helper used elsewhere stops at the fence,
+  // but the field-line-shape sentence sits AFTER the illustrative fence, so the
+  // section is bounded by the named next heading instead — the fence's interior
+  // "## Active project" heading is not that name, so it cannot terminate early.
+  function blockModelSection() {
+    const parts = DOC_FOR.get(PROJECTS_FILE).split(/^## Block model$/m);
+    expect(parts.length, "projects.md reference doc has no '## Block model' section").toBe(2);
+    const end = parts[1].split(/^## Required blocks$/m);
+    expect(end.length, "projects.md Block model section has no following '## Required blocks'").toBeGreaterThan(1);
+    return end[0];
+  }
+
+  it("projects.md still requires at least two per-block fields (guard against a vacuous suite)", () => {
+    // "each on their own line" is only a meaningful contract when a block carries
+    // more than one field; this suite is built around the active block's fields.
+    expect(
+      [...(rule.fieldsByTag?.active ?? [])].sort(),
+      "projects.md per-block fields changed — retarget or retire this suite",
+    ).toEqual(["Name", "Status"]);
+    expect(rule.enumField?.name, "projects.md enum field changed — retarget this suite").toBe("Status");
+  });
+
+  it("the Block model prose states a field line sits on its own line", () => {
+    expect(blockModelSection(), "Block model prose omits the per-line field-line shape").toMatch(
+      /field line is `Key: value` on its own line/i,
+    );
+  });
+
+  it("the Field conventions prose states field lines sit before the body, each on their own line", () => {
+    const conventions = fieldConventions();
+    expect(
+      conventions,
+      "Field conventions omits the 'each on their own line' field-line shape",
+    ).toMatch(/field lines[\s\S]*each on their own line/i);
+    expect(
+      conventions,
+      "Field conventions omits that field lines precede the prose body",
+    ).toMatch(/before the prose body/i);
+  });
+
+  it("validates clean when the two fields sit each on their own line", () => {
+    const [first, second] = rule.fieldsByTag.active;
+    const value = (field) => (field === rule.enumField?.name ? rule.enumField.allowed[0] : "Sample");
+    const source =
+      `# Projects\n\n## Active project #project #active\n\n` +
+      `${first}: ${value(first)}\n${second}: ${value(second)}\n\n` +
+      `What this project is and why it matters.\n`;
+    expect(
+      validateSource(PROJECTS_FILE, source, rule),
+      "projects.md rejects fields placed each on their own line",
+    ).toEqual([]);
+  });
+
+  it("masks the second field when both are crammed onto one line — proving the per-line contract", () => {
+    const [first, second] = rule.fieldsByTag.active;
+    const value = (field) => (field === rule.enumField?.name ? rule.enumField.allowed[0] : "Sample");
+    // Same two fields, same values — but the second no longer starts its own line.
+    const source =
+      `# Projects\n\n## Active project #project #active\n\n` +
+      `${first}: ${value(first)} ${second}: ${value(second)}\n\n` +
+      `What this project is and why it matters.\n`;
+    const issues = validateSource(PROJECTS_FILE, source, rule);
+    const missing = issues.find((issue) => issue.rule === "required-field");
+    expect(
+      missing,
+      `projects.md still sees ${second}: when it shares a line — contradicts "each on their own line"`,
+    ).toBeTruthy();
+    expect(missing.message, `required-field error does not name the masked ${second}: field`).toContain(
+      `${second}:`,
+    );
+  });
+});
