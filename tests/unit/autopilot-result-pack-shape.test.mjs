@@ -225,4 +225,19 @@ describe("autopilot result-pack shape guard (A14)", () => {
     expect(lower).toContain("tests/unit/autopilot-result-pack-shape.test.mjs");
     expect(lower).toContain("test-pinned documented surface");
   });
+
+  // The same note makes an architectural claim the assertion above does not
+  // pin: the shared rule set (validateResultPack) has *two* consumers — the
+  // engine guard and the `mind-ontology review` command. That "two consumers"
+  // framing is what tells a reader the CLI verdict and the module verdict come
+  // from one rule set; the behavioral proof of the equivalence lives in
+  // tests/unit/review-command.test.mjs, but no doc-surface test held the doc's
+  // own naming of the second consumer. Pin the two stable tokens — the command
+  // name and the "two consumers" concept — so the doc can't drop the second
+  // consumer or the shared-rule-set framing while leaving the wording free.
+  it("the doc names the second consumer (`mind-ontology review`) and the two-consumers concept", () => {
+    const lower = docText.toLowerCase();
+    expect(lower).toContain("mind-ontology review");
+    expect(lower).toContain("two consumers");
+  });
 });
