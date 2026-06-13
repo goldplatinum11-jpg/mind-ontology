@@ -27,6 +27,17 @@ describe("autopilot stop policy v1 (A3)", () => {
     expect(header).toMatch(
       /part of the \[autopilot integration pack\]\(mind-ontology-autopilot-pack-v1\.md\)/,
     );
+    // Also pin the exact-cased link string in the raw header so the aggregate
+    // owner-test ledger can delist this doc. The lowercased match above stays
+    // as-is; this is a strictly stronger, structural assertion alongside it.
+    const raw = readFileSync(DOC, "utf8");
+    const rawHeader = raw.slice(
+      0,
+      raw.toLowerCase().indexOf("## valid terminal stop conditions"),
+    );
+    expect(rawHeader).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
   });
 
   it("enumerates the valid terminal stop conditions", () => {

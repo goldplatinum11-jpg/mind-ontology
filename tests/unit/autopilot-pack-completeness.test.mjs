@@ -98,10 +98,6 @@ const LIVE_PENDING = HEADER_DOCS.filter((doc) => !pinsHeader(doc)).sort();
 // may be added without a real, pre-existing gap.
 const KNOWN_PENDING = [
   "mind-ontology-autopilot-result-pack-v1.md",
-  "mind-ontology-autopilot-state-of-pack-v1.md",
-  "mind-ontology-autopilot-stop-policy-v1.md",
-  "mind-ontology-autopilot-tool-call-ordering-v1.md",
-  "mind-ontology-autopilot-trust-tie-in-v1.md",
   "mind-ontology-autopilot-two-roles-v1.md",
   "mind-ontology-autopilot-two-tool-contract-v1.md",
   "mind-ontology-autopilot-two-tool-vs-many-v1.md",
