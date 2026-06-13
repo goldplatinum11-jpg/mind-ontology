@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ONTOLOGY_SCHEMA, STATUS_VALUES } from "../../scripts/agentctx/schema.mjs";
-import { SOURCE_FILES } from "../../scripts/agentctx/compile.mjs";
+import { SOURCE_FILES, parseMarkdownBlocks } from "../../scripts/agentctx/compile.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const GUIDE = readFileSync(resolve(REPO_ROOT, "docs/schema-authoring.md"), "utf8");
@@ -173,5 +173,83 @@ describe("schema authoring guide fences are classified", () => {
     expect(GUIDE, "guide claims a conformant fence; that belongs in a reference doc").not.toMatch(
       /\bconformant\b/i,
     );
+  });
+});
+
+// The block-format section (skeleton fence + the bullet rules below it), ended
+// at the next real ## section so a rule stated under "Per-file rules" cannot
+// satisfy a block-format claim. The cut is the literal "## Per-file rules"
+// heading, not a bare `^## `, because the skeleton fence carries its own
+// "## <Block heading>" line that a bare split would mistake for a section end.
+function blockFormatSection() {
+  const parts = GUIDE_NORMALIZED.split(/^## Block format \(shared by every file\)$/m);
+  expect(parts.length, 'guide has no "## Block format (shared by every file)" section').toBe(2);
+  const ended = parts[1].split(/^## Per-file rules$/m);
+  expect(ended.length, 'guide has no "## Per-file rules" section after block format').toBe(2);
+  return ended[0];
+}
+
+// schema-authoring-illustrative-tags-v1 — the block-format skeleton is the
+// guide's one fence and the only place the shared block model is shown. Like
+// the per-file reference docs' Block model fences (schema-reference-illustrative-tags-v1
+// in schema-reference-docs.test.mjs), it is a placeholder skeleton we never run
+// through validateSource — its `<File Title>` / `<Block heading>` tokens would
+// not validate. But its job is to demonstrate the three rules the prose states
+// right below it: a single `#` H1 title (ignored by the compiler), a `##` block
+// whose inline `#tag` tokens are extracted as tags and stripped from the title,
+// and a non-empty body. We parse it with the real compiler parser (the same tag
+// extraction the validator sees), so editing the skeleton to drop its inline
+// tags, body, or block heading — or the prose to drop those rules — fails here,
+// without forcing the `<...>` placeholders to fully validate.
+describe("schema-authoring-illustrative-tags-v1 — skeleton illustrates the block model", () => {
+  const skeletonBlocks = () => parseMarkdownBlocks(guideFences()[0].body, "skeleton");
+
+  it("parses into exactly one ## block — the `#` H1 title is ignored", () => {
+    expect(
+      skeletonBlocks().length,
+      "skeleton no longer shows exactly one ## block above an ignored H1 title",
+    ).toBe(1);
+  });
+
+  it("extracts the inline #tag tokens the prose says are extracted", () => {
+    const [block] = skeletonBlocks();
+    expect(
+      block.tags.length,
+      "skeleton block heading illustrates no inline #tag tokens",
+    ).toBeGreaterThan(0);
+  });
+
+  it("strips the extracted tags from the rendered title but keeps them on the heading", () => {
+    const [block] = skeletonBlocks();
+    expect(block.title, "skeleton rendered title still carries a #tag token").not.toMatch(
+      /#[A-Za-z0-9_-]/,
+    );
+    expect(block.heading, "skeleton raw heading lost its inline #tag tokens").toMatch(
+      /#[A-Za-z0-9_-]/,
+    );
+  });
+
+  it("has a non-empty body, as the prose requires", () => {
+    const [block] = skeletonBlocks();
+    expect(block.body.trim().length, "skeleton block illustrates an empty body").toBeGreaterThan(0);
+  });
+
+  it("keeps the block heading an angle-bracket placeholder, never a real tagged title", () => {
+    const [block] = skeletonBlocks();
+    expect(block.title, "skeleton block heading is no longer a `<...>` placeholder").toMatch(
+      /<[^>]+>/,
+    );
+  });
+
+  it("the block-format prose states the three rules the skeleton illustrates", () => {
+    const prose = blockFormatSection();
+    expect(prose, "block-format prose drops the one-H1-title rule").toContain("H1 title");
+    expect(prose, "block-format prose drops inline #tag extraction").toContain(
+      "inline `#tag` tokens are extracted as tags",
+    );
+    expect(prose, "block-format prose drops the tag-stripping rule").toContain(
+      "stripped from the rendered title",
+    );
+    expect(prose, "block-format prose drops the non-empty-body rule").toContain("non-empty body");
   });
 });
