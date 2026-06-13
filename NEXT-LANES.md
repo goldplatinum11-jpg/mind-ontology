@@ -9,30 +9,32 @@ bounded, reviewable lane.
 > lanes; candidates that need engine changes are marked **[engine]** and must be
 > done in a lane that has write access to the compiler, with backward-compat tests.
 
-## Ready to pick up (docs + tests only)
+## Shipped since this list was written
 
-1. **Deeper CQ regression suite** — table-driven tests that compile the template
-   and assert each competency question is answerable from the named source files
-   (e.g. the `#scope` CQ surfaces `projects.md`/`direction.md` blocks). Locks the
-   "CQs are the verification core" promise against drift.
-2. **Richer local examples** — a second worked `.agentctx/` example folder under
-   `docs/examples/` (a non-trivial multi-project ontology) plus a test that
-   compiles it and checks scoping/metrics, so examples can't rot.
-3. **Doc audit tooling expansion** — extend `doc-link-audit` to also flag (a)
-   headings referenced by `#anchor` links that don't exist, and (b) cited
-   `npm run <script>` commands that aren't in `package.json`.
-4. **MCP setup fixture validation** — golden-file tests that parse every config
-   under `docs/agentctx-setup/` and assert it launches the same server entry with
-   the two-tool surface (extend `connector-surface-thin`).
-5. **CLI error-UX catalog** — a doc + tests cataloguing every CLI failure mode
-   (missing task, bad `--format`, missing `.agentctx/`, bad `--risk`) and asserting
-   each prints an actionable, stable message.
-6. **Schema authoring guide** — a single contributor doc that consolidates the
-   per-file `*-schema-v0.md` rules into one authoring reference, with a guard test
-   that it stays consistent with `ONTOLOGY_SCHEMA`.
-7. **Release packaging dry-run docs** — document `npm pack` contents and a
-   `.npmignore`/`files` allowlist plan (dry-run only; no publish), gated behind the
-   open license decision.
+Every "ready to pick up" candidate below has since landed. This section is kept
+truthful so the backlog cannot send anyone to re-do finished work; each item
+names the tests/docs that now own it.
+
+1. **Deeper CQ regression suite** — shipped. `tests/unit/cq-regression-table.test.mjs`
+   (M55, per-CQ file presence) and `tests/unit/cq-regression-deep.test.mjs` (each CQ
+   resolves from its named source blocks + cq.md sync guards).
+2. **Richer local examples** — shipped. `docs/examples/team-ontology/`,
+   `docs/examples/solo-founder-ai-os/`, and `docs/examples/studio-multi-client/`
+   (multi-client isolation), each exercised by an `example-*-ontology` /
+   `example-*-multi-client` test.
+3. **Doc audit tooling expansion** — shipped. `#anchor` and `npm run` citation
+   audits in `tests/unit/doc-anchor-audit.test.mjs` (M46); cited `node scripts/...`
+   paths in `tests/unit/doc-script-command-audit.test.mjs`.
+4. **MCP setup fixture validation** — shipped. `tests/unit/mcp-setup-fixtures.test.mjs`
+   (M43; every `docs/agentctx-setup/` config parsed against one manifest, two-tool
+   surface pinned, directory-completeness guarded) + `http-endpoint-openapi-consistency`.
+5. **CLI error-UX catalog** — shipped. `docs/cli-errors.md` +
+   `tests/unit/cli-error-ux-catalog.test.mjs` / `cli-error-ux.test.mjs`.
+6. **Schema authoring guide** — shipped. `docs/schema-authoring.md` +
+   `tests/unit/schema-authoring-guide.test.mjs`.
+7. **Release packaging dry-run docs** — shipped. `docs/packaging.md` +
+   `tests/unit/packaging-dry-run-contract.test.mjs` / `packaging-plan.test.mjs` /
+   `package-metadata.test.mjs`.
 
 ## Autopilot Integration Pack (shipped in this lane)
 
@@ -55,14 +57,16 @@ and more), three example fixtures (`autopilot-line/` nine-file, `autopilot-roles
 follow-on ideas (wrong-axis corpus, result-pack shape guard, multi-agent role
 matrix) are all shipped.
 
-Remaining follow-on autopilot lanes (still docs/tests only):
+Follow-on autopilot lanes — all shipped (docs/tests only):
 
-- **Trust-model tie-in** — relate the autopilot two-tool surface to the product
-  trust & security model in one doc + guard.
-- **Operator FAQ** — the questions an operator asks before wiring a line, each
-  answered from a local artifact.
-- **Deeper compiler-backed retrieval guards** — more table-driven CQ rows over the
-  example fixtures as the schema grows.
+- **Trust-model tie-in** — shipped. `docs/mind-ontology-autopilot-trust-tie-in-v1.md`
+  + `tests/unit/autopilot-trust-tie-in.test.mjs` (and the broader
+  `agentctx-trust-security-model` / `trust-security-enforcement` tests).
+- **Operator FAQ** — shipped. `docs/mind-ontology-autopilot-operator-faq-v1.md` and
+  the contributor FAQ, each with an `autopilot-*-faq` test.
+- **Deeper compiler-backed retrieval guards** — shipped as the deep CQ regression
+  (`tests/unit/cq-regression-deep.test.mjs`) and the multi-client example's scoping
+  and isolation assertions.
 
 ## Needs an engine lane (out of scope for docs/tests hardening)
 
