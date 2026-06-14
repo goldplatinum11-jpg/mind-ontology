@@ -549,17 +549,22 @@ export const EXPLAIN_REASONS = Object.freeze({
 });
 
 export function explainBlock(block) {
-  return {
+  const out = {
     sourceFile: block.file,
     heading: block.title,
     score: block.reason === "matched" ? block.score : null,
     reason: EXPLAIN_REASONS[block.reason],
   };
+  // Surface the recency tie-breaker date when --recency attached one, so a close call
+  // is explainable. Absent (no --recency, or no/placeholder date) → output unchanged.
+  if (block.recencyDate) out.recencyDate = block.recencyDate;
+  return out;
 }
 
 function renderExplainLine(block) {
   const e = explainBlock(block);
-  return `Explain: sourceFile=${e.sourceFile} heading="${e.heading}" score=${e.score === null ? "null" : e.score} reason=${e.reason}`;
+  const recency = e.recencyDate ? ` recencyDate=${e.recencyDate}` : "";
+  return `Explain: sourceFile=${e.sourceFile} heading="${e.heading}" score=${e.score === null ? "null" : e.score} reason=${e.reason}${recency}`;
 }
 
 export function renderContextPack(pack, options = {}) {
