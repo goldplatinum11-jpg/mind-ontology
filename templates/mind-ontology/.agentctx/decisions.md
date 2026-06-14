@@ -1,6 +1,6 @@
 # Decisions
 
-## Use one source for agent context #cross-agent #context
+## Use one source for agent context #cross-agent #context #decision
 
 Status: accepted
 Date: YYYY-MM-DD
@@ -13,7 +13,7 @@ Reason:
 Separate instruction files drift. A single source lets every agent start from
 the same meaning while still receiving task-specific context.
 
-## Keep the free layer self-hosted #oss #self-host
+## Keep the free layer self-hosted #oss #self-host #decision
 
 Status: accepted
 Date: YYYY-MM-DD

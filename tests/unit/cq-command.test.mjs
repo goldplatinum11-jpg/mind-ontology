@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { evaluateCqs, parseCqs } from "../../scripts/agentctx/cq-core.mjs";
 
 // W8 — `mind-ontology cq` (W2 §6) and the answerability predicate locked with
@@ -274,4 +274,70 @@ describe("W8 — cq CLI surface", () => {
     const args = ["cq", "--cwd", cwd, "--format", "json"];
     expect(runCli(args).stdout).toBe(runCli(args).stdout);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Template ontology per-CQ contributor assertions.
+// Locks each CQ id to the source file that must appear in answered_by —
+// so a scorer change that accidentally stops direction.md from answering
+// the #context CQs is caught here, not silently accepted.
+// ---------------------------------------------------------------------------
+
+// Expected contributor per CQ id (1-based source order in cq.md).
+// Values are locked from a live run of the template ontology — if the compiler or the
+// template content drifts and a CQ stops producing its expected contributor, this table
+// catches it. Pinned at 2026-06-15 against mind-ontology@0.1.0 template.
+//
+// Expectations locked from live run against mind-ontology@0.1.0 template (2026-06-15).
+// Where the expected contributor matches the cq.md body-text contract, the comment
+// notes the mechanism. Known gaps are documented.
+//
+//   CQ 1 (#context): cq.md body says "drawn from direction.md, decisions.md, glossary.md"
+//     but direction.md does not appear in answered_by — the CQ title text "What should
+//     the agent know before starting?" has no token overlap with direction.md's headings
+//     or body, so direction.md never enters the compiled pack for this question. The CQ
+//     is still answered via constraints.md whose "Prefer small scoped context packs" block
+//     carries a #context tag. This is a known template gap: direction.md needs to either
+//     contain "before starting" vocabulary or the CQ title must be rephrased.
+//   CQ 6 (#decision): after adding #decision to decisions.md blocks, decisions.md now
+//     answers CQ6 correctly via topic-tag matching.
+const TEMPLATE_CQ_CONTRIBUTORS = [
+  { id: 1, required: true,  topic: "context",  mustContain: "constraints.md" },
+  { id: 2, required: true,  topic: "context",  mustContain: "direction.md" },
+  { id: 3, required: true,  topic: "safety",   mustContain: "constraints.md" },
+  { id: 4, required: true,  topic: "safety",   mustContain: "constraints.md" },
+  { id: 5, required: false, topic: "scope",    mustContain: "projects.md" },
+  { id: 6, required: false, topic: "decision", mustContain: "decisions.md" },
+  { id: 7, required: false, topic: "boundary", mustContain: "glossary.md" },
+];
+
+describe("W8 — template ontology per-CQ contributor assertions", () => {
+  let templateCwd;
+  let templateResult;
+  beforeAll(() => {
+    templateCwd = mkdtempSync(join(tmpdir(), "mo-cq-tpl2-"));
+    tempRoots.push(templateCwd);
+    expect(runCli(["init", "--cwd", templateCwd]).status).toBe(0);
+    templateResult = JSON.parse(runCli(["cq", "--cwd", templateCwd, "--format", "json"]).stdout);
+  });
+
+  it("template gate is green: all CQs answered", () => {
+    expect(templateResult.ok).toBe(true);
+    expect(templateResult.answered).toBe(templateResult.total);
+  });
+
+  for (const { id, required, topic, mustContain } of TEMPLATE_CQ_CONTRIBUTORS) {
+    it(`CQ ${id} (#${topic}): answered_by includes ${mustContain}`, () => {
+      const cq = templateResult.cqs.find((c) => c.id === id);
+      expect(cq, `CQ id ${id} not found in result`).toBeTruthy();
+      expect(cq.answered, `CQ ${id} (#${topic}) is not answered`).toBe(true);
+      if (required) {
+        expect(cq.required, `CQ ${id} (#${topic}) should be required`).toBe(true);
+      }
+      expect(
+        cq.answered_by.map((b) => b.sourceFile),
+        `CQ ${id} (#${topic}) answered_by does not include ${mustContain}`,
+      ).toContain(mustContain);
+    });
+  }
 });
