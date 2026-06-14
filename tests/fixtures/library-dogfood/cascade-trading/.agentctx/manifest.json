@@ -1,0 +1,7 @@
+{
+  "id": "cascade-trading",
+  "name": "Cascade Trading",
+  "description": "Polymarket weather cascade trading: Nearcaster, v4 prediction, METAR-grounded entry/exit, Tourniquet stop-loss.",
+  "triggers": ["Polymarket", "cascade", "bracket", "temperature", "METAR", "weather", "Nearcaster", "scout", "Tourniquet", "FAK", "settlement", "LFPG", "EGLC", "KLGA", "ZSPD", "scout_predict"],
+  "scopes": ["trading", "weather", "prediction", "risk"]
+}

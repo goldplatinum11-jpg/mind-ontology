@@ -1,0 +1,7 @@
+{
+  "id": "sirtuin-x",
+  "name": "SirtuinX",
+  "description": "Kei's longevity supplement brand: NAD+ precursors, sirtuin activation, MindTech product line.",
+  "triggers": ["SirtuinX", "MindTech", "supplement", "longevity", "sirtuin", "NAD+", "NMN", "NR", "cellular aging", "brand"],
+  "scopes": ["brand", "product", "longevity", "sales"]
+}
