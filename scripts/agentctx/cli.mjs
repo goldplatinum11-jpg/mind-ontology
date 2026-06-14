@@ -48,6 +48,13 @@ export const COMMANDS = {
     group: "engine",
     summary: "Compile a task-scoped context pack from .agentctx/ sources.",
   },
+  route: {
+    script: "router.mjs",
+    prefix: ["route"],
+    npmScript: null,
+    group: "operator",
+    summary: "Pick which ontology (box) a task belongs to, from a --library of many.",
+  },
   init: {
     script: "init.mjs",
     prefix: [],

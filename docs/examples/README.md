@@ -94,3 +94,26 @@ node scripts/agentctx/compile.mjs compile --cwd docs/examples/studio-multi-clien
 
 This example is exercised by `tests/unit/example-studio-multi-client.test.mjs`,
 so it stays valid and in sync with the compiler.
+
+## Routing across the library
+
+These three boxes together form a small library. Each carries an
+`.agentctx/manifest.json` declaring the trigger terms that route to it, so you can
+ask "which box does this task belong to?" and then compile it — without naming the
+box yourself.
+
+```sh
+# Which box is this task about? (deterministic, with a why)
+node scripts/agentctx/router.mjs route --library docs/examples \
+  --task "booking latency on the partner API"          # -> team-ontology
+node scripts/agentctx/router.mjs route --library docs/examples \
+  --task "Lumen Cloud hosted billing"                  # -> solo-founder-ai-os
+
+# Route AND compile in one step — pick the box, then its task-scoped pack
+node scripts/agentctx/compile.mjs compile --library docs/examples \
+  --task "Acme client engagement isolation" --format json   # routes -> studio-multi-client
+```
+
+Routing is exercised by `tests/unit/router.test.mjs`. It is deterministic (verbatim
+trigger matching, so it handles non-English terms) and never blends boxes — on a
+close call it picks one and reports the ranked candidates with reasons.

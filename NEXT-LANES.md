@@ -92,6 +92,25 @@ Follow-on autopilot lanes — all shipped (docs/tests only):
 Genuinely open after this campaign: scoring **recency** (needs a date-signal design),
 and any further additive `--format`/scoring extensions as the product grows.
 
+## New direction — ontology library + router (layer ①)
+
+Beyond the hardening backlog, a strategy dialogue opened the product's next axis: a
+**library of many ontologies (boxes), routed deterministically**. The compiler already
+picks the right *blocks* within one box (layer ②) and fits them to a token budget
+(layer ③, `--max-tokens`); the router adds layer ① — pick the right *box* for a task
+out of many, before compiling.
+
+Shipped (MVP): each box declares `.agentctx/manifest.json` (`id`, `name`, `triggers`,
+`scopes`, optional `excludeTerms`); `scripts/agentctx/router.mjs` scores a task against
+those signatures (verbatim trigger match, so it handles non-English terms) and picks one
+box deterministically, never blending — close calls are flagged `ambiguous` with ranked
+candidates + reasons. `route --library <dir>` and `compile --library <dir>` (route then
+compile) expose it; the MCP two-tool contract is untouched. Guarded by
+`tests/unit/router.test.mjs`; backward compatible (no `--library` = unchanged).
+
+Open follow-on: route inside the MCP `get_context` when a library is configured; manifest
+auto-derivation from existing sources; a `doctor` health check over a library.
+
 ## Never in this product (hosted/closed boundary)
 
 Memory graph storage, vector retrieval, typed-edge inference execution, writeback
