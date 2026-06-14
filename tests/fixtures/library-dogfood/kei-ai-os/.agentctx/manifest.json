@@ -1,0 +1,7 @@
+{
+  "id": "kei-ai-os",
+  "name": "Kei AI OS",
+  "description": "Kei's AI Development OS operating model: Controller-Worker line, SIRT Brain, SIRT Runway, Mind Ontology.",
+  "triggers": ["Controller", "Worker", "Result Pack", "Lane", "agentctx", "Mind Ontology", "SIRT Brain", "SIRT Runway", "SIRT AI Development OS"],
+  "scopes": ["brain", "dogfood", "mind-ontology", "planning"]
+}
