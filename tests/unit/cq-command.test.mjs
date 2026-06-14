@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { evaluateCqs, parseCqs } from "../../scripts/agentctx/cq-core.mjs";
 
 // W8 — `mind-ontology cq` (W2 §6) and the answerability predicate locked with
@@ -274,4 +274,64 @@ describe("W8 — cq CLI surface", () => {
     const args = ["cq", "--cwd", cwd, "--format", "json"];
     expect(runCli(args).stdout).toBe(runCli(args).stdout);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Template ontology per-CQ contributor assertions.
+// Locks each CQ id to the source file that must appear in answered_by —
+// so a scorer change that accidentally stops direction.md from answering
+// the #context CQs is caught here, not silently accepted.
+// ---------------------------------------------------------------------------
+
+// Expected contributor per CQ id (1-based source order in cq.md).
+// Values are locked from a live run of the template ontology — if the compiler or the
+// template content drifts and a CQ stops producing its expected contributor, this table
+// catches it. Pinned at 2026-06-15 against mind-ontology@0.1.0 template.
+//
+// Notable observations encoded here (not assumptions):
+//   CQ 1 (#context): the question "What should the agent know before starting?" does not
+//     score direction.md (no "starting" token there, blocks not tagged #context) — it is
+//     answered via constraints.md (always-present, tagged context) and other files.
+//   CQ 6 (#decision): "Which prior decision applies?" does not score decisions.md
+//     (block headings/content do not contain strong #decision tokens) — answered by
+//     glossary.md which has decision-adjacent vocabulary.
+const TEMPLATE_CQ_CONTRIBUTORS = [
+  { id: 1, required: true,  topic: "context",  mustContain: "constraints.md" },
+  { id: 2, required: true,  topic: "context",  mustContain: "direction.md" },
+  { id: 3, required: true,  topic: "safety",   mustContain: "constraints.md" },
+  { id: 4, required: true,  topic: "safety",   mustContain: "constraints.md" },
+  { id: 5, required: false, topic: "scope",    mustContain: "projects.md" },
+  { id: 6, required: false, topic: "decision", mustContain: "glossary.md" },
+  { id: 7, required: false, topic: "boundary", mustContain: "glossary.md" },
+];
+
+describe("W8 — template ontology per-CQ contributor assertions", () => {
+  let templateCwd;
+  let templateResult;
+  beforeAll(() => {
+    templateCwd = mkdtempSync(join(tmpdir(), "mo-cq-tpl2-"));
+    tempRoots.push(templateCwd);
+    expect(runCli(["init", "--cwd", templateCwd]).status).toBe(0);
+    templateResult = JSON.parse(runCli(["cq", "--cwd", templateCwd, "--format", "json"]).stdout);
+  });
+
+  it("template gate is green: all CQs answered", () => {
+    expect(templateResult.ok).toBe(true);
+    expect(templateResult.answered).toBe(templateResult.total);
+  });
+
+  for (const { id, required, topic, mustContain } of TEMPLATE_CQ_CONTRIBUTORS) {
+    it(`CQ ${id} (#${topic}): answered_by includes ${mustContain}`, () => {
+      const cq = templateResult.cqs.find((c) => c.id === id);
+      expect(cq, `CQ id ${id} not found in result`).toBeTruthy();
+      expect(cq.answered, `CQ ${id} (#${topic}) is not answered`).toBe(true);
+      if (required) {
+        expect(cq.required, `CQ ${id} (#${topic}) should be required`).toBe(true);
+      }
+      expect(
+        cq.answered_by.map((b) => b.sourceFile),
+        `CQ ${id} (#${topic}) answered_by does not include ${mustContain}`,
+      ).toContain(mustContain);
+    });
+  }
 });

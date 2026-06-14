@@ -44,57 +44,64 @@ function answerTextFor(pack, file) {
 //   task     — how an agent would ask, in prose (no tag injection).
 //   sources  — every file this CQ must make answerable (superset of the files the CQ
 //              names in backticks; the guard verifies the backtick set is covered).
-//   answers  — { file, needle }: a stable fragment that must appear in that file's
-//              surfaced answer material.
+//   answers  — { file, needle, reason }: a stable fragment that must appear in that
+//              file's surfaced answer material, AND the selection reason that the block
+//              must carry. "matched" = earned by scoring against the task; "always" =
+//              the safety floor (constraints.md); "risk-forced" = risk-gate inclusion.
+//              Asserting reason proves the retrieval is genuine (not a lucky always-floor
+//              hit passing as a scored match, or vice-versa).
 const DEEP_CASES = [
   {
     cqTitle: "What should the agent know before starting?",
     task: "Before starting, what is the current direction, which prior decision keeps the free layer self-hosted, and what does the context pack term mean?",
     sources: ["direction.md", "decisions.md", "glossary.md"],
     answers: [
-      { file: "direction.md", needle: "current direction" },
-      { file: "decisions.md", needle: "self-host" },
-      { file: "glossary.md", needle: "context pack" },
+      { file: "direction.md", needle: "current direction", reason: "matched" },
+      { file: "decisions.md", needle: "self-host", reason: "matched" },
+      { file: "glossary.md", needle: "context pack", reason: "matched" },
     ],
   },
   {
     cqTitle: "What is the current direction this work serves?",
     task: "What is the current direction and near-term priorities this work serves?",
     sources: ["direction.md"],
-    answers: [{ file: "direction.md", needle: "current direction" }],
+    answers: [{ file: "direction.md", needle: "current direction", reason: "matched" }],
   },
   {
     cqTitle: "What must the agent avoid?",
     task: "What actions must the agent avoid because they are forbidden, risky, or destructive?",
     sources: ["constraints.md"],
-    answers: [{ file: "constraints.md", needle: "destructive" }],
+    // constraints.md is always included; the safety floor, not a scored match.
+    answers: [{ file: "constraints.md", needle: "destructive", reason: "always" }],
   },
   {
     cqTitle: "Which writes are forbidden, and when must the agent fail closed?",
     task: "Which writes are forbidden — deploy, migration, secrets, production config, live data — and when must the agent fail closed?",
     sources: ["constraints.md"],
-    answers: [{ file: "constraints.md", needle: "secret" }],
+    // This task mentions risk keywords (deploy, secrets) so the risk gate may also
+    // fire; asserting "always" still holds since constraints.md is always present.
+    answers: [{ file: "constraints.md", needle: "secret", reason: "always" }],
   },
   {
     cqTitle: "Which files am I allowed to write for this task?",
     task: "Which files, paths, and repos am I allowed to write for the active project given the current direction?",
     sources: ["projects.md", "direction.md", "constraints.md"],
     answers: [
-      { file: "projects.md", needle: "active project" },
-      { file: "direction.md", needle: "current direction" },
+      { file: "projects.md", needle: "active project", reason: "matched" },
+      { file: "direction.md", needle: "current direction", reason: "matched" },
     ],
   },
   {
     cqTitle: "Which prior decision applies?",
     task: "Which prior decision applies — for example, why was the free layer kept self-hosted as OSS?",
     sources: ["decisions.md"],
-    answers: [{ file: "decisions.md", needle: "self-host" }],
+    answers: [{ file: "decisions.md", needle: "self-host", reason: "matched" }],
   },
   {
     cqTitle: "Is this capability local or hosted?",
     task: "Is this capability part of the local OSS layer or an optional, fail-closed hosted adapter?",
     sources: ["glossary.md"],
-    answers: [{ file: "glossary.md", needle: "hosted adapter" }],
+    answers: [{ file: "glossary.md", needle: "hosted adapter", reason: "matched" }],
   },
 ];
 
@@ -112,7 +119,7 @@ function filesNamedBy(block) {
 
 describe("CQ regression (deep): each CQ is answerable from its named source blocks", () => {
   for (const { cqTitle, task, sources, answers } of DEEP_CASES) {
-    it(`"${cqTitle}" surfaces its named sources with answer material`, () => {
+    it(`"${cqTitle}" surfaces its named sources with answer material and correct selection reason`, () => {
       const pack = compile(project(), task);
 
       for (const file of sources) {
@@ -125,10 +132,17 @@ describe("CQ regression (deep): each CQ is answerable from its named source bloc
         ).toBe(true);
       }
 
-      for (const { file, needle } of answers) {
+      for (const { file, needle, reason } of answers) {
+        const hits = pack.selected.filter((b) => b.file === file);
         expect(
           answerTextFor(pack, file).includes(needle.toLowerCase()),
           `${file} surfaced but its answer material is missing "${needle}" for: ${task}`,
+        ).toBe(true);
+        // Verify the block was selected for the right reason — not just that it appeared.
+        // "matched" = scorer earned it from the task text; "always" = safety floor.
+        expect(
+          hits.some((b) => b.reason === reason),
+          `${file} has no block with reason="${reason}" for: ${task} (got: [${hits.map((b) => b.reason).join(", ")}])`,
         ).toBe(true);
       }
     });
@@ -177,6 +191,60 @@ describe("CQ regression (deep): each CQ is answerable from its named source bloc
           true,
         );
       }
+    }
+  });
+
+  it("sync guard: every answer's reason is 'matched' or 'always' (no unknown reasons in table)", () => {
+    const KNOWN_REASONS = new Set(["matched", "always", "risk-forced"]);
+    for (const { cqTitle, answers } of DEEP_CASES) {
+      for (const { file, reason } of answers) {
+        expect(
+          KNOWN_REASONS.has(reason),
+          `DEEP_CASES row "${cqTitle}" answer for ${file} has unknown reason "${reason}"`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Negative controls: unrelated topics must not cross-contaminate
+// ---------------------------------------------------------------------------
+
+describe("CQ regression (deep): negative controls — selection reason isolation", () => {
+  it("constraints.md always appears in every CQ task's pack but never via plain 'matched'", () => {
+    // The safety floor guarantee: constraints.md must be present for every task (the
+    // always-include invariant) but must not appear with reason "matched" — that would
+    // mean the task text scored against constraint content, implying a false coupling.
+    for (const { task } of DEEP_CASES) {
+      const pack = compile(project(), task);
+      const constraintBlocks = pack.selected.filter((b) => b.file === "constraints.md");
+      expect(constraintBlocks.length, `constraints.md missing from pack for: ${task}`).toBeGreaterThan(0);
+      expect(
+        constraintBlocks.every((b) => b.reason === "always" || b.reason === "risk-forced"),
+        `constraints.md has a plain "matched" block for: ${task} — safety floor is masquerading as scored retrieval`,
+      ).toBe(true);
+    }
+  });
+
+  it("direction.md never appears with reason 'always' in any CQ task", () => {
+    // direction.md is a scored source, never the always-include floor. If it ever
+    // appears with reason "always" the always-include guarantee has expanded and
+    // the always-only invariant for constraints.md would be meaningless.
+    for (const { task } of DEEP_CASES) {
+      const pack = compile(project(), task);
+      const dirAlways = pack.selected.filter((b) => b.file === "direction.md" && b.reason === "always");
+      expect(dirAlways.length, `direction.md appeared with reason "always" for: ${task}`).toBe(0);
+    }
+  });
+
+  it("projects.md never appears with reason 'always' in any CQ task", () => {
+    // projects.md is a scored source too — only constraints.md has the always-include
+    // privilege. Asserting projects.md stays "matched" keeps the scorer's role clear.
+    for (const { task } of DEEP_CASES) {
+      const pack = compile(project(), task);
+      const projAlways = pack.selected.filter((b) => b.file === "projects.md" && b.reason === "always");
+      expect(projAlways.length, `projects.md appeared with reason "always" for: ${task}`).toBe(0);
     }
   });
 });
