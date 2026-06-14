@@ -1,0 +1,7 @@
+{
+  "id": "solo-founder-ai-os",
+  "name": "Lumen open-core founder",
+  "description": "A solo founder running an open-core business: free Lumen Core vs paid hosted Lumen Cloud.",
+  "triggers": ["Lumen", "open-core", "Lumen Cloud", "Lumen Core", "hosted", "release", "billing", "workspace"],
+  "scopes": ["hosted", "oss"]
+}

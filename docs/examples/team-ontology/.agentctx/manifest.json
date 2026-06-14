@@ -1,0 +1,7 @@
+{
+  "id": "team-ontology",
+  "name": "Helios scheduling team",
+  "description": "A B2B scheduling team: booking latency, a public partner API, and on-call reliability.",
+  "triggers": ["booking", "scheduling", "Helios", "latency", "partner API", "on-call", "throughput"],
+  "scopes": ["performance", "api", "reliability"]
+}

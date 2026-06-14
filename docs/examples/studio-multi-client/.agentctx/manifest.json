@@ -1,0 +1,7 @@
+{
+  "id": "studio-multi-client",
+  "name": "Northstar multi-client studio",
+  "description": "An AI product studio running several isolated client engagements at once.",
+  "triggers": ["client", "engagement", "Acme", "Northwind", "Globex", "studio platform", "isolation"],
+  "scopes": ["client-acme", "client-northwind", "client-globex", "studio-platform"]
+}
