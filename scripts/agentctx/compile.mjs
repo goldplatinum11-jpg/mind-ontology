@@ -159,13 +159,18 @@ export function tokenize(input) {
 // or null when there is no date, a placeholder (`YYYY-MM-DD`), or an invalid value
 // (`2026-13-40`, `2026-2-3`). null is the neutral rank — it neither wins nor loses a
 // score tie, it just falls through to the index tie-breaker. Never used to add score.
+//
+// First-Date-wins-or-null: the FIRST `Date:` line decides the block. If that first
+// line is malformed/placeholder the block is dateless (null) — we do not skip ahead
+// to a later valid line. A block has one authoritative date; a broken first one is a
+// data error to surface (as neutral), not to silently paper over with a later line.
 export function parseBlockDate(body) {
   for (const line of String(body).split("\n")) {
     const m = line.match(/^\s*Date:\s*(\S+)\s*$/i);
     if (!m) continue;
     const value = m[1];
     const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!parts) return null; // placeholder (YYYY-MM-DD) or malformed
+    if (!parts) return null; // first Date: is a placeholder (YYYY-MM-DD) or malformed → dateless
     const [, y, mo, d] = parts;
     const year = Number(y);
     const month = Number(mo);
@@ -312,9 +317,10 @@ export function scoreBlock(block, taskTokens, scopes = [], opts = {}) {
   // block's author-declared `Aliases:` synonyms join its heading token set: the author
   // is asserting "this block IS about these terms", so a task/scope term matching a
   // synonym scores at the heading tier (e.g. task "auth" surfaces a block that lists
-  // `Aliases: auth, authentication`). Static, author-declared only — no stemming. The
-  // alias surface forms already appear in the body text, so this never double-counts a
-  // body hit; it only promotes the match to the stronger heading signal.
+  // `Aliases: auth, authentication`). Static, author-declared only — no stemming.
+  // Note: the `Aliases:` line text is itself part of the body, so a flag-off match on a
+  // synonym already earns a body hit (+1); enabling --aliases ADDS a heading-tier hit
+  // (+4 task / +5 scope) on top of that existing body credit — it does not replace it.
   if (opts.aliases) {
     const aliasTokens = parseBlockAliases(block.body);
     if (aliasTokens.length > 0) headingTokens = Array.from(new Set([...headingTokens, ...aliasTokens]));
@@ -472,9 +478,11 @@ export function compileContext({
       .map((block) => ({
         ...block,
         score: scoreBlock(block, taskTokens, scopes, { richScoring, aliases }),
-        // recencyDate is attached for the opt-in recency tie-breaker only. It never
-        // feeds score; a block with no/invalid/placeholder Date: gets null (neutral).
-        recencyDate: parseBlockDate(block.body),
+        // recencyDate is attached for the opt-in recency tie-breaker only, and only
+        // computed when recency is on (null otherwise — saves the body scan and keeps
+        // the field uniformly null on the legacy path). It never feeds score; a block
+        // with no/invalid/placeholder Date: is null (neutral). Never rendered.
+        recencyDate: recency ? parseBlockDate(block.body) : null,
       }))
       // Sort: score desc, then (opt-in) recency desc, then index asc. With recency
       // OFF the recency term is a no-op, so the order is byte-for-byte the legacy

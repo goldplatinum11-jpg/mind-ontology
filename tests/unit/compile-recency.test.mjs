@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileContext,
   parseBlockDate,
+  renderContextPack,
   renderContextPackJson,
 } from "../../scripts/agentctx/compile.mjs";
 
@@ -39,6 +40,17 @@ describe("parseBlockDate (Lane A)", () => {
 
   it("uses the first Date: line when several appear", () => {
     expect(parseBlockDate("Date: 2026-01-01\nDate: 2026-12-31")).toBe("2026-01-01");
+  });
+
+  it("a malformed/placeholder first Date: makes the block dateless (first-wins-or-null)", () => {
+    // Intentional: the first Date: is authoritative. A broken first line is surfaced as
+    // neutral (null), not silently repaired by scanning ahead to a later valid line.
+    expect(parseBlockDate("Date: YYYY-MM-DD\nDate: 2026-01-01")).toBeNull();
+    expect(parseBlockDate("Date: 2026-13-40\nDate: 2026-01-01")).toBeNull();
+  });
+
+  it("tolerates CRLF line endings in the body", () => {
+    expect(parseBlockDate("Status: accepted\r\nDate: 2026-02-10\r\n")).toBe("2026-02-10");
   });
 });
 
@@ -146,5 +158,12 @@ describe("recency byte-for-byte backward compatibility (Lane A)", () => {
       compileContext({ sources: SOURCES, task: "perf", scopes: ["perf"], recency: true }),
     );
     expect(json).not.toContain("recencyDate");
+  });
+
+  it("recencyDate never leaks into rendered markdown", () => {
+    const md = renderContextPack(
+      compileContext({ sources: SOURCES, task: "perf", scopes: ["perf"], recency: true }),
+    );
+    expect(md).not.toContain("recencyDate");
   });
 });
