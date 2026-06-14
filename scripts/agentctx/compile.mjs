@@ -113,6 +113,10 @@ export function parseArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--rich-scoring") {
       parsed.richScoring = true;
+    } else if (arg === "--recency") {
+      parsed.recency = true;
+    } else if (arg === "--aliases") {
+      parsed.aliases = true;
     } else if (arg === "--max-tokens") {
       const raw = args[++i];
       const n = Number(raw);
@@ -147,6 +151,67 @@ export function tokenize(input) {
         .filter((word) => word.length >= 3 && !STOP_WORDS.has(word)),
     ),
   );
+}
+
+// Parse a block body's `Date: YYYY-MM-DD` line into a sortable ISO date string.
+// Deterministic and clock-free: the raw date text is the only signal. Returns the
+// ISO string (which sorts lexically === chronologically) for a real calendar date,
+// or null when there is no date, a placeholder (`YYYY-MM-DD`), or an invalid value
+// (`2026-13-40`, `2026-2-3`). null is the neutral rank — it neither wins nor loses a
+// score tie, it just falls through to the index tie-breaker. Never used to add score.
+export function parseBlockDate(body) {
+  for (const line of String(body).split("\n")) {
+    const m = line.match(/^\s*Date:\s*(\S+)\s*$/i);
+    if (!m) continue;
+    const value = m[1];
+    const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!parts) return null; // placeholder (YYYY-MM-DD) or malformed
+    const [, y, mo, d] = parts;
+    const year = Number(y);
+    const month = Number(mo);
+    const day = Number(d);
+    // Validate it is a real calendar date (rejects 2026-13-40, 2026-02-31).
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (
+      dt.getUTCFullYear() !== year ||
+      dt.getUTCMonth() !== month - 1 ||
+      dt.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return value;
+  }
+  return null;
+}
+
+// Tie-break comparator for recency: newer Date: wins, a missing/invalid date is
+// neutral (loses to any real date, ties with other neutrals). Returns a negative
+// number when `a` should rank before `b`. Pure on the parsed date strings; it never
+// touches score, so it can only ever reorder blocks that are already score-tied.
+function compareRecency(a, b) {
+  const da = a.recencyDate ?? null;
+  const db = b.recencyDate ?? null;
+  if (da === db) return 0;
+  if (da === null) return 1; // a has no date → a ranks after b
+  if (db === null) return -1; // b has no date → a ranks before b
+  return da < db ? 1 : -1; // newer (greater ISO string) ranks first
+}
+
+// Parse a block body's `Aliases: a, b, c` line(s) into a token list. Static and
+// dependency-free: it just reads the literal synonyms an author declared on the
+// block, lowercased and tokenized like everything else (no stemming, no inference).
+// Returns [] when the block declares no aliases. Opt-in only (see --aliases); never
+// changes scoring unless the caller passes the expanded tokens into scoreBlock.
+export function parseBlockAliases(body) {
+  const aliases = [];
+  for (const line of String(body).split("\n")) {
+    const m = line.match(/^\s*Aliases:\s*(.+?)\s*$/i);
+    if (!m) continue;
+    for (const piece of m[1].split(",")) {
+      aliases.push(...tokenize(piece));
+    }
+  }
+  return Array.from(new Set(aliases));
 }
 
 export function parseMarkdownBlocks(markdown, file) {
@@ -241,8 +306,19 @@ export function validateAgentctxSources(cwd = process.cwd()) {
 
 export function scoreBlock(block, taskTokens, scopes = [], opts = {}) {
   const scopeSet = new Set(scopes.map((scope) => scope.toLowerCase()));
-  const headingTokens = tokenize(`${block.title} ${block.tags.join(" ")}`);
+  let headingTokens = tokenize(`${block.title} ${block.tags.join(" ")}`);
   const bodyTokens = tokenize(block.body);
+  // Opt-in alias matching (default OFF → byte-for-byte legacy). When enabled, a
+  // block's author-declared `Aliases:` synonyms join its heading token set: the author
+  // is asserting "this block IS about these terms", so a task/scope term matching a
+  // synonym scores at the heading tier (e.g. task "auth" surfaces a block that lists
+  // `Aliases: auth, authentication`). Static, author-declared only — no stemming. The
+  // alias surface forms already appear in the body text, so this never double-counts a
+  // body hit; it only promotes the match to the stronger heading signal.
+  if (opts.aliases) {
+    const aliasTokens = parseBlockAliases(block.body);
+    if (aliasTokens.length > 0) headingTokens = Array.from(new Set([...headingTokens, ...aliasTokens]));
+  }
   let score = 0;
 
   for (const scope of scopeSet) {
@@ -323,7 +399,7 @@ function isMandatoryBlock(block, risky) {
 // with reason "budget". If the mandatory blocks alone exceed the budget, constraints
 // are still kept and overBudget is flagged (the one allowed budget overrun). Returns
 // the survivors in their original selected order plus budget metadata.
-export function applyTokenBudget(selected, omitted, maxTokens, risky = false) {
+export function applyTokenBudget(selected, omitted, maxTokens, risky = false, recency = false) {
   const ordered = [...selected].sort((a, b) => {
     const pa = blockBudgetPriority(a, risky);
     const pb = blockBudgetPriority(b, risky);
@@ -331,6 +407,12 @@ export function applyTokenBudget(selected, omitted, maxTokens, risky = false) {
     const sa = a.score === Infinity ? Number.MAX_SAFE_INTEGER : a.score;
     const sb = b.score === Infinity ? Number.MAX_SAFE_INTEGER : b.score;
     if (sb !== sa) return sb - sa;
+    // Recency tie-break (opt-in): among equal-priority, equal-score blocks the newer
+    // Date: is retained first. Off by default → byte-for-byte legacy index order.
+    if (recency) {
+      const r = compareRecency(a, b);
+      if (r !== 0) return r;
+    }
     return a.index - b.index;
   });
 
@@ -369,6 +451,8 @@ export function compileContext({
   minScore = DEFAULT_MIN_SCORE,
   riskMode = DEFAULT_RISK_MODE,
   richScoring = false,
+  recency = false,
+  aliases = false,
   maxTokens = null,
   now = new Date(),
 }) {
@@ -385,8 +469,24 @@ export function compileContext({
     }
 
     const scored = blocks
-      .map((block) => ({ ...block, score: scoreBlock(block, taskTokens, scopes, { richScoring }) }))
-      .sort((a, b) => b.score - a.score || a.index - b.index);
+      .map((block) => ({
+        ...block,
+        score: scoreBlock(block, taskTokens, scopes, { richScoring, aliases }),
+        // recencyDate is attached for the opt-in recency tie-breaker only. It never
+        // feeds score; a block with no/invalid/placeholder Date: gets null (neutral).
+        recencyDate: parseBlockDate(block.body),
+      }))
+      // Sort: score desc, then (opt-in) recency desc, then index asc. With recency
+      // OFF the recency term is a no-op, so the order is byte-for-byte the legacy
+      // `score desc → index asc`. Recency only ever reorders score-tied blocks.
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (recency) {
+          const r = compareRecency(a, b);
+          if (r !== 0) return r;
+        }
+        return a.index - b.index;
+      });
     const matches = scored.filter((block) => block.score >= minScore).slice(0, maxBlocksPerFile);
 
     selected.push(...matches.map((block) => ({ ...block, reason: "matched" })));
@@ -410,7 +510,7 @@ export function compileContext({
   let budget = null;
   let finalSelected = selected;
   if (maxTokens !== null && maxTokens !== undefined) {
-    const result = applyTokenBudget(selected, omitted, maxTokens, risk.level === "risky");
+    const result = applyTokenBudget(selected, omitted, maxTokens, risk.level === "risky", recency);
     finalSelected = result.selected;
     omitted = result.omitted;
     budget = { maxTokens, estimatedTokens: result.estimatedTokens, overBudget: result.overBudget };
@@ -595,6 +695,8 @@ export function compileFromCwd(options) {
     minScore: options.minScore,
     riskMode: options.riskMode,
     richScoring: options.richScoring === true,
+    recency: options.recency === true,
+    aliases: options.aliases === true,
     maxTokens: options.maxTokens ?? null,
   });
   if (routedTo) pack.routedTo = routedTo;
@@ -638,6 +740,17 @@ Options:
   --rich-scoring                Opt in to richer ranking signals: a task/scope hit in a
                                 block's heading/tags earns an extra boost over a body-only
                                 hit. Off by default; the default ranking is unchanged.
+  --recency                     Break score ties by a block's "Date: YYYY-MM-DD" line:
+                                among equally-relevant blocks the newer date is preferred.
+                                Deterministic — no decay, no current-time; never adds score
+                                (a tie-breaker only). Blocks with no/placeholder/invalid date
+                                are neutral. Off by default; the default ranking is unchanged.
+  --aliases                     Honor a block's "Aliases: a, b, c" line: a task/scope term
+                                matching a declared synonym is treated as a heading-tier
+                                signal, so it surfaces the block (e.g. task "auth" hits a
+                                block listing "auth, authentication"). Static, author-declared
+                                synonyms only — no stemming or inference, no schema change.
+                                Off by default; the default ranking is unchanged.
   --max-tokens <n>              Fit the pack inside a rough token budget. constraints and
                                 risk-forced safety blocks are always kept; lower-priority
                                 blocks are dropped (reason: budget) to fit. The budget counts

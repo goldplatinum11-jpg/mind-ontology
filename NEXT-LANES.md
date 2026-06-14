@@ -75,9 +75,21 @@ Follow-on autopilot lanes — all shipped (docs/tests only):
   `tests/unit/compile-format-compact.test.mjs`; markdown/json paths unchanged.
 - **[engine]** richer scoring signals — heading weight **shipped** as opt-in
   `--rich-scoring` (default-off, byte-for-byte legacy ranking otherwise), guarded by
-  `tests/unit/compile-rich-scoring.test.mjs`. **Recency is still open** and parked:
-  blocks carry no reliable per-block date signal to rank on, so it needs a data
-  decision before it can ship without guesswork.
+  `tests/unit/compile-rich-scoring.test.mjs`.
+- **[engine]** deterministic recency tie-breaker — **shipped** as opt-in `--recency`.
+  Parses a block's literal `Date: YYYY-MM-DD` line and, among equally-scored blocks,
+  prefers the newer date. Clock-free and decay-free (the raw date text is the only
+  signal, so it stays deterministic) and **never adds score** — a tie-breaker only, so
+  relevance ranking is unchanged. Placeholder (`YYYY-MM-DD`), malformed, and missing
+  dates are neutral. Default-off = byte-for-byte legacy `score → index` order. Guarded
+  by `tests/unit/compile-recency.test.mjs`.
+- **[engine]** static alias matching — **shipped** as opt-in `--aliases`. Reads a
+  block's author-declared `Aliases: a, b, c` line and treats those synonyms as
+  heading-level signals, so a task/scope term matching a declared synonym surfaces the
+  block (e.g. task "auth" hits a block listing `Aliases: auth, authentication`). Static,
+  author-declared only — no stemming, no inference, no schema/manifest change.
+  Default-off = byte-for-byte legacy. Guarded by `tests/unit/compile-aliases.test.mjs`
+  and `tests/unit/compile-recency-alias-combined.test.mjs`.
 - **[engine]** the `mind-ontology` CLI wrapper — shipped. `scripts/agentctx/cli.mjs`
   is the product `bin`, a thin verbatim dispatcher over the `agentctx:*` scripts
   (which stay intact, backward compatible), guarded by `tests/unit/cli-wrapper.test.mjs`.
@@ -89,8 +101,8 @@ Follow-on autopilot lanes — all shipped (docs/tests only):
   flagged. Opt-in/additive (unset = byte-for-byte legacy), guarded by
   `tests/unit/compile-budget.test.mjs`.
 
-Genuinely open after this campaign: scoring **recency** (needs a date-signal design),
-and any further additive `--format`/scoring extensions as the product grows.
+Genuinely open after this campaign: any further additive `--format`/scoring extensions
+as the product grows.
 
 ## New direction — ontology library + router (layer ①)
 
@@ -121,7 +133,8 @@ Productionizing the router (order B→A→C from the strategy dialogue):
   headings (dropping generic words; CJK kept), as a draft to review and trim. Guarded by
   `tests/unit/manifest-scaffold.test.mjs`.
 
-Remaining: scoring recency (needs a date-signal design).
+Remaining: none from the original scoring backlog — recency and aliases shipped
+(`--recency`, `--aliases`).
 
 ## Never in this product (hosted/closed boundary)
 
