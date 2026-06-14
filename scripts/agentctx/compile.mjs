@@ -475,15 +475,23 @@ export function compileContext({
     }
 
     const scored = blocks
-      .map((block) => ({
-        ...block,
-        score: scoreBlock(block, taskTokens, scopes, { richScoring, aliases }),
-        // recencyDate is attached for the opt-in recency tie-breaker only, and only
-        // computed when recency is on (null otherwise — saves the body scan and keeps
-        // the field uniformly null on the legacy path). It never feeds score; a block
-        // with no/invalid/placeholder Date: is null (neutral). Never rendered.
-        recencyDate: recency ? parseBlockDate(block.body) : null,
-      }))
+      .map((block) => {
+        const aliasTokens = aliases ? parseBlockAliases(block.body) : [];
+        const matchedAliasTokens = aliasTokens.filter((t) => taskTokens.includes(t));
+        return {
+          ...block,
+          score: scoreBlock(block, taskTokens, scopes, { richScoring, aliases }),
+          // recencyDate is attached for the opt-in recency tie-breaker only, and only
+          // computed when recency is on (null otherwise — saves the body scan and keeps
+          // the field uniformly null on the legacy path). It never feeds score; a block
+          // with no/invalid/placeholder Date: is null (neutral). Never rendered.
+          recencyDate: recency ? parseBlockDate(block.body) : null,
+          // matchedAliases: which alias tokens (from the block's Aliases: line) actually
+          // matched the task/scope query, enabling observability of alias-driven selection.
+          // null when --aliases is off or no alias fired. Never rendered inline.
+          matchedAliases: aliases && matchedAliasTokens.length > 0 ? matchedAliasTokens : null,
+        };
+      })
       // Sort: score desc, then (opt-in) recency desc, then index asc. With recency
       // OFF the recency term is a no-op, so the order is byte-for-byte the legacy
       // `score desc → index asc`. Recency only ever reorders score-tied blocks.
@@ -558,13 +566,18 @@ export function explainBlock(block) {
   // Surface the recency tie-breaker date when --recency attached one, so a close call
   // is explainable. Absent (no --recency, or no/placeholder date) → output unchanged.
   if (block.recencyDate) out.recencyDate = block.recencyDate;
+  // Surface which alias tokens drove selection when --aliases is on, so the caller can
+  // trace "task term X hit declared synonym Y on block Z". Absent when --aliases is off
+  // or no alias actually matched → output byte-for-byte unchanged from the non-alias path.
+  if (block.matchedAliases && block.matchedAliases.length > 0) out.matchedAliases = block.matchedAliases;
   return out;
 }
 
 function renderExplainLine(block) {
   const e = explainBlock(block);
   const recency = e.recencyDate ? ` recencyDate=${e.recencyDate}` : "";
-  return `Explain: sourceFile=${e.sourceFile} heading="${e.heading}" score=${e.score === null ? "null" : e.score} reason=${e.reason}${recency}`;
+  const aliases = e.matchedAliases && e.matchedAliases.length > 0 ? ` matchedAliases=${e.matchedAliases.join(",")}` : "";
+  return `Explain: sourceFile=${e.sourceFile} heading="${e.heading}" score=${e.score === null ? "null" : e.score} reason=${e.reason}${recency}${aliases}`;
 }
 
 export function renderContextPack(pack, options = {}) {
