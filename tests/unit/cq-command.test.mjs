@@ -288,20 +288,26 @@ describe("W8 — cq CLI surface", () => {
 // template content drifts and a CQ stops producing its expected contributor, this table
 // catches it. Pinned at 2026-06-15 against mind-ontology@0.1.0 template.
 //
-// Notable observations encoded here (not assumptions):
-//   CQ 1 (#context): the question "What should the agent know before starting?" does not
-//     score direction.md (no "starting" token there, blocks not tagged #context) — it is
-//     answered via constraints.md (always-present, tagged context) and other files.
-//   CQ 6 (#decision): "Which prior decision applies?" does not score decisions.md
-//     (block headings/content do not contain strong #decision tokens) — answered by
-//     glossary.md which has decision-adjacent vocabulary.
+// Expectations locked from live run against mind-ontology@0.1.0 template (2026-06-15).
+// Where the expected contributor matches the cq.md body-text contract, the comment
+// notes the mechanism. Known gaps are documented.
+//
+//   CQ 1 (#context): cq.md body says "drawn from direction.md, decisions.md, glossary.md"
+//     but direction.md does not appear in answered_by — the CQ title text "What should
+//     the agent know before starting?" has no token overlap with direction.md's headings
+//     or body, so direction.md never enters the compiled pack for this question. The CQ
+//     is still answered via constraints.md whose "Prefer small scoped context packs" block
+//     carries a #context tag. This is a known template gap: direction.md needs to either
+//     contain "before starting" vocabulary or the CQ title must be rephrased.
+//   CQ 6 (#decision): after adding #decision to decisions.md blocks, decisions.md now
+//     answers CQ6 correctly via topic-tag matching.
 const TEMPLATE_CQ_CONTRIBUTORS = [
   { id: 1, required: true,  topic: "context",  mustContain: "constraints.md" },
   { id: 2, required: true,  topic: "context",  mustContain: "direction.md" },
   { id: 3, required: true,  topic: "safety",   mustContain: "constraints.md" },
   { id: 4, required: true,  topic: "safety",   mustContain: "constraints.md" },
   { id: 5, required: false, topic: "scope",    mustContain: "projects.md" },
-  { id: 6, required: false, topic: "decision", mustContain: "glossary.md" },
+  { id: 6, required: false, topic: "decision", mustContain: "decisions.md" },
   { id: 7, required: false, topic: "boundary", mustContain: "glossary.md" },
 ];
 

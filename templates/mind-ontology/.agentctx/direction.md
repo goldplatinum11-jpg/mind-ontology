@@ -1,6 +1,6 @@
 # Direction
 
-## Current direction #direction #now
+## Current direction #direction #now #context
 
 Describe what you are trying to build, improve, or decide right now.
 

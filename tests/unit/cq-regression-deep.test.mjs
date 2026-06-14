@@ -89,6 +89,7 @@ const DEEP_CASES = [
     answers: [
       { file: "projects.md", needle: "active project", reason: "matched" },
       { file: "direction.md", needle: "current direction", reason: "matched" },
+      { file: "constraints.md", needle: "destructive", reason: "always" },
     ],
   },
   {
