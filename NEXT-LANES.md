@@ -108,8 +108,20 @@ candidates + reasons. `route --library <dir>` and `compile --library <dir>` (rou
 compile) expose it; the MCP two-tool contract is untouched. Guarded by
 `tests/unit/router.test.mjs`; backward compatible (no `--library` = unchanged).
 
-Open follow-on: route inside the MCP `get_context` when a library is configured; manifest
-auto-derivation from existing sources; a `doctor` health check over a library.
+Productionizing the router (order B→A→C from the strategy dialogue):
+- **B — library doctor** shipped. `agentctx doctor --library <dir>` lints a library for
+  unloadable manifests, duplicate ids (errors) and overlapping triggers (warnings),
+  guarded by `tests/unit/library-doctor.test.mjs`.
+- **A — MCP routing** shipped. With `AGENTCTX_LIBRARY` set, the MCP `get_context` routes
+  the task to a box then compiles it (the two-tool contract and schemas are unchanged;
+  an explicit `cwd` still pins a box; unset = the existing single-box server). Guarded by
+  `tests/unit/mcp-library-routing.test.mjs`.
+- **C — manifest scaffolding** shipped. `agentctx scaffold --cwd <box>` drafts a
+  manifest's triggers/scopes from the box's existing project names, glossary terms and
+  headings (dropping generic words; CJK kept), as a draft to review and trim. Guarded by
+  `tests/unit/manifest-scaffold.test.mjs`.
+
+Remaining: scoring recency (needs a date-signal design).
 
 ## Never in this product (hosted/closed boundary)
 

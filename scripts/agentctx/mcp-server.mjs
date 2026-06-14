@@ -14,6 +14,13 @@
  *   root so the same server resolves the same .agentctx/ regardless of which
  *   directory the MCP client launches it from. Individual tool calls can still
  *   override per call via the `cwd` parameter.
+ *
+ * Library routing (opt-in):
+ *   If AGENTCTX_LIBRARY points at a library directory (<id>/.agentctx/manifest.json
+ *   boxes), get_context routes the task to the best-matching box first, then compiles
+ *   it, and includes `routedTo` in the pack. A call that pins an explicit `cwd` skips
+ *   routing. Unset, every tool behaves exactly as before (single .agentctx/). The two
+ *   tool names and schemas are unchanged — routing is internal.
  */
 
 import { createInterface } from "node:readline";
@@ -26,6 +33,7 @@ import {
   renderContextPack,
   renderContextPackJson,
 } from "./compile.mjs";
+import { routeOntology, scanLibrary } from "./router.mjs";
 
 const SERVER_INFO = { name: "agentctx", version: "0.1.0" };
 const PROTOCOL_VERSION = "2024-11-05";
@@ -128,8 +136,8 @@ function assertFormat(format) {
 // Exported handler functions (pure — no stdio, testable directly)
 // ---------------------------------------------------------------------------
 
-export function handleGetContext(args, defaultCwd = process.cwd()) {
-  const { task, scope, format = "markdown", cwd = defaultCwd } = args ?? {};
+export function handleGetContext(args, defaultCwd = process.cwd(), env = process.env) {
+  const { task, scope, format = "markdown", cwd } = args ?? {};
 
   if (!task || typeof task !== "string" || !task.trim()) {
     throw new McpError(-32602, 'Parameter "task" is required and must be a non-empty string.');
@@ -137,8 +145,30 @@ export function handleGetContext(args, defaultCwd = process.cwd()) {
   assertFormat(format);
 
   const scopes = normalizeScope(scope);
-  const sources = readAgentctx(resolve(cwd));
+
+  // Library routing (opt-in via AGENTCTX_LIBRARY): when a library is configured and the
+  // caller did not pin a specific box via `cwd`, route the task to one box first, then
+  // compile it. Unset, or with an explicit cwd, this is the existing single-box path.
+  const library = typeof env.AGENTCTX_LIBRARY === "string" ? env.AGENTCTX_LIBRARY.trim() : "";
+  let useCwd = cwd ?? defaultCwd;
+  let routedTo = null;
+  if (library && !cwd) {
+    const ontologies = scanLibrary(library);
+    const routed = routeOntology(task.trim(), scopes, ontologies);
+    if (!routed.selected) {
+      throw new McpError(-32602, "No ontology in the configured library (AGENTCTX_LIBRARY) matched the task.");
+    }
+    useCwd = ontologies.find((o) => o.id === routed.selected).dir;
+    routedTo = {
+      selected: routed.selected,
+      ambiguous: routed.ambiguous,
+      candidates: routed.candidates.map((c) => ({ id: c.id, score: c.score })),
+    };
+  }
+
+  const sources = readAgentctx(resolve(useCwd));
   const pack = compileContext({ sources, task: task.trim(), scopes });
+  if (routedTo) pack.routedTo = routedTo;
   const text = format === "json" ? renderContextPackJson(pack) : renderContextPack(pack);
   return { content: [{ type: "text", text }] };
 }

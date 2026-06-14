@@ -55,6 +55,20 @@ export const COMMANDS = {
     group: "operator",
     summary: "Pick which ontology (box) a task belongs to, from a --library of many.",
   },
+  doctor: {
+    script: "library-doctor.mjs",
+    prefix: ["doctor"],
+    npmScript: null,
+    group: "operator",
+    summary: "Lint an ontology --library for routing problems (duplicate ids, overlapping triggers).",
+  },
+  scaffold: {
+    script: "manifest-scaffold.mjs",
+    prefix: ["scaffold"],
+    npmScript: null,
+    group: "operator",
+    summary: "Draft a routing manifest.json from an ontology's existing sources.",
+  },
   init: {
     script: "init.mjs",
     prefix: [],
