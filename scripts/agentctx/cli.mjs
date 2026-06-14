@@ -55,6 +55,13 @@ export const COMMANDS = {
     group: "operator",
     summary: "Pick which ontology (box) a task belongs to, from a --library of many.",
   },
+  doctor: {
+    script: "library-doctor.mjs",
+    prefix: ["doctor"],
+    npmScript: null,
+    group: "operator",
+    summary: "Lint an ontology --library for routing problems (duplicate ids, overlapping triggers).",
+  },
   init: {
     script: "init.mjs",
     prefix: [],
