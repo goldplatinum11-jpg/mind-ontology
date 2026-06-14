@@ -116,8 +116,12 @@ Productionizing the router (order B→A→C from the strategy dialogue):
   the task to a box then compiles it (the two-tool contract and schemas are unchanged;
   an explicit `cwd` still pins a box; unset = the existing single-box server). Guarded by
   `tests/unit/mcp-library-routing.test.mjs`.
-- **C — manifest scaffolding** (draft a manifest's triggers from existing sources) is the
-  remaining follow-on, plus scoring recency.
+- **C — manifest scaffolding** shipped. `agentctx scaffold --cwd <box>` drafts a
+  manifest's triggers/scopes from the box's existing project names, glossary terms and
+  headings (dropping generic words; CJK kept), as a draft to review and trim. Guarded by
+  `tests/unit/manifest-scaffold.test.mjs`.
+
+Remaining: scoring recency (needs a date-signal design).
 
 ## Never in this product (hosted/closed boundary)
 
