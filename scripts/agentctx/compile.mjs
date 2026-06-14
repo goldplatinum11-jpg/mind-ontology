@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveRiskLevel } from "./risk.mjs";
+import { routeOntology, scanLibrary } from "./router.mjs";
 
 export const DEFAULT_AGENTCTX_DIR = ".agentctx";
 // Tags that mark a block as safety guidance. On a risky task these blocks are
@@ -119,6 +120,12 @@ export function parseArgv(argv = process.argv.slice(2)) {
         throw new Error(`--max-tokens must be a positive integer, got: ${raw ?? ""}`);
       }
       parsed.maxTokens = n;
+    } else if (arg === "--library") {
+      const dir = args[++i];
+      if (!dir || dir.startsWith("--")) {
+        throw new Error("--library requires a directory path");
+      }
+      parsed.library = dir;
     } else if (arg === "-h" || arg === "--help") {
       parsed.command = "help";
     } else {
@@ -459,6 +466,9 @@ export function renderContextPack(pack, options = {}) {
     `Generated: ${pack.generatedAt}`,
     "",
   ];
+  if (pack.routedTo) {
+    lines.push(`Routed to: ${pack.routedTo.selected}${pack.routedTo.ambiguous ? " (ambiguous)" : ""}`, "");
+  }
   if (pack.budget) {
     lines.push(
       `Budget: ${pack.budget.estimatedTokens}/${pack.budget.maxTokens} tokens${
@@ -528,6 +538,7 @@ export function renderContextPackJson(pack, options = {}) {
                 })),
             }
           : {}),
+        ...(pack.routedTo ? { routedTo: pack.routedTo } : {}),
       },
       null,
       2,
@@ -554,8 +565,28 @@ export function renderContextPackCompact(pack) {
 }
 
 export function compileFromCwd(options) {
-  validateAgentctxSources(options.cwd);
-  const sources = readAgentctx(options.cwd);
+  // Layer ① (opt-in): when a library is given, route the task to one box first, then
+  // compile that box. Without --library this is byte-for-byte the single-ontology path.
+  let cwd = options.cwd;
+  let routedTo = null;
+  if (options.library) {
+    const ontologies = scanLibrary(options.library);
+    const routed = routeOntology(options.task, options.scopes ?? [], ontologies);
+    if (!routed.selected) {
+      throw new Error(
+        `No ontology in ${options.library} matched the task. Add trigger terms to a box's manifest, or check the task wording.`,
+      );
+    }
+    cwd = ontologies.find((o) => o.id === routed.selected).dir;
+    routedTo = {
+      selected: routed.selected,
+      ambiguous: routed.ambiguous,
+      candidates: routed.candidates.map((c) => ({ id: c.id, score: c.score })),
+    };
+  }
+
+  validateAgentctxSources(cwd);
+  const sources = readAgentctx(cwd);
   const pack = compileContext({
     sources,
     task: options.task,
@@ -566,6 +597,7 @@ export function compileFromCwd(options) {
     richScoring: options.richScoring === true,
     maxTokens: options.maxTokens ?? null,
   });
+  if (routedTo) pack.routedTo = routedTo;
   const render = { explain: options.explain === true };
   if (options.format === "json") return renderContextPackJson(pack, render);
   if (options.format === "compact") return renderContextPackCompact(pack);
@@ -612,6 +644,10 @@ Options:
                                 the context content (exact for --format compact); markdown
                                 and json add human-facing display overhead. Off by default;
                                 without it the pack is unchanged.
+  --library <dir>               Route across a library of boxes first: pick the ontology
+                                whose manifest triggers best match the task, then compile it
+                                (see the route command). Without it, compile the single
+                                .agentctx/ at --cwd unchanged.
   -h, --help                    Show this help message.
 
 Source files (under .agentctx/):
