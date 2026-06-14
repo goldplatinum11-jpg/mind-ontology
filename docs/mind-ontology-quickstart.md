@@ -268,6 +268,206 @@ contract is explicitly scoped.
 
 ---
 
+## Scoring and output options
+
+The default compiler behavior is minimal and deterministic. All of the following
+flags are **opt-in** — a flag-off run is byte-for-byte identical to before.
+
+### --format compact
+
+Strip all metadata from the output and emit only the block headings and bodies.
+Useful when feeding the pack directly into a tight prompt:
+
+```sh
+npm run agentctx:compile -- --task "Fix the OAuth flow" --format compact
+```
+
+Output: a `# context pack: <task>` header, a risk line if the task is risky, then
+each block as `## file / heading` + body. No `Source:`, `Reason:`, `Tags:`,
+generated timestamp, or Omitted section.
+
+### --rich-scoring
+
+Boost heading/tag hits over body-only hits, so the block that *names* the topic
+outranks one that only mentions it in passing:
+
+```sh
+npm run agentctx:compile -- --task "Fix the OAuth flow" --scope auth --rich-scoring
+```
+
+Off by default. Does not change which blocks are available — only their rank.
+
+### --recency
+
+Break score ties by a `Date: YYYY-MM-DD` line in the block body. Among
+equally-relevant blocks the newer date is preferred. Deterministic: no decay,
+no current-time comparison, just stable ISO-date ordering. Blocks with no date
+or an invalid date are neutral:
+
+```sh
+npm run agentctx:compile -- --task "Latest caching decision" --recency
+```
+
+To use recency, add a `Date:` line to any block:
+
+```markdown
+## Cache booking availability #performance #cache
+
+Status: accepted
+Date: 2026-02-10
+
+Availability lookups dominate booking latency…
+```
+
+### --aliases
+
+Honor a block's `Aliases: a, b, c` line. A task/scope term matching a declared
+synonym is treated as a heading-tier hit, surfacing the block even when the task
+uses a different word:
+
+```sh
+npm run agentctx:compile -- --task "Fix the auth bug" --aliases
+```
+
+To use aliases, add an `Aliases:` line to any block that should respond to synonyms:
+
+```markdown
+## OAuth 2.0 integration #security
+
+Aliases: auth, authentication, login, sign-in
+
+Implemented as a PKCE flow with short-lived tokens…
+```
+
+`--aliases` is static and author-declared: no stemming, no inference, no schema
+change. The `Aliases:` line is part of the block body, so it already earns a
+body-tier hit without the flag; enabling it adds a heading-tier hit on top.
+
+### --explain
+
+Add per-block provenance to the output. Each included block gets an `Explain:`
+line showing `sourceFile`, `heading`, `score`, and `reason` (`constraint` /
+`scored` / `risk-forced`). When `--recency` fires, `recencyDate` is added; when
+`--aliases` fires, `matchedAliases` is added:
+
+```sh
+npm run agentctx:compile -- --task "Fix the auth bug" --aliases --recency --explain
+```
+
+Example explain line in markdown output:
+
+```text
+Explain: sourceFile=decisions.md heading="OAuth 2.0 integration" score=14 reason=scored recencyDate=2026-02-10 matchedAliases=auth
+```
+
+### --max-tokens
+
+Cap the pack size to a rough token budget (approximately 4 chars/token). Mandatory
+blocks (constraints, risk-forced safety guidance) are always kept; lower-priority
+blocks are dropped to fit:
+
+```sh
+npm run agentctx:compile -- --task "Fix the OAuth flow" --max-tokens 2000
+```
+
+Combine with `--format compact` for the tightest budgets — the token estimate
+counts the compact rendering, so what you estimate is what the agent receives:
+
+```sh
+npm run agentctx:compile -- --task "Fix the OAuth flow" --max-tokens 2000 --format compact
+```
+
+---
+
+## Library routing (layer ①)
+
+One ontology handles a single product or domain. When you have more than one,
+keep each in its own subdirectory of a **library** folder, each with its own
+`.agentctx/` and a `manifest.json`:
+
+```text
+ontologies/
+  my-product/.agentctx/      + manifest.json
+  other-service/.agentctx/   + manifest.json
+```
+
+The `manifest.json` for each box declares the trigger terms that route to it:
+
+```json
+{
+  "id": "my-product",
+  "name": "My Product",
+  "triggers": ["checkout", "payment", "stripe"],
+  "scopes": ["backend", "billing"]
+}
+```
+
+### Route a task to the best-matching box
+
+```sh
+npm run mind-ontology -- route --library ./ontologies --task "debug the checkout flow"
+```
+
+Output: which box was selected, whether the decision was ambiguous, and the
+candidate scores.
+
+### Compile from a library in one step
+
+```sh
+npm run mind-ontology -- compile --library ./ontologies --task "debug the checkout flow"
+```
+
+Routes to the best box and compiles it. The same flags as a single-ontology
+compile apply (`--rich-scoring`, `--recency`, `--aliases`, `--format`,
+`--max-tokens`, etc.):
+
+```sh
+npm run mind-ontology -- compile --library ./ontologies \
+  --task "debug the checkout flow" --aliases --recency --format compact
+```
+
+### Lint the whole library
+
+```sh
+npm run mind-ontology -- doctor --library ./ontologies
+```
+
+`doctor` flags duplicate box ids, boxes with no triggers, and trigger sets that
+would always produce an ambiguous match. Run this in CI alongside `emit --check`
+to keep the routing contract fresh.
+
+### Draft a manifest from an existing ontology
+
+```sh
+npm run mind-ontology -- scaffold --cwd ./ontologies/my-product
+```
+
+`scaffold` reads the existing project names, glossary terms, and direction
+blocks, and emits a draft `manifest.json` with suggested triggers. Review and
+trim the suggestions before saving — the router only trusts author-confirmed
+terms, and a manifest with no triggers is rejected.
+
+Pass `--format json` to emit a machine-readable draft:
+
+```sh
+npm run mind-ontology -- scaffold --cwd ./ontologies/my-product --format json
+```
+
+### MCP opt-in: route via environment variable
+
+Start the MCP server with `AGENTCTX_LIBRARY` set to the library path:
+
+```sh
+AGENTCTX_LIBRARY=./ontologies npm run agentctx:mcp
+```
+
+When a library is present, `get_context(task)` routes to the best-matching box
+before compiling. Without the variable, the server compiles from `AGENTCTX_HOME`
+(or the server's working directory) as before. Library routing is transparent to
+the client: same two-tool surface, same instruction text.
+
+---
+
 ## Done state
 
 The quickstart is successful when:

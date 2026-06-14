@@ -204,6 +204,155 @@ writeback is proposal-only). See
 
 ---
 
+## Three-layer mental model
+
+Mind Ontology has three layers, each opt-in from the one before it:
+
+```text
+① route     —  pick which ontology (box) a task belongs to, from a library of many
+② compile   —  select the right blocks within that box, scored for the task
+③ budget    —  trim the pack to fit a token window (--max-tokens)
+```
+
+Starting with one `.agentctx/` folder? You are already at layer ②. Add more
+ontologies in a library folder and layer ① routes between them. Layer ③ is
+on-demand — add `--max-tokens` only when a downstream model has a tight context
+window.
+
+---
+
+## Library routing (layer ①)
+
+When you have more than one ontology, keep each in its own subdirectory of a
+library folder. Each box declares a `manifest.json` with the trigger terms that
+route to it:
+
+```json
+{
+  "id": "my-product",
+  "name": "My Product",
+  "triggers": ["checkout", "payment", "stripe"],
+  "scopes": ["backend", "billing"]
+}
+```
+
+Then route a task to the best-matching box:
+
+```sh
+npm run mind-ontology -- route   --library ./ontologies --task "debug the checkout flow"
+npm run mind-ontology -- compile --library ./ontologies --task "debug the checkout flow"
+```
+
+`route` prints which box was selected (and why). `compile --library` routes and
+then compiles in one step — the agent calls one command and gets the right
+context from the right box, deterministically.
+
+To lint the whole library for routing problems (duplicate ids, boxes with no
+triggers, ambiguous trigger sets):
+
+```sh
+npm run mind-ontology -- doctor --library ./ontologies
+```
+
+To draft a `manifest.json` for an existing `.agentctx/` folder:
+
+```sh
+npm run mind-ontology -- scaffold --cwd ./ontologies/my-product
+```
+
+`scaffold` reads the existing project names, glossary terms, and direction
+blocks, and emits a draft `manifest.json` with suggested triggers. Review and
+trim the suggestions before committing — the router only trusts author-confirmed
+terms.
+
+---
+
+## Scoring signals (opt-in upgrades)
+
+The default scorer is minimal and deterministic. Three optional flags extend it
+without changing the default behavior (a flag-off run is byte-for-byte identical
+to before):
+
+**`--rich-scoring`** — boosts heading/tag hits over body-only hits. A block that
+*names* the topic in its `## heading #tag` outranks one that only mentions it in
+passing:
+
+```sh
+npm run agentctx:compile -- --task "Fix OAuth bug" --scope auth --rich-scoring
+```
+
+**`--recency`** — breaks score ties by the `Date: YYYY-MM-DD` line in a block's
+body. Among equally-relevant blocks the newer date is preferred. Deterministic:
+no decay, no current-time comparison, just a stable ISO-date ordering:
+
+```sh
+npm run agentctx:compile -- --task "What changed recently" --recency
+```
+
+Add a `Date:` line to any block you want recency-aware:
+
+```markdown
+## Adopt async-first messaging #architecture
+
+Date: 2026-05-10
+
+All inter-service calls use async messaging by default…
+```
+
+**`--aliases`** — expands a block's `Aliases: a, b, c` line into the heading
+token set. A task term that matches a declared synonym is treated as a
+heading-tier hit (not just a body hit), surfacing the block even when the task
+uses a different word:
+
+```sh
+npm run agentctx:compile -- --task "Fix the auth bug" --aliases
+```
+
+Add an `Aliases:` line to any block that should respond to synonyms:
+
+```markdown
+## OAuth 2.0 integration #security
+
+Aliases: auth, authentication, login, sign-in
+
+Implemented as a PKCE flow with short-lived tokens…
+```
+
+**`--explain`** — adds per-block provenance to the output. Each block shows
+`sourceFile`, `heading`, `score`, and `reason` (`constraint` / `scored` /
+`risk-forced`). When `--recency` fires, `recencyDate` appears; when `--aliases`
+fires, `matchedAliases` appears:
+
+```sh
+npm run agentctx:compile -- --task "Fix auth" --aliases --recency --explain
+```
+
+---
+
+## Token budgets (layer ③)
+
+When a downstream model has a tight context window, add `--max-tokens` to cap
+the pack size. Mandatory blocks (constraints, risk-forced safety guidance) are
+always kept; lower-priority blocks are dropped in priority order to fit:
+
+```sh
+npm run agentctx:compile -- --task "Fix the OAuth flow" --max-tokens 2000
+```
+
+For the tightest budgets, combine with `--format compact` to strip all metadata
+and emit only the block headings and bodies:
+
+```sh
+npm run agentctx:compile -- --task "Fix the OAuth flow" --max-tokens 2000 --format compact
+```
+
+`--format compact` removes the generated timestamp, per-block Source/Reason/Tags
+lines, and the Omitted section — just the task header, a risk note if risky, and
+the block content. The `--max-tokens` estimate counts the compact rendering, so
+what you estimate is what the agent receives.
+
+---
+
 ## Competency Questions — the verification core
 
 Mind Ontology is verified by the concrete questions an agent must be able to
@@ -225,7 +374,10 @@ the [CQ schema](docs/mind-ontology-cq-schema-v0.md) and the template at
 | Layer | What | Status |
 |---|---|---|
 | Sources | `.agentctx/` schema: constraints, identity, direction, projects, decisions, architecture, roles, glossary, competency questions | shipped |
-| Compiler | task-scoped scoring, risk-aware forcing, JSON/Markdown | shipped |
+| Compiler | task-scoped scoring, risk-aware forcing, JSON/Markdown/compact output | shipped |
+| Scoring signals | `--rich-scoring` heading boost, `--recency` date tie-breaker, `--aliases` synonym expansion, `--explain` per-block provenance | shipped |
+| Budget | `--max-tokens` opt-in compaction (priority-ordered, never drops constraints or risk-forced safety) | shipped |
+| Library routing | `route` / `compile --library` deterministic box selection, `doctor` library linter, `scaffold` manifest drafter | shipped |
 | Emit | `AGENTS.md` + `CLAUDE.md` compile targets, deterministic with fingerprint headers, `emit --check` drift gate for CI | shipped |
 | Tooling | `init`, `compile`, `validate`, `metrics`, `smoke`, `proof` — plus a unified [`mind-ontology` CLI](docs/mind-ontology-cli-v0.md) | shipped |
 | Clients | Claude Code / Codex / Cursor (proven), ChatGPT / Claude.ai (thin connector, designed) | shipped / designed |
