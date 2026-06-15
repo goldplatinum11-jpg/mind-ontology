@@ -139,6 +139,13 @@ export const COMMANDS = {
     group: "operator",
     summary: "Validate a worker Result Pack against its shape invariants.",
   },
+  import: {
+    script: "import.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Import a ChatGPT export and harvest ontology candidates into .agentctx/.",
+  },
 };
 
 const HELP_FLAGS = new Set(["help", "--help", "-h"]);

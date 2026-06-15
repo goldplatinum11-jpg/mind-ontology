@@ -3,7 +3,7 @@ target: agents-md
 profile: full
 emit_version: 2
 source: .agentctx/
-source_digest: sha256:091bd1824bd3d824b5a445ab36d442bfc06c6c18f94eeecac4fe852e7efe86ad
+source_digest: sha256:bdb4a600a40bbe6fc8de15b4d7138ea82a7e4694260d32a69a3cb09cfe9f3f55
 content_digest: sha256:93feffbe88e94b2638ace1318bb452340991fb131d4a742ee160eb90996bed2f
 note: GENERATED FILE - do not hand-edit. Edit .agentctx/ and re-run: mind-ontology emit
 -->
