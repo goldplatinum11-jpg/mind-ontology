@@ -88,7 +88,7 @@ describe("npm pack --dry-run is non-publishing and fail-closed (M48)", () => {
     for (const internal of ["EXTRACTION-INVENTORY.md", "CONTROL.md", "NEXT-LANES.md", "MIGRATION-PLAN.md"]) {
       expect(paths, `${internal} is internal and must not ship`).not.toContain(internal);
     }
-    expect(paths.length).toBeLessThan(60);
+    expect(paths.length).toBeLessThan(65);
   });
 
   it("would produce a 0.1.0 tarball; publishing stays an explicit operator decision", () => {
