@@ -146,6 +146,13 @@ export const COMMANDS = {
     group: "operator",
     summary: "Import a ChatGPT export and harvest ontology candidates into .agentctx/.",
   },
+  setup: {
+    script: "setup.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Configure auto-harvesting: write a Claude Code Stop hook to .claude/settings.json.",
+  },
 };
 
 const HELP_FLAGS = new Set(["help", "--help", "-h"]);
