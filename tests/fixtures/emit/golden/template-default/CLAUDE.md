@@ -3,7 +3,7 @@ target: claude-md
 profile: default
 emit_version: 2
 source: .agentctx/
-source_digest: sha256:6d2764a612e0365d1b6d3428fca2bf447b65c2422f497684988b5356062353b7
+source_digest: sha256:c3fea6fbf665ff3740ea3c868ec659f34921d62316417a98a52aea9a5bc39e2d
 content_digest: sha256:2d8bbed1465634390667f3a7dab2da879115919890fb9cebb9db85c5df59e0ad
 note: GENERATED FILE - do not hand-edit. Edit .agentctx/ and re-run: mind-ontology emit
 -->
