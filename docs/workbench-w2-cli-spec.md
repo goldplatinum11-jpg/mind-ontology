@@ -310,8 +310,8 @@ JSON shape (normative keys):
 ### 7.1 Synopsis and flags
 
 ```text
-mind-ontology emit [--target <id>[,<id>…]]… [--check [--explain]] [--force]
-                   [--full] [--format text|json] [--cwd <path>]
+mind-ontology emit [--target <id>[,<id>…]]… [--check [--explain]] [--reconcile]
+                   [--force] [--full] [--format text|json] [--cwd <path>]
 ```
 
 | Flag | Meaning | Constraints |
@@ -319,6 +319,7 @@ mind-ontology emit [--target <id>[,<id>…]]… [--check [--explain]] [--force]
 | `--target` | restrict to a subset of the registry (W1 §2): `agents-md`, `claude-md` | repeatable **and** CSV (mirrors `--scope`); duplicates are deduped; processing order is always registry order regardless of flag order (determinism) |
 | `--check` | classify instead of write (W1 §8); writes nothing | — |
 | `--explain` | annotate each `--check` verdict with WHY the target got its class and WHAT a reconcile would do; read-only (writes nothing) | valid **only** with `--check`; using it in write mode is a usage error (exit `2`) |
+| `--reconcile` | SAFE drift repair: re-emit `MISSING`/`STALE` targets (`STALE` keeps the **header's recorded** profile), skip `OK`, and REFUSE `UNMANAGED`/`HAND-EDITED` — all-or-nothing, writing artifacts only (never `.agentctx/`). Exit `0` reconciled/clean, `1` refused, `2` error. | write mode; combining with `--check` is a usage error (opposite modes); combining with `--full` is a usage error (it would override the recorded profile) |
 | `--force` | overwrite an `UNMANAGED` (headerless) existing file — the only way emit replaces one (W1 §9) | write mode only; combining with `--check` is a usage error (`--check` never writes, so `--force` could only mislead) |
 | `--full` | whole-ontology dump profile (W1 §3) | write mode only; combining with `--check` is a usage error — `--check` recompiles with the **header's recorded** profile, never a flag |
 | `--format` | stdout format | per section 2.1 |
@@ -335,8 +336,9 @@ Proposed `emit --help` text (final bytes frozen in W3):
 mind-ontology emit — compile static per-tool artifacts from .agentctx/
 
 Usage:
-  mind-ontology emit [options]            write all v1 targets (AGENTS.md, CLAUDE.md)
-  mind-ontology emit --check [options]    verify freshness; writes nothing
+  mind-ontology emit [options]             write all v1 targets (AGENTS.md, CLAUDE.md)
+  mind-ontology emit --check [options]     verify freshness; writes nothing
+  mind-ontology emit --reconcile [options] safely re-emit only drifted targets
 
 Options:
   --target <id>[,<id>]   Restrict to targets: agents-md, claude-md. Repeatable.
@@ -344,6 +346,11 @@ Options:
                          Exit 0 fresh, 1 drift, 2 error.
   --explain              With --check only: explain why each target got its class
                          and what a reconcile would write. Read-only; never writes.
+  --reconcile            Repair drift safely: re-emit MISSING/STALE targets
+                         (STALE keeps its recorded profile), SKIP OK ones, and
+                         REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
+                         target). Writes artifacts only, never .agentctx/.
+                         Exit 0 reconciled/clean, 1 refused, 2 error.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.

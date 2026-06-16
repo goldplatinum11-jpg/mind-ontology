@@ -97,6 +97,8 @@ exist. Specs: [W1 emit targets](workbench-w1-emit-target-spec.md),
 | `--full` with `--check` | `--full cannot be combined with --check (--check verifies against the profile recorded in the artifact header)` | Drop one flag. |
 | `--force` with `--check` | `--force cannot be combined with --check (--check never writes)` | Drop one flag. |
 | `--explain` without `--check` | `--explain is only valid together with --check (it never writes)` | Add `--check`, or drop `--explain`. Exit `2`. |
+| `--reconcile` with `--check` | `--reconcile cannot be combined with --check (--check never writes; --reconcile is the write side)` | Drop one flag. Exit `2`. |
+| `--full` with `--reconcile` | `--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)` | Drop one flag. Exit `2`. |
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Compile errors | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
 | Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
@@ -127,6 +129,34 @@ safe action needs a human. `1` therefore means exactly "re-emit needed".
 Hard errors (stderr, exit `2`): the unknown-target and flag-combo rows from
 the write-mode table, plus compile failures passing through unchanged. On a
 hard error stdout stays empty — no partial verdict (fail closed, W1 §8).
+
+## `mind-ontology emit --reconcile`
+
+SAFE drift repair. Reconcile writes generated artifacts (`AGENTS.md` /
+`CLAUDE.md`) **only** — never `.agentctx/` sources — and only for the classes
+where nothing is lost. It is **all-or-nothing**: if ANY requested target is in a
+refuse class, nothing is written for *any* target (classify first, write second).
+
+| Class | Reconcile action | Why |
+|---|---|---|
+| `OK` | skip (writes nothing) | already fresh |
+| `MISSING` | emit it (default profile) | nothing on disk to lose |
+| `STALE` | re-emit against the **profile recorded in the header** | so a `full` artifact stays `full` — reconcile never silently degrades it to `default` |
+| `UNMANAGED` | **refuse** | a headerless file is not emit's to claim; needs `--force` |
+| `HAND-EDITED` | **refuse** | a re-emit would discard the hand edit |
+
+Exit codes: `0` reconciled or already clean; `1` refused (a real verdict — at
+least one target needs a human; report on **stderr**, nothing written); `2` hard
+error (usage / flag-combo / compile failure). Refusal messages (stderr):
+
+| Refusal | Message (stderr) | Next safe action |
+|---|---|---|
+| `UNMANAGED` target | `<path> (<id>) is UNMANAGED (a headerless file emit will not claim); reconcile will not overwrite it. Move its content into .agentctx/ sources, then run: mind-ontology emit --force --target <id>` | Port content to sources, then `--force`. |
+| `HAND-EDITED` target | `<path> (<id>) is HAND-EDITED; a re-emit would discard the hand edit. Move the edit into the .agentctx/ source, then run: mind-ontology emit --target <id>` | Port the edit, then re-emit. |
+| Unreproducible `STALE` target | `<path> (<id>) records a target/profile that is no longer reproducible; reconcile will not guess a profile. Re-emit it explicitly with a known profile.` | Re-emit with a known profile. |
+
+Each refusal is prefixed by a `Refusing to reconcile: <n> target(s) need a
+human (nothing written for any target).` summary line.
 
 ## `mind-ontology status`
 
