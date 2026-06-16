@@ -311,3 +311,150 @@ describe("existing emit/check output is byte-unchanged without --reconcile", () 
     expect(check.stdout).not.toContain("RECONCILED");
   });
 });
+
+// Lane 4 / Phase 4 — `emit --reconcile --block-level`: opt-in block-level repair
+// with the SAME safety contract as file-level reconcile, proven byte-identical.
+describe("--reconcile --block-level (block-level repair, opt-in)", () => {
+  // Make a STALE project by appending to a source (line-ending agnostic).
+  function staleProject() {
+    const cwd = emitted();
+    appendFileSync(join(cwd, ".agentctx", "constraints.md"), "Block-level drift line.\n");
+    return cwd;
+  }
+
+  it("output is byte-identical to the file-level reconcile for the same drift", () => {
+    const fileCwd = staleProject();
+    const blockCwd = staleProject();
+    expect(runCli(["emit", "--cwd", fileCwd, "--reconcile"]).status).toBe(0);
+    expect(runCli(["emit", "--cwd", blockCwd, "--reconcile", "--block-level"]).status).toBe(0);
+    for (const f of ["AGENTS.md", "CLAUDE.md"]) {
+      expect(readFileSync(join(blockCwd, f), "utf8")).toBe(readFileSync(join(fileCwd, f), "utf8"));
+    }
+  });
+
+  it("repairs a STALE target (it passes --check afterward) and reports changed blocks", () => {
+    const cwd = staleProject();
+    expect(runCli(["emit", "--cwd", cwd, "--check"]).status).toBe(1); // stale
+    const r = runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level", "--format", "json"]);
+    expect(r.status).toBe(0);
+    const j = JSON.parse(r.stdout);
+    expect(j.mode).toBe("block-level");
+    const agents = j.targets.find((t) => t.target === "agents-md");
+    expect(agents.action).toBe("block-reconciled");
+    expect(agents.changed_blocks).toBeGreaterThan(0);
+    expect(runCli(["emit", "--cwd", cwd, "--check"]).status).toBe(0); // fresh now
+  });
+
+  it("creates a MISSING target, byte-identical to the file-level reconcile", () => {
+    const fileCwd = emitted();
+    const blockCwd = emitted();
+    unlinkSync(join(fileCwd, "AGENTS.md"));
+    unlinkSync(join(blockCwd, "AGENTS.md"));
+    expect(runCli(["emit", "--cwd", fileCwd, "--reconcile", "--target", "agents-md"]).status).toBe(0);
+    expect(runCli(["emit", "--cwd", blockCwd, "--reconcile", "--block-level", "--target", "agents-md"]).status).toBe(0);
+    expect(readFileSync(join(blockCwd, "AGENTS.md"), "utf8")).toBe(readFileSync(join(fileCwd, "AGENTS.md"), "utf8"));
+  });
+
+  it("SKIPs an already-fresh (OK) target, writing nothing", () => {
+    const cwd = emitted();
+    const before = readFileSync(join(cwd, "AGENTS.md"), "utf8");
+    const r = runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("SKIP");
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(before);
+  });
+
+  it("refuses HAND-EDITED and writes nothing (same boundary as file-level)", () => {
+    const cwd = emitted();
+    appendFileSync(join(cwd, "AGENTS.md"), "\nA hand edit.\n");
+    const before = readFileSync(join(cwd, "AGENTS.md"), "utf8");
+    const r = runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level", "--target", "agents-md"]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/Refusing to reconcile/);
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(before);
+  });
+
+  it("never writes .agentctx/ sources", () => {
+    const cwd = staleProject();
+    const srcPath = join(cwd, ".agentctx", "constraints.md");
+    const srcBefore = readFileSync(srcPath, "utf8");
+    expect(runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level"]).status).toBe(0);
+    expect(readFileSync(srcPath, "utf8")).toBe(srcBefore);
+  });
+
+  it("is all-or-nothing: a refused target blocks a safe one", () => {
+    const cwd = emitted();
+    appendFileSync(join(cwd, ".agentctx", "constraints.md"), "Drift.\n"); // both STALE
+    appendFileSync(join(cwd, "AGENTS.md"), "\nA hand edit.\n"); // agents-md now HAND-EDITED
+    const claudeBefore = readFileSync(join(cwd, "CLAUDE.md"), "utf8");
+    const r = runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level"]);
+    expect(r.status).toBe(1);
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe(claudeBefore); // safe target untouched
+  });
+
+  it("--block-level without --reconcile is a usage error (exit 2, nothing written)", () => {
+    const cwd = project();
+    const r = runCli(["emit", "--cwd", cwd, "--block-level"]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toMatch(/--block-level is only valid together with --reconcile/);
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(parseEmitArgv(["--reconcile", "--block-level"]).blockLevel).toBe(true);
+  });
+
+  it("leaves plain --reconcile completely unchanged (no block-level wording)", () => {
+    const cwd = staleProject();
+    const r = runCli(["emit", "--cwd", cwd, "--reconcile"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("RECONCILED");
+    expect(r.stdout).not.toContain("BLOCK-RECONCILED");
+  });
+});
+
+// Lane 4 / Phase 5 — result-shape lock and compatibility guards. The opt-in
+// block-level result shape is frozen; the file-level result shape stays exactly
+// as Lane 2 shipped it.
+describe("--reconcile result shapes: file-level frozen, block-level locked (Phase 5)", () => {
+  function staleProject() {
+    const cwd = emitted();
+    appendFileSync(join(cwd, ".agentctx", "constraints.md"), "Shape lock drift.\n");
+    return cwd;
+  }
+
+  it("file-level --reconcile --format json keeps its exact Lane-2 shape (no mode/changed_blocks)", () => {
+    const cwd = staleProject();
+    const j = JSON.parse(runCli(["emit", "--cwd", cwd, "--reconcile", "--format", "json"]).stdout);
+    expect(Object.keys(j)).toEqual(["ok", "targets"]); // no top-level `mode`
+    for (const t of j.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "action", "status", "profile"]);
+      expect(["reconciled", "skipped"]).toContain(t.action); // never "block-reconciled"
+      expect(t).not.toHaveProperty("changed_blocks");
+    }
+  });
+
+  it("block-level --reconcile --format json has the locked opt-in shape", () => {
+    const cwd = staleProject();
+    const j = JSON.parse(runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level", "--format", "json"]).stdout);
+    expect(Object.keys(j)).toEqual(["ok", "mode", "targets"]);
+    expect(j.mode).toBe("block-level");
+    for (const t of j.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "action", "status", "profile", "changed_blocks"]);
+      expect(["block-reconciled", "skipped"]).toContain(t.action);
+      expect(Number.isInteger(t.changed_blocks)).toBe(true);
+    }
+  });
+
+  it("a block-level reconciled artifact is a clean managed file: exactly the seven header keys", () => {
+    const cwd = staleProject();
+    expect(runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level"]).status).toBe(0);
+    const parsed = parseEmitHeader(readFileSync(join(cwd, "AGENTS.md"), "utf8"));
+    expect(parsed).not.toBeNull();
+    expect(Object.keys(parsed.header)).toEqual([
+      "target", "profile", "emit_version", "source", "source_digest", "content_digest", "note",
+    ]);
+    // No block-reconcile data leaked into the written artifact bytes.
+    for (const needle of ["block_reconcile", "changed_blocks", "block-level"]) {
+      expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).not.toContain(needle);
+    }
+  });
+});

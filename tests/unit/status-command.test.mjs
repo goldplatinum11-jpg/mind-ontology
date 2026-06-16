@@ -71,12 +71,13 @@ describe("W7 — each section is sourced from its engine module", () => {
     expect(status.sections.emit).toEqual(check);
   });
 
-  it("sections.emit never carries the --explain or --block-manifest opt-ins (no leakage)", () => {
+  it("sections.emit never carries the --explain / --block-manifest / --block-reconcile-plan opt-ins (no leakage)", () => {
     const cwd = emitted();
     const status = JSON.parse(runCli(["status", "--cwd", cwd, "--format", "json"]).stdout);
     for (const target of status.sections.emit.targets) {
       expect(target).not.toHaveProperty("explain");
       expect(target).not.toHaveProperty("block_manifest");
+      expect(target).not.toHaveProperty("block_reconcile_plan");
       // The status embed is the frozen base shape — exactly these four keys.
       expect(Object.keys(target)).toEqual(["target", "path", "status", "detail"]);
     }

@@ -580,6 +580,313 @@ export function explainText(result, explain) {
 }
 
 // ---------------------------------------------------------------------------
+// Block-level reconcile — read-only drift planner (lane 4, Phase 1)
+//
+// All pure (string in, data out): no I/O, no writes. These let a caller see
+// WHICH emitted blocks drifted, as the read-only foundation for an opt-in
+// block-level reconcile whose safety is proven by a full-artifact byte guard
+// (the surgical patch is the mechanism; byte-equality with a full re-emit is
+// the proof). Nothing here changes the artifact bytes or the existing surfaces.
+// ---------------------------------------------------------------------------
+
+// A rendered block heading in an emitted payload: '### <title> <!-- (from
+// .agentctx/<file>) -->'. The trailing provenance comment is renderBlock's
+// signature (W1 §4) and the reliable anchor for an emitted block start — far
+// more robust than a blank line, since a block body may contain blank lines.
+//
+// Residual edge (accepted, byte-guard-protected): a block BODY that itself
+// contains a line shaped EXACTLY like a rendered heading would be mis-split
+// here. This can only mis-report the read-only --block-reconcile-plan preview;
+// the --reconcile --block-level WRITE path is never corrupted, because
+// applyBlockReconcilePlan proves the patched bytes equal the file-level oracle
+// and refuses the whole run on any mismatch (the surgical splice is only a
+// mechanism; byte-equality is the proof).
+const EMITTED_BLOCK_HEADING = /^### .* <!-- \(from \.agentctx\/(.+?)\) -->$/;
+
+/**
+ * Parse an emitted artifact payload (the bytes AFTER the header terminator)
+ * into its emitted block spans, in document order. Each span is one rendered
+ * block: { emittedIndex, sourceFile, renderedText, renderedDigest, start, end }.
+ * A block runs from its heading line to the next structural marker (another
+ * block heading, a generated '## ' section heading, or the '---' footer); the
+ * trailing '\n\n' join blank line is stripped, so renderedText is exactly
+ * renderBlock's output and sha256(renderedText) reproduces the manifest's
+ * rendered_digest. `start`/`end` are char offsets into `payload` such that
+ * payload.slice(start, end) === renderedText (used by the patch primitive to
+ * splice a single block in place). Pure.
+ */
+export function parseEmittedBlockSpans(payload) {
+  const text = String(payload);
+  const lines = text.split("\n");
+  // Char offset of the start of each line in `text`.
+  const lineStart = new Array(lines.length);
+  let acc = 0;
+  for (let k = 0; k < lines.length; k += 1) {
+    lineStart[k] = acc;
+    acc += lines[k].length + 1; // +1 for the '\n' join
+  }
+
+  const spans = [];
+  let i = 0;
+  while (i < lines.length) {
+    const m = lines[i].match(EMITTED_BLOCK_HEADING);
+    if (!m) {
+      i += 1;
+      continue;
+    }
+    const sourceFile = m[1];
+    const blockLines = [lines[i]];
+    let j = i + 1;
+    for (; j < lines.length; j += 1) {
+      const line = lines[j];
+      // A new block heading, a section heading ('## ' but not '### '), or the
+      // generated footer ends the current block. EMITTED_BLOCK_HEADING is
+      // checked first so a rendered heading is never mistaken for a section
+      // heading. The footer is matched specifically — a bare '---' rule inside a
+      // block BODY must NOT end the block, so a '---' only terminates when it is
+      // the frame footer (always immediately followed by the '*Source:' line,
+      // FRAMES.*.footer). This keeps Markdown horizontal rules inside bodies.
+      if (EMITTED_BLOCK_HEADING.test(line)) break;
+      if (line.startsWith("## ")) break;
+      if (line === "---" && (lines[j + 1] ?? "").startsWith("*Source:")) break;
+      blockLines.push(line);
+    }
+    // The single '\n\n' join blank line trails every block; a parsed body is
+    // trimmed, so a trailing empty line is always separator, never content.
+    while (blockLines.length > 1 && blockLines[blockLines.length - 1] === "") {
+      blockLines.pop();
+    }
+    const renderedText = blockLines.join("\n");
+    const start = lineStart[i];
+    spans.push({
+      emittedIndex: spans.length,
+      sourceFile,
+      renderedText,
+      renderedDigest: sha256(renderedText),
+      start,
+      end: start + renderedText.length,
+    });
+    i = j;
+  }
+  return spans;
+}
+
+// One block-drift entry (read-only report). kind ∈ unchanged|replace|insert|
+// delete. emitted_index is the position in the EXPECTED sequence (null for a
+// delete, which exists only in the actual artifact). digests are null on the
+// side where the block is absent.
+function blockChange(kind, { emittedIndex, sourceFile, sourceBlockIndex, actual, expected }) {
+  return {
+    kind,
+    emitted_index: emittedIndex,
+    source_file: sourceFile,
+    source_block_index: sourceBlockIndex ?? null,
+    actual_rendered_digest: actual ?? null,
+    expected_rendered_digest: expected ?? null,
+  };
+}
+
+/**
+ * Per-block drift between an actual artifact's emitted spans and the expected
+ * build's spans. When both sides have the same length and same source-file
+ * sequence (the dominant STALE case: in-place edits / an emit_version bump),
+ * the comparison is positional — clean unchanged/replace. Otherwise it falls
+ * back to an LCS alignment over rendered digests, collapsing an in-place
+ * delete+insert into a replace. `expectedManifest` (buildArtifact().blockManifest,
+ * index-aligned with expectedSpans) supplies source_block_index. Pure.
+ */
+export function compareBlockDrift(actualSpans, expectedSpans, expectedManifest = null) {
+  const srcIdx = (k) => expectedManifest?.[k]?.source_block_index ?? null;
+  const sameStructure =
+    actualSpans.length === expectedSpans.length &&
+    actualSpans.every((s, k) => s.sourceFile === expectedSpans[k].sourceFile);
+
+  if (sameStructure) {
+    return expectedSpans.map((b, k) => {
+      const a = actualSpans[k];
+      const same = a.renderedDigest === b.renderedDigest;
+      return blockChange(same ? "unchanged" : "replace", {
+        emittedIndex: k,
+        sourceFile: b.sourceFile,
+        sourceBlockIndex: srcIdx(k),
+        actual: a.renderedDigest,
+        expected: b.renderedDigest,
+      });
+    });
+  }
+
+  // LCS over rendered digests (deterministic; ties resolve toward delete-first).
+  const a = actualSpans;
+  const b = expectedSpans;
+  const n = a.length;
+  const m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i][j] =
+        a[i].renderedDigest === b[j].renderedDigest
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const raw = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i].renderedDigest === b[j].renderedDigest) {
+      raw.push(blockChange("unchanged", { emittedIndex: j, sourceFile: b[j].sourceFile, sourceBlockIndex: srcIdx(j), actual: a[i].renderedDigest, expected: b[j].renderedDigest }));
+      i += 1;
+      j += 1;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      raw.push(blockChange("delete", { emittedIndex: null, sourceFile: a[i].sourceFile, sourceBlockIndex: null, actual: a[i].renderedDigest, expected: null }));
+      i += 1;
+    } else {
+      raw.push(blockChange("insert", { emittedIndex: j, sourceFile: b[j].sourceFile, sourceBlockIndex: srcIdx(j), actual: null, expected: b[j].renderedDigest }));
+      j += 1;
+    }
+  }
+  while (i < n) {
+    raw.push(blockChange("delete", { emittedIndex: null, sourceFile: a[i].sourceFile, sourceBlockIndex: null, actual: a[i].renderedDigest, expected: null }));
+    i += 1;
+  }
+  while (j < m) {
+    raw.push(blockChange("insert", { emittedIndex: j, sourceFile: b[j].sourceFile, sourceBlockIndex: srcIdx(j), actual: null, expected: b[j].renderedDigest }));
+    j += 1;
+  }
+  // Collapse an adjacent delete+insert (an in-place edit the LCS split) into a
+  // single replace, preserving the expected emitted_index.
+  const changes = [];
+  for (let k = 0; k < raw.length; k += 1) {
+    const cur = raw[k];
+    const next = raw[k + 1];
+    if (cur.kind === "delete" && next?.kind === "insert") {
+      changes.push(blockChange("replace", {
+        emittedIndex: next.emitted_index,
+        sourceFile: next.source_file,
+        sourceBlockIndex: next.source_block_index,
+        actual: cur.actual_rendered_digest,
+        expected: next.expected_rendered_digest,
+      }));
+      k += 1;
+    } else {
+      changes.push(cur);
+    }
+  }
+  return changes;
+}
+
+/**
+ * Read-only block-reconcile plan for one target, driven by an already-computed
+ * classifyTarget `result` (single source of truth — never re-classifies). It
+ * reports what a block-level reconcile WOULD do without writing:
+ *   OK        -> reproducible, no drift (blocks empty).
+ *   MISSING   -> reproducible create at the default profile (every expected
+ *                block is an insert).
+ *   STALE     -> if reproducible, the per-block drift against the recorded
+ *                profile's expected build; if not, a refuse (no blocks).
+ *   UNMANAGED / HAND-EDITED -> refuse (no blocks), mirroring file-level reconcile.
+ * Pure aside from reading the on-disk artifact (never writes).
+ */
+export function planBlockReconcileTarget({ cwd, target, sources, result }) {
+  const spec = EMIT_TARGETS[target];
+  const path = spec.path;
+  const base = { target, path, status: result.status };
+
+  // Refuse classes: same boundary file-level reconcile enforces. No block patch.
+  if (result.status === "unmanaged" || result.status === "hand-edited") {
+    return { ...base, reproducible: false, expected_profile: null, would_write_paths: [], refuse_reason: reconcileRefusal(result), blocks: [] };
+  }
+  if (result.status === "stale" && !staleIsReproducible(result)) {
+    return { ...base, reproducible: false, expected_profile: null, would_write_paths: [], refuse_reason: reconcileRefusal(result), blocks: [] };
+  }
+
+  if (result.status === "ok") {
+    // Reproducible and already fresh: nothing to reconcile.
+    return { ...base, reproducible: true, expected_profile: result.recordedProfile, would_write_paths: [], refuse_reason: null, blocks: [] };
+  }
+
+  if (result.status === "missing") {
+    const expected = buildArtifact({ sources, target, profile: "default" });
+    const expectedSpans = parseEmittedBlockSpans(expected.payload);
+    const blocks = expectedSpans.map((b, k) =>
+      blockChange("insert", { emittedIndex: k, sourceFile: b.sourceFile, sourceBlockIndex: expected.blockManifest[k]?.source_block_index, actual: null, expected: b.renderedDigest }),
+    );
+    return { ...base, reproducible: true, expected_profile: "default", would_write_paths: [path], refuse_reason: null, blocks };
+  }
+
+  // STALE + reproducible: diff the on-disk artifact against the recorded
+  // target/profile's expected build (the same build a file-level reconcile uses).
+  const expected = buildArtifact({ sources, target: result.recordedTarget, profile: result.recordedProfile });
+  const actualContent = canonicalize(readFileSync(resolve(cwd, path), "utf8"));
+  const actualParsed = parseEmitHeader(actualContent);
+  const actualSpans = actualParsed ? parseEmittedBlockSpans(actualParsed.payload) : [];
+  const expectedSpans = parseEmittedBlockSpans(expected.payload);
+  const blocks = compareBlockDrift(actualSpans, expectedSpans, expected.blockManifest);
+  return { ...base, reproducible: true, expected_profile: result.recordedProfile, would_write_paths: [path], refuse_reason: null, blocks };
+}
+
+/**
+ * Patch-application primitive (Phase 3). Produce the reconciled artifact bytes
+ * for one target from its current on-disk artifact, the EXPECTED full artifact
+ * (the oracle a file-level reconcile would write), and the read-only `plan`.
+ *
+ * Safety is proven, not assumed: the surgical block splice is only a mechanism,
+ * and the result is ALWAYS checked byte-for-byte against `expectedArtifact`
+ * before it is returned. On any mismatch this returns { ok: false } with no
+ * artifact, so a caller can never write unverified bytes. Returns
+ * { ok, artifact, error }. Pure (string in / data out, no I/O, no writes).
+ *
+ * Surgical path: when the current artifact is managed and the drift is
+ * replace-only (same block structure), only the changed block substrings and
+ * the header are swapped in the current bytes — a minimal patch. Otherwise it
+ * falls back to the expected bytes wholesale (structural change: insert/delete/
+ * reorder/MISSING). Either way the byte guard is the final word.
+ */
+export function applyBlockReconcilePlan(currentArtifact, expectedArtifact, plan) {
+  const exp = canonicalize(expectedArtifact);
+  let patched = exp; // default: reproduce the oracle wholesale.
+
+  const cur = canonicalize(currentArtifact);
+  const curParsed = parseEmitHeader(cur);
+  const expParsed = parseEmitHeader(exp);
+
+  const replaceOnly =
+    plan &&
+    Array.isArray(plan.blocks) &&
+    plan.blocks.length > 0 &&
+    plan.blocks.every((b) => b.kind === "unchanged" || b.kind === "replace");
+
+  if (curParsed && expParsed && replaceOnly) {
+    const curSpans = parseEmittedBlockSpans(curParsed.payload);
+    const expSpans = parseEmittedBlockSpans(expParsed.payload);
+    if (curSpans.length === expSpans.length && curSpans.length === plan.blocks.length) {
+      // Header text = everything up to and including the '-->' + '\n' separator.
+      const expHeaderText = exp.slice(0, exp.length - expParsed.payload.length);
+      let payload = curParsed.payload;
+      // Splice changed blocks from last to first so earlier offsets stay valid.
+      for (let k = curSpans.length - 1; k >= 0; k -= 1) {
+        if (plan.blocks[k].kind === "replace") {
+          payload =
+            payload.slice(0, curSpans[k].start) +
+            expSpans[k].renderedText +
+            payload.slice(curSpans[k].end);
+        }
+      }
+      patched = expHeaderText + payload;
+    }
+  }
+
+  if (patched !== exp) {
+    return {
+      ok: false,
+      artifact: null,
+      error: "block-level reconcile patch did not reproduce the expected artifact bytes",
+    };
+  }
+  return { ok: true, artifact: exp, error: null };
+}
+
+// ---------------------------------------------------------------------------
 // CLI surface (W2 §7)
 // ---------------------------------------------------------------------------
 
@@ -590,9 +897,11 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     check: false,
     explain: false,
     reconcile: false,
+    blockLevel: false,
     reconcileSource: false,
     apply: false,
     blockManifest: false,
+    blockReconcilePlan: false,
     force: false,
     full: false,
     format: "text",
@@ -615,12 +924,16 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--reconcile") {
       parsed.reconcile = true;
+    } else if (arg === "--block-level") {
+      parsed.blockLevel = true;
     } else if (arg === "--reconcile-source") {
       parsed.reconcileSource = true;
     } else if (arg === "--apply") {
       parsed.apply = true;
     } else if (arg === "--block-manifest") {
       parsed.blockManifest = true;
+    } else if (arg === "--block-reconcile-plan") {
+      parsed.blockReconcilePlan = true;
     } else if (arg === "--force") {
       parsed.force = true;
     } else if (arg === "--full") {
@@ -673,6 +986,12 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   if (parsed.reconcile && parsed.full) {
     throw new Error("--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)");
   }
+  // --block-level is a modifier on --reconcile: it makes reconcile repair drift
+  // with a block-level patch (proven byte-identical to the file-level reconcile)
+  // instead of a whole-file rewrite. It is meaningless without --reconcile.
+  if (parsed.blockLevel && !parsed.reconcile) {
+    throw new Error("--block-level is only valid together with --reconcile (it selects the block-level reconcile patch path)");
+  }
   // --block-manifest is an opt-in, read-only annotation that attaches per-block
   // provenance to the structured check verdict. It is structured data with no
   // text rendering, and it never writes, so it is valid ONLY alongside
@@ -685,11 +1004,24 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       "--block-manifest is only valid with --check --explain --format json (it is read-only structured provenance and never writes)",
     );
   }
+  // --block-reconcile-plan is the read-only preview of a block-level reconcile:
+  // per-target drift (which emitted blocks would change) with no write. Same
+  // opt-in surface as --block-manifest.
+  if (
+    parsed.blockReconcilePlan &&
+    !(parsed.check && parsed.explain && parsed.format === "json")
+  ) {
+    throw new Error(
+      "--block-reconcile-plan is only valid with --check --explain --format json (it is a read-only drift preview and never writes)",
+    );
+  }
   // --reconcile-source is a READ-ONLY preview mode of its own: it shows the
   // patch a future block-level writeback WOULD apply to `.agentctx/`, writing
   // nothing. It is mutually exclusive with the other modes/annotations (which
   // either write artifacts or annotate --check). Only --target / --format /
-  // --apply may accompany it.
+  // --apply may accompany it. (--block-level needs --reconcile and
+  // --block-reconcile-plan needs --check, both excluded below, so they cannot
+  // accompany it either.)
   if (
     parsed.reconcileSource &&
     (parsed.check ||
@@ -845,8 +1177,19 @@ const TEXT_STATUS = {
  * per-block provenance (Phase 2), or null when the recorded profile is not
  * reproducible. Only ever set under --check --explain --format json
  * --block-manifest; never on the `status` path.
+ *
+ * `planByTarget` (a Map target -> block-reconcile-plan object) is a further
+ * opt-in: when present each target gains a `block_reconcile_plan` key (lane 4)
+ * previewing the per-block drift a block-level reconcile would repair. Only ever
+ * set under --check --explain --format json --block-reconcile-plan; never on the
+ * `status` path.
  */
-export function checkResultJson(results, explainByTarget = null, manifestByTarget = null) {
+export function checkResultJson(
+  results,
+  explainByTarget = null,
+  manifestByTarget = null,
+  planByTarget = null,
+) {
   return {
     ok: results.every((r) => r.status === "ok"),
     targets: results.map((r) => {
@@ -858,6 +1201,7 @@ export function checkResultJson(results, explainByTarget = null, manifestByTarge
       };
       if (explainByTarget) base.explain = explainByTarget.get(r.target);
       if (manifestByTarget) base.block_manifest = manifestByTarget.get(r.target);
+      if (planByTarget) base.block_reconcile_plan = planByTarget.get(r.target);
       return base;
     }),
   };
@@ -956,9 +1300,23 @@ export function runEmitCheck(options) {
       )
     : null;
 
+  // --block-reconcile-plan (read-only, opt-in; requires --explain --format json):
+  // preview the per-block drift a block-level reconcile would repair. Derived
+  // from planBlockReconcileTarget on the same classification; no writes. The
+  // target/path are already on the parent entry, so embed only the plan body.
+  const planByTarget = options.blockReconcilePlan
+    ? new Map(
+        results.map((r) => {
+          const { reproducible, expected_profile, would_write_paths, refuse_reason, blocks } =
+            planBlockReconcileTarget({ cwd: options.cwd, target: r.target, sources, result: r });
+          return [r.target, { reproducible, expected_profile, would_write_paths, refuse_reason, blocks }];
+        }),
+      )
+    : null;
+
   const stdout =
     options.format === "json"
-      ? JSON.stringify(checkResultJson(results, explainByTarget, manifestByTarget), null, 2) + "\n"
+      ? JSON.stringify(checkResultJson(results, explainByTarget, manifestByTarget, planByTarget), null, 2) + "\n"
       : renderCheckText(results, explainByTarget);
 
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
@@ -1090,6 +1448,118 @@ export function runEmitReconcile(options) {
     reconciled.size === 0
       ? `OK - ${results.length} of ${results.length} targets already fresh`
       : `RECONCILED - ${reconciled.size} of ${results.length} targets re-emitted`,
+  );
+  return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
+}
+
+/**
+ * Block-level reconcile mode (lane 4, Phase 4; opt-in `--reconcile --block-level`).
+ * SAME safety contract and refusal rules as the file-level reconcile above —
+ * OK skip, MISSING/STALE repair, UNMANAGED/HAND-EDITED/unreproducible-STALE
+ * refuse, all-or-nothing, never `.agentctx/`. The ONLY difference is the repair
+ * mechanism: each drifted target is patched at block granularity and the result
+ * is proven byte-for-byte identical to what the file-level reconcile would write
+ * (applyBlockReconcilePlan's guard) BEFORE any file is touched. A guard failure
+ * anywhere refuses the whole run, so a block-patch bug can never emit corrupted
+ * bytes. Classification + every byte guard complete first; writes happen last.
+ */
+export function runEmitReconcileBlockLevel(options) {
+  validateAgentctxSources(options.cwd);
+  const sources = readAgentctx(options.cwd);
+
+  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
+
+  // Phase 1 — same refusal screen as file-level reconcile (single source of truth).
+  const refusals = results
+    .filter(
+      (r) =>
+        r.status === "unmanaged" ||
+        r.status === "hand-edited" ||
+        (r.status === "stale" && !staleIsReproducible(r)),
+    )
+    .map((r) => reconcileRefusal(r));
+  if (refusals.length > 0) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr:
+        `Refusing to reconcile: ${refusals.length} target(s) need a human (nothing written for any target).\n` +
+        refusals.map((m) => `  ${m}`).join("\n") +
+        "\n",
+    };
+  }
+
+  // Phase 2 — build the expected artifact, the read-only plan, and the patched
+  // bytes for every drifted target IN MEMORY. The same expected build the
+  // file-level reconcile uses is the oracle; applyBlockReconcilePlan proves the
+  // block patch reproduces it. A guard failure refuses the whole run.
+  const planned = [];
+  for (const r of results) {
+    if (r.status === "ok") continue;
+    const build =
+      r.status === "stale"
+        ? buildArtifact({ sources, target: r.recordedTarget, profile: r.recordedProfile })
+        : buildArtifact({ sources, target: r.target, profile: "default" });
+    const plan = planBlockReconcileTarget({ cwd: options.cwd, target: r.target, sources, result: r });
+    const artifactPath = resolve(options.cwd, build.path);
+    const current = existsSync(artifactPath) ? readFileSync(artifactPath, "utf8") : "";
+    const applied = applyBlockReconcilePlan(current, build.artifact, plan);
+    if (!applied.ok) {
+      return {
+        exitCode: 1,
+        stdout: "",
+        stderr:
+          `Refusing to reconcile: the block-level patch for ${build.path} (${r.target}) failed its byte-equality guard (nothing written for any target).\n  ${applied.error}\n`,
+      };
+    }
+    const changedBlocks = plan.blocks.filter((b) => b.kind !== "unchanged").length;
+    planned.push({ result: r, build, artifact: applied.artifact, changedBlocks });
+  }
+
+  // Phase 3 — write all patched artifacts. Each is byte-identical to a
+  // file-level reconcile; only v1 artifact paths are written, never `.agentctx/`.
+  for (const { build, artifact } of planned) {
+    const path = resolve(options.cwd, build.path);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, artifact, "utf8");
+  }
+
+  const byTarget = new Map(planned.map((p) => [p.result.target, p]));
+  if (options.format === "json") {
+    const stdout =
+      JSON.stringify(
+        {
+          ok: true,
+          mode: "block-level",
+          targets: results.map((r) => {
+            const p = byTarget.get(r.target);
+            return {
+              target: r.target,
+              path: r.path,
+              action: p ? "block-reconciled" : "skipped",
+              status: r.status,
+              profile: p ? p.build.profile : (r.profile ?? null),
+              changed_blocks: p ? p.changedBlocks : 0,
+            };
+          }),
+        },
+        null,
+        2,
+      ) + "\n";
+    return { exitCode: 0, stdout, stderr: "" };
+  }
+
+  const lines = results.map((r) => {
+    const p = byTarget.get(r.target);
+    if (!p) {
+      return `SKIP            ${r.path} (${r.target}, already ${TEXT_STATUS[r.status]})`;
+    }
+    return `BLOCK-RECONCILED ${r.path} (${r.target}, was ${TEXT_STATUS[r.status]}, profile ${p.build.profile}, ${p.changedBlocks} block(s))`;
+  });
+  lines.push(
+    byTarget.size === 0
+      ? `OK - ${results.length} of ${results.length} targets already fresh`
+      : `BLOCK-RECONCILED - ${byTarget.size} of ${results.length} targets repaired at block level`,
   );
   return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
 }
@@ -1484,11 +1954,18 @@ Options:
                          per-block provenance (source_file/source_block_index/
                          source_block_digest/rendered_digest/...) to each target.
                          Read-only; never writes.
+  --block-reconcile-plan With --check --explain --format json only: preview the
+                         per-block drift a block-level reconcile would repair
+                         (unchanged/replace/insert/delete). Read-only; never writes.
   --reconcile            Repair drift safely: re-emit MISSING/STALE targets
                          (STALE keeps its recorded profile), SKIP OK ones, and
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
                          target). Writes artifacts only, never .agentctx/.
                          Exit 0 reconciled/clean, 1 refused, 2 error.
+  --block-level          With --reconcile only: repair drift with a block-level
+                         patch instead of a whole-file rewrite. Proven
+                         byte-identical to the file-level reconcile (a failed
+                         byte guard refuses the whole run). Same refusal rules.
   --reconcile-source     PREVIEW (dry-run) reconciling a HAND-EDITED artifact
                          BACK to its .agentctx/ sources: attribute each edited
                          block to its source block (via block-manifest
@@ -1526,9 +2003,11 @@ if (isMain) {
     argv.includes("--check") ||
     argv.includes("--explain") ||
     argv.includes("--reconcile") ||
+    argv.includes("--block-level") ||
     argv.includes("--reconcile-source") ||
     argv.includes("--apply") ||
-    argv.includes("--block-manifest");
+    argv.includes("--block-manifest") ||
+    argv.includes("--block-reconcile-plan");
   try {
     const options = parseEmitArgv(argv);
     if (options.help) {
@@ -1538,7 +2017,9 @@ if (isMain) {
     const result = options.check
       ? runEmitCheck(options)
       : options.reconcile
-        ? runEmitReconcile(options)
+        ? options.blockLevel
+          ? runEmitReconcileBlockLevel(options)
+          : runEmitReconcile(options)
         : options.reconcileSource
           ? runEmitReconcileSource(options)
           : runEmitWrite(options);
