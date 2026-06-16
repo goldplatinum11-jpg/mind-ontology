@@ -886,15 +886,28 @@ export function runEmitCheck(options) {
   // --block-manifest (read-only, opt-in; requires --explain --format json):
   // attach the per-block provenance the current sources produce for each target
   // under the profile --explain already reports (recorded profile if managed,
-  // else default). null when that profile is not a known PROFILE (the same
-  // unreproducible case --check/--explain flag), so the manifest can never
-  // claim provenance it cannot recompute. Reuses buildArtifact — no writes.
+  // else default). It is null whenever the recorded header is NOT reproducible
+  // — an unknown recorded profile OR a non-v1 recorded target — so it stays in
+  // lock-step with --explain's own reproducibility signal
+  // (sourceDigestMatchesCurrent === null while a header is present) and never
+  // claims provenance for an artifact it cannot rebuild. Reuses buildArtifact;
+  // no writes.
   const manifestByTarget = options.blockManifest
     ? new Map(
         results.map((r) => {
-          const expectedProfile = explainByTarget.get(r.target).expectedProfile;
-          const manifest = PROFILES[expectedProfile]
-            ? buildArtifact({ sources, target: r.target, profile: expectedProfile }).blockManifest
+          const explain = explainByTarget.get(r.target);
+          // A header is present but its recorded target/profile cannot be
+          // reproduced (the same gate classify/reconcile/explain apply): the
+          // on-disk artifact's provenance is unrecomputable -> null.
+          if (explain.headerPresent && explain.sourceDigestMatchesCurrent === null) {
+            return [r.target, null];
+          }
+          // Otherwise expectedProfile is reproducible: the recorded profile for
+          // a managed target, or the default for a fresh (MISSING/UNMANAGED)
+          // emit. PROFILES guard is defensive — this branch only sees known
+          // profiles.
+          const manifest = PROFILES[explain.expectedProfile]
+            ? buildArtifact({ sources, target: r.target, profile: explain.expectedProfile }).blockManifest
             : null;
           return [r.target, manifest];
         }),

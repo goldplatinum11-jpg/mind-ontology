@@ -425,24 +425,32 @@ describe("--block-manifest opt-in provenance (Phase 2, read-only)", () => {
     expect(agents.block_manifest.length).toBeGreaterThan(0);
   });
 
-  it("an unreproducible STALE target reports block_manifest: null (cannot recompute)", () => {
-    const cwd = emitted();
-    // Rewrite only the header's profile to an unknown name: payload (hence
-    // content_digest) is untouched, so this is STALE-unreproducible, not
-    // HAND-EDITED. The recorded profile is no longer a known PROFILE.
-    const p = join(cwd, "AGENTS.md");
-    const original = readFileSync(p, "utf8");
-    const corrupted = original.replace("profile: default", "profile: bogus");
-    expect(corrupted).not.toBe(original);
-    writeFileSync(p, corrupted);
-    const r = runCli([
-      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-manifest", "--target", "agents-md",
-    ]);
-    expect(r.status).toBe(1);
-    const agents = JSON.parse(r.stdout).targets.find((t) => t.target === "agents-md");
-    expect(agents.status).toBe("stale");
-    expect(agents.block_manifest).toBeNull();
-  });
+  // Both unreproducible-STALE shapes must report block_manifest: null, in
+  // lock-step with --explain's sourceDigestMatchesCurrent === null. Rewriting
+  // only a header line leaves the payload (hence content_digest) intact, so the
+  // class is STALE-unreproducible, never HAND-EDITED.
+  for (const [label, from, to] of [
+    ["an unknown recorded profile", "profile: default", "profile: bogus"],
+    ["a non-v1 recorded target", "target: agents-md", "target: bogus-target"],
+  ]) {
+    it(`reports block_manifest: null for ${label} (cannot recompute)`, () => {
+      const cwd = emitted();
+      const p = join(cwd, "AGENTS.md");
+      const original = readFileSync(p, "utf8");
+      const corrupted = original.replace(from, to);
+      expect(corrupted).not.toBe(original);
+      writeFileSync(p, corrupted);
+      const r = runCli([
+        "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-manifest", "--target", "agents-md",
+      ]);
+      expect(r.status).toBe(1);
+      const agents = JSON.parse(r.stdout).targets.find((t) => t.target === "agents-md");
+      expect(agents.status).toBe("stale");
+      // Consistency: explain flags it unreproducible, so the manifest is null.
+      expect(agents.explain.sourceDigestMatchesCurrent).toBeNull();
+      expect(agents.block_manifest).toBeNull();
+    });
+  }
 
   it("writes nothing — even with a MISSING target in the set", () => {
     const cwd = emitted();
