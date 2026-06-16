@@ -96,6 +96,7 @@ exist. Specs: [W1 emit targets](workbench-w1-emit-target-spec.md),
 | Existing un-managed file, no `--force` | `Refusing to overwrite <path>: file exists but has no emit header. Move its content into .agentctx/ sources, then re-run with --force to overwrite.` | Port the content into `.agentctx/`, then `mind-ontology emit --force --target <id>`. |
 | `--full` with `--check` | `--full cannot be combined with --check (--check verifies against the profile recorded in the artifact header)` | Drop one flag. |
 | `--force` with `--check` | `--force cannot be combined with --check (--check never writes)` | Drop one flag. |
+| `--explain` without `--check` | `--explain is only valid together with --check (it never writes)` | Add `--check`, or drop `--explain`. Exit `2`. |
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Compile errors | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
 | Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |

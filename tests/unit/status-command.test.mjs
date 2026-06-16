@@ -71,6 +71,15 @@ describe("W7 — each section is sourced from its engine module", () => {
     expect(status.sections.emit).toEqual(check);
   });
 
+  it("sections.emit never carries the emit --explain object (no leakage)", () => {
+    const cwd = emitted();
+    const status = JSON.parse(runCli(["status", "--cwd", cwd, "--format", "json"]).stdout);
+    for (const target of status.sections.emit.targets) {
+      expect(target).not.toHaveProperty("explain");
+      expect(Object.keys(target)).toEqual(["target", "path", "status", "detail"]);
+    }
+  });
+
   it("metrics tasks are the cq.md question titles, in source order", () => {
     const cwd = emitted();
     const status = JSON.parse(runCli(["status", "--cwd", cwd, "--format", "json"]).stdout);

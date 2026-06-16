@@ -310,14 +310,15 @@ JSON shape (normative keys):
 ### 7.1 Synopsis and flags
 
 ```text
-mind-ontology emit [--target <id>[,<id>…]]… [--check] [--force] [--full]
-                   [--format text|json] [--cwd <path>]
+mind-ontology emit [--target <id>[,<id>…]]… [--check [--explain]] [--force]
+                   [--full] [--format text|json] [--cwd <path>]
 ```
 
 | Flag | Meaning | Constraints |
 |---|---|---|
 | `--target` | restrict to a subset of the registry (W1 §2): `agents-md`, `claude-md` | repeatable **and** CSV (mirrors `--scope`); duplicates are deduped; processing order is always registry order regardless of flag order (determinism) |
 | `--check` | classify instead of write (W1 §8); writes nothing | — |
+| `--explain` | annotate each `--check` verdict with WHY the target got its class and WHAT a reconcile would do; read-only (writes nothing) | valid **only** with `--check`; using it in write mode is a usage error (exit `2`) |
 | `--force` | overwrite an `UNMANAGED` (headerless) existing file — the only way emit replaces one (W1 §9) | write mode only; combining with `--check` is a usage error (`--check` never writes, so `--force` could only mislead) |
 | `--full` | whole-ontology dump profile (W1 §3) | write mode only; combining with `--check` is a usage error — `--check` recompiles with the **header's recorded** profile, never a flag |
 | `--format` | stdout format | per section 2.1 |
@@ -341,6 +342,8 @@ Options:
   --target <id>[,<id>]   Restrict to targets: agents-md, claude-md. Repeatable.
   --check                Classify each target (OK/MISSING/UNMANAGED/HAND-EDITED/STALE).
                          Exit 0 fresh, 1 drift, 2 error.
+  --explain              With --check only: explain why each target got its class
+                         and what a reconcile would write. Read-only; never writes.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.
@@ -424,6 +427,31 @@ This is the shape W1's handoff item 4 asked W2 to lock; `status` embeds
 - `detail` is the operator-guidance sentence from W1 §8's per-class table;
   `null` for `ok`.
 - `ok` is `true` iff every entry is `ok` — exactly the exit-`0` condition.
+
+**Opt-in extension — `--explain`.** Passing `--explain` (valid only with
+`--check`) adds one **additive** key, `explain`, to each `targets[]` entry. The
+locked base shape above is byte-for-byte unchanged when `--explain` is absent —
+in particular `status` always embeds the base shape and never carries `explain`.
+The `explain` object reuses the existing classifier internals (it never
+re-classifies) and is read-only (a reconcile is described, never run). Its fields:
+
+- `status` — the same classification as the row's `status`.
+- `managed` / `headerPresent` — whether the on-disk file carries an emit header.
+- `payloadDigestMatchesHeader` — payload vs. the header's `content_digest`
+  (`null` when no header).
+- `sourceDigestMatchesCurrent` — current sources' fingerprint vs. the header's
+  `source_digest` under the recorded profile (`null` when no header, or when the
+  recorded target/profile is no longer reproducible).
+- `emitVersionMatches` — header `emit_version` vs. the current generator
+  (`null` when no header).
+- `expectedProfile` — the profile a reconcile would recompile against (the
+  header's recorded profile, else the default).
+- `reconcileCommand` — the command a user would run to fix the target
+  (`mind-ontology emit --target <id>`, or `--force --target <id>` for
+  `unmanaged`).
+- `wouldWritePaths` — the artifact path(s) a reconcile WOULD write (empty for
+  `ok`). File-level, not block-level: the header records only file-level digests,
+  so there is no per-block manifest to narrow this to.
 
 ## 8. Ruling — default emit targets and the AGENTS.md/CLAUDE.md double-load
 
