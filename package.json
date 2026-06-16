@@ -33,6 +33,7 @@
     "docs/agentctx-mcp-setup.md",
     "docs/cli-errors.md",
     "docs/init-from-repo.md",
+    "docs/import-sirt.md",
     "docs/schema-authoring.md",
     "docs/testing.md"
   ],

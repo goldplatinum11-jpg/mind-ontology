@@ -68,9 +68,13 @@ describe("npm pack --dry-run is non-publishing and fail-closed (M48)", () => {
     }
   });
 
-  it("ships the user-facing feature docs, including init --from-repo", () => {
+  it("ships the user-facing feature docs, including init --from-repo and import-sirt", () => {
     const paths = filePaths();
-    for (const doc of ["docs/mind-ontology-quickstart.md", "docs/init-from-repo.md"]) {
+    for (const doc of [
+      "docs/mind-ontology-quickstart.md",
+      "docs/init-from-repo.md",
+      "docs/import-sirt.md",
+    ]) {
       expect(PKG.files, `package.json files allowlist is missing ${doc}`).toContain(doc);
       expect(paths, `tarball is missing ${doc}`).toContain(doc);
     }
