@@ -578,6 +578,7 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     check: false,
     explain: false,
     reconcile: false,
+    blockManifest: false,
     force: false,
     full: false,
     format: "text",
@@ -600,6 +601,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--reconcile") {
       parsed.reconcile = true;
+    } else if (arg === "--block-manifest") {
+      parsed.blockManifest = true;
     } else if (arg === "--force") {
       parsed.force = true;
     } else if (arg === "--full") {
@@ -651,6 +654,18 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   // (e.g. degrade or upgrade a target). Refuse the combination outright.
   if (parsed.reconcile && parsed.full) {
     throw new Error("--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)");
+  }
+  // --block-manifest is an opt-in, read-only annotation that attaches per-block
+  // provenance to the structured check verdict. It is structured data with no
+  // text rendering, and it never writes, so it is valid ONLY alongside
+  // --check --explain --format json. Any other combination is a usage error.
+  if (
+    parsed.blockManifest &&
+    !(parsed.check && parsed.explain && parsed.format === "json")
+  ) {
+    throw new Error(
+      "--block-manifest is only valid with --check --explain --format json (it is read-only structured provenance and never writes)",
+    );
   }
 
   // Default target set: all v1 targets (W1 §2, W2 §8 ruling). Explicit
@@ -782,8 +797,14 @@ const TEXT_STATUS = {
  * the shape is byte-for-byte the frozen base shape (mandatory back-compat, and
  * what `status` always embeds). When present, each target gains an `explain`
  * key. It is never set on the `status` path.
+ *
+ * `manifestByTarget` (a Map target -> block-manifest array | null) is a further
+ * opt-in: when present each target gains a `block_manifest` key carrying the
+ * per-block provenance (Phase 2), or null when the recorded profile is not
+ * reproducible. Only ever set under --check --explain --format json
+ * --block-manifest; never on the `status` path.
  */
-export function checkResultJson(results, explainByTarget = null) {
+export function checkResultJson(results, explainByTarget = null, manifestByTarget = null) {
   return {
     ok: results.every((r) => r.status === "ok"),
     targets: results.map((r) => {
@@ -794,6 +815,7 @@ export function checkResultJson(results, explainByTarget = null) {
         detail: r.detail,
       };
       if (explainByTarget) base.explain = explainByTarget.get(r.target);
+      if (manifestByTarget) base.block_manifest = manifestByTarget.get(r.target);
       return base;
     }),
   };
@@ -861,9 +883,27 @@ export function runEmitCheck(options) {
       )
     : null;
 
+  // --block-manifest (read-only, opt-in; requires --explain --format json):
+  // attach the per-block provenance the current sources produce for each target
+  // under the profile --explain already reports (recorded profile if managed,
+  // else default). null when that profile is not a known PROFILE (the same
+  // unreproducible case --check/--explain flag), so the manifest can never
+  // claim provenance it cannot recompute. Reuses buildArtifact — no writes.
+  const manifestByTarget = options.blockManifest
+    ? new Map(
+        results.map((r) => {
+          const expectedProfile = explainByTarget.get(r.target).expectedProfile;
+          const manifest = PROFILES[expectedProfile]
+            ? buildArtifact({ sources, target: r.target, profile: expectedProfile }).blockManifest
+            : null;
+          return [r.target, manifest];
+        }),
+      )
+    : null;
+
   const stdout =
     options.format === "json"
-      ? JSON.stringify(checkResultJson(results, explainByTarget), null, 2) + "\n"
+      ? JSON.stringify(checkResultJson(results, explainByTarget, manifestByTarget), null, 2) + "\n"
       : renderCheckText(results, explainByTarget);
 
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
@@ -1013,6 +1053,10 @@ Options:
                          Exit 0 fresh, 1 drift, 2 error.
   --explain              With --check only: explain why each target got its class
                          and what a reconcile would write. Read-only; never writes.
+  --block-manifest       With --check --explain --format json only: attach
+                         per-block provenance (source_file/source_block_index/
+                         source_block_digest/rendered_digest/...) to each target.
+                         Read-only; never writes.
   --reconcile            Repair drift safely: re-emit MISSING/STALE targets
                          (STALE keeps its recorded profile), SKIP OK ones, and
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
@@ -1042,7 +1086,10 @@ if (isMain) {
   // for usage errors (1 stays reserved for a reconcile refusal — a real verdict,
   // not a usage mistake). Plain write-mode usage errors stay exit 1.
   const usageExit2 =
-    argv.includes("--check") || argv.includes("--explain") || argv.includes("--reconcile");
+    argv.includes("--check") ||
+    argv.includes("--explain") ||
+    argv.includes("--reconcile") ||
+    argv.includes("--block-manifest");
   try {
     const options = parseEmitArgv(argv);
     if (options.help) {

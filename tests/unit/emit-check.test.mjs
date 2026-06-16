@@ -379,6 +379,112 @@ describe("--check --explain drift explanation (read-only, W2 §13 item 15)", () 
   });
 });
 
+describe("--block-manifest opt-in provenance (Phase 2, read-only)", () => {
+  const BLOCK_MANIFEST_KEYS = [
+    "emitted_index",
+    "forced",
+    "rendered_digest",
+    "section",
+    "source_block_digest",
+    "source_block_index",
+    "source_file",
+  ];
+
+  it("attaches a per-block manifest to each target, after explain, base shape intact", () => {
+    const cwd = emitted();
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-manifest",
+    ]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(Object.keys(parsed)).toEqual(["ok", "targets"]); // base shape preserved
+    for (const t of parsed.targets) {
+      // block_manifest is appended after explain; nothing else changes.
+      expect(Object.keys(t)).toEqual(["target", "path", "status", "detail", "explain", "block_manifest"]);
+      expect(Array.isArray(t.block_manifest)).toBe(true);
+      expect(t.block_manifest.length).toBeGreaterThan(0);
+      t.block_manifest.forEach((entry, i) => {
+        expect(Object.keys(entry).sort()).toEqual(BLOCK_MANIFEST_KEYS);
+        expect(entry.emitted_index).toBe(i);
+        expect(entry.source_block_digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+        expect(entry.rendered_digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+      });
+    }
+  });
+
+  it("a MISSING target still recomputes the manifest it WOULD emit (default profile)", () => {
+    const cwd = emitted();
+    unlinkSync(join(cwd, "AGENTS.md")); // MISSING
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-manifest", "--target", "agents-md",
+    ]);
+    expect(r.status).toBe(1); // drift (missing) -> exit 1, but manifest is recomputable
+    const agents = JSON.parse(r.stdout).targets.find((t) => t.target === "agents-md");
+    expect(agents.status).toBe("missing");
+    expect(Array.isArray(agents.block_manifest)).toBe(true);
+    expect(agents.block_manifest.length).toBeGreaterThan(0);
+  });
+
+  it("an unreproducible STALE target reports block_manifest: null (cannot recompute)", () => {
+    const cwd = emitted();
+    // Rewrite only the header's profile to an unknown name: payload (hence
+    // content_digest) is untouched, so this is STALE-unreproducible, not
+    // HAND-EDITED. The recorded profile is no longer a known PROFILE.
+    const p = join(cwd, "AGENTS.md");
+    const original = readFileSync(p, "utf8");
+    const corrupted = original.replace("profile: default", "profile: bogus");
+    expect(corrupted).not.toBe(original);
+    writeFileSync(p, corrupted);
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-manifest", "--target", "agents-md",
+    ]);
+    expect(r.status).toBe(1);
+    const agents = JSON.parse(r.stdout).targets.find((t) => t.target === "agents-md");
+    expect(agents.status).toBe("stale");
+    expect(agents.block_manifest).toBeNull();
+  });
+
+  it("writes nothing — even with a MISSING target in the set", () => {
+    const cwd = emitted();
+    unlinkSync(join(cwd, "AGENTS.md"));
+    const claudeBefore = readFileSync(join(cwd, "CLAUDE.md"), "utf8");
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-manifest",
+    ]);
+    expect(r.status).toBe(1);
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false); // not created
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe(claudeBefore); // not rewritten
+  });
+
+  it("is a usage error without --explain / without json / without --check (exit 2, nothing written)", () => {
+    const cwd = project();
+    for (const argv of [
+      ["emit", "--cwd", cwd, "--check", "--format", "json", "--block-manifest"], // no --explain
+      ["emit", "--cwd", cwd, "--check", "--explain", "--block-manifest"], // text format
+      ["emit", "--cwd", cwd, "--block-manifest"], // no --check
+    ]) {
+      const r = runCli(argv);
+      expect(r.status, argv.join(" ")).toBe(2);
+      expect(r.stdout).toBe("");
+      expect(r.stderr).toMatch(/--block-manifest is only valid with --check --explain --format json/);
+    }
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(cwd, "CLAUDE.md"))).toBe(false);
+  });
+
+  it("parseEmitArgv accepts the canonical combination and rejects the rest", () => {
+    expect(
+      parseEmitArgv(["--check", "--explain", "--format", "json", "--block-manifest"]).blockManifest,
+    ).toBe(true);
+    expect(() => parseEmitArgv(["--check", "--explain", "--block-manifest"])).toThrow(
+      /--block-manifest is only valid with --check --explain --format json/,
+    );
+    expect(() => parseEmitArgv(["--check", "--format", "json", "--block-manifest"])).toThrow(
+      /--block-manifest is only valid with --check --explain --format json/,
+    );
+  });
+});
+
 describe("CRLF round-trip immunity (freeze 10, W1 §9)", () => {
   it("an artifact rewritten with CRLF line endings still checks OK", () => {
     const cwd = emitted();
