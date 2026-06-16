@@ -200,10 +200,12 @@ function buildBlockManifestEntry(block, renderedText, { emittedIndex, section, f
 /**
  * Build one target artifact entirely in memory.
  * Returns { target, path, profile, payload, artifact, sourceDigest,
- *           contentDigest, payloadLines, lineContributions, blockManifest }.
+ *           contentDigest, payloadLines, lineContributions, blockManifest,
+ *           renderedBlocks }.
  * `blockManifest` is an in-memory provenance array (one entry per emitted
- * block); it is NOT serialized into `artifact`/`payload` and does not affect
- * the emitted bytes.
+ * block); `renderedBlocks` is the parallel array of each block's verbatim
+ * emitted text (same order/count). Neither is serialized into
+ * `artifact`/`payload`; they do not affect the emitted bytes.
  */
 export function buildArtifact({ sources, target, profile = "default" }) {
   const spec = EMIT_TARGETS[target];
@@ -246,6 +248,14 @@ export function buildArtifact({ sources, target, profile = "default" }) {
   // back into `sections`/`payload`.
   const sections = [];
   const blockManifest = [];
+  // `renderedBlocks[k]` is the exact emitted text of the k-th emitted block,
+  // captured in lock-step with `blockManifest[k]` (same order, same count). It
+  // is the verbatim substring `renderBlock` contributed to `payload`, so a
+  // consumer can locate each block inside the artifact by plain substring
+  // search — the block-level reconcile preview (Lane 3b) relies on this to
+  // partition a hand-edited artifact into scaffolding + per-block bodies
+  // without re-implementing the renderer. Not serialized into the artifact.
+  const renderedBlocks = [];
   const lineContributions = new Map();
   const countLines = (file, text) => {
     lineContributions.set(
@@ -272,6 +282,7 @@ export function buildArtifact({ sources, target, profile = "default" }) {
           forced,
         }),
       );
+      renderedBlocks.push(text);
       return text;
     });
     sections.push(`## ${SECTION_TITLES[file]}\n\n${rendered.join("\n\n")}`);
@@ -320,6 +331,7 @@ export function buildArtifact({ sources, target, profile = "default" }) {
     payloadLines,
     lineContributions,
     blockManifest,
+    renderedBlocks,
   };
 }
 
@@ -578,6 +590,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     check: false,
     explain: false,
     reconcile: false,
+    reconcileSource: false,
+    apply: false,
     blockManifest: false,
     force: false,
     full: false,
@@ -601,6 +615,10 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--reconcile") {
       parsed.reconcile = true;
+    } else if (arg === "--reconcile-source") {
+      parsed.reconcileSource = true;
+    } else if (arg === "--apply") {
+      parsed.apply = true;
     } else if (arg === "--block-manifest") {
       parsed.blockManifest = true;
     } else if (arg === "--force") {
@@ -666,6 +684,30 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     throw new Error(
       "--block-manifest is only valid with --check --explain --format json (it is read-only structured provenance and never writes)",
     );
+  }
+  // --reconcile-source is a READ-ONLY preview mode of its own: it shows the
+  // patch a future block-level writeback WOULD apply to `.agentctx/`, writing
+  // nothing. It is mutually exclusive with the other modes/annotations (which
+  // either write artifacts or annotate --check). Only --target / --format /
+  // --apply may accompany it.
+  if (
+    parsed.reconcileSource &&
+    (parsed.check ||
+      parsed.reconcile ||
+      parsed.explain ||
+      parsed.force ||
+      parsed.full ||
+      parsed.blockManifest)
+  ) {
+    throw new Error(
+      "--reconcile-source cannot be combined with --check/--reconcile/--explain/--force/--full/--block-manifest (it is a read-only preview mode of its own)",
+    );
+  }
+  // --apply only modifies --reconcile-source (and even there it is intentionally
+  // not implemented in this unit — runEmitReconcileSource reports that). Used
+  // without --reconcile-source it is a plain usage error.
+  if (parsed.apply && !parsed.reconcileSource) {
+    throw new Error("--apply is only valid with --reconcile-source");
   }
 
   // Default target set: all v1 targets (W1 §2, W2 §8 ruling). Explicit
@@ -1052,6 +1094,376 @@ export function runEmitReconcile(options) {
   return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
 }
 
+// ---------------------------------------------------------------------------
+// Lane 3b — block-level source reconcile PREVIEW (`emit --reconcile-source`)
+// ---------------------------------------------------------------------------
+// READ-ONLY. For a HAND-EDITED artifact, attribute each edited block back to
+// the `.agentctx/` source block it was emitted from (via the block manifest's
+// source_file / source_block_index) and PREVIEW the patch a future writeback
+// WOULD apply to that source. Writes NOTHING — not `.agentctx/`, not the
+// artifact. Real apply (`--apply`) is intentionally deferred to a separate,
+// explicitly-gated lane. Determinism: every comparison rebuilds the expected
+// artifact from current sources under the RECORDED profile (the same single
+// source of truth `--check`/`--reconcile`/`--explain` use); ambiguity always
+// REFUSES (all-or-nothing) rather than guess.
+
+// Minimal deterministic line-level unified diff (LCS backtrace). Dependency-free
+// and pure; used only to render a human/JSON preview of one source block body
+// change. An empty side contributes no lines.
+export function unifiedBlockDiff(oldText, newText, { fromLabel, toLabel }) {
+  const a = oldText === "" ? [] : oldText.split("\n");
+  const b = newText === "" ? [] : newText.split("\n");
+  const m = a.length;
+  const n = b.length;
+  // lcs[i][j] = length of the longest common subsequence of a[i:] and b[j:].
+  const lcs = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i -= 1) {
+    for (let j = n - 1; j >= 0; j -= 1) {
+      lcs[i][j] =
+        a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const lines = [`--- ${fromLabel}`, `+++ ${toLabel}`];
+  let i = 0;
+  let j = 0;
+  while (i < m && j < n) {
+    if (a[i] === b[j]) {
+      lines.push(` ${a[i]}`);
+      i += 1;
+      j += 1;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      lines.push(`-${a[i]}`);
+      i += 1;
+    } else {
+      lines.push(`+${b[j]}`);
+      j += 1;
+    }
+  }
+  while (i < m) {
+    lines.push(`-${a[i]}`);
+    i += 1;
+  }
+  while (j < n) {
+    lines.push(`+${b[j]}`);
+    j += 1;
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Partition a HAND-EDITED artifact payload into per-block texts, using the
+ * expected build's VERBATIM rendered blocks as anchors. The expected payload
+ * is `gap[0] block[0] gap[1] block[1] … block[n-1] gap[n]`, where each gap is
+ * fixed scaffolding (title, notice, `## Section` headings, separators, footer)
+ * and each block begins with an unforgeable `### … <!-- (from .agentctx/F) -->`
+ * provenance heading. A valid hand-edit changes ONLY block bodies, so the gaps
+ * and heading lines must survive byte-identically. We anchor on
+ * `gap + nextHeading` (not the thin "\n\n" separators) so a body may legitimately
+ * contain blank lines. Returns { blocks: [{ index, expectedFull, actualFull,
+ * edited }] } on a clean alignment, or { refusal } when any change escapes a
+ * single block body or the structure cannot be aligned. Pure (string ops only).
+ */
+export function partitionEditedArtifact({ expectedPayload, actualPayload, renderedBlocks }) {
+  // Decompose the expected payload into the fixed scaffolding gaps around each
+  // rendered block (each block text is a verbatim substring of the payload).
+  const gaps = [];
+  const headings = [];
+  let cursor = 0;
+  for (const text of renderedBlocks) {
+    const at = expectedPayload.indexOf(text, cursor);
+    if (at < 0) return { refusal: "internal: a rendered block was not found in the expected payload" };
+    gaps.push(expectedPayload.slice(cursor, at));
+    headings.push(text.split("\n", 1)[0]);
+    cursor = at + text.length;
+  }
+  gaps.push(expectedPayload.slice(cursor)); // trailing scaffold (footer + "\n")
+
+  // Forgery / structure guard: the boundary search below anchors on
+  // `gap + nextHeading` and takes the FIRST match, so a body containing bytes
+  // identical to a separator+provenance-heading could shift a boundary into the
+  // body and mis-attribute. A forged or removed heading changes the COUNT of
+  // provenance-heading LINES, so require the edited artifact to carry exactly as
+  // many as the expected one. (Editing a heading's text keeps the count but is
+  // caught by the per-block heading check; this closes the count-changing case.)
+  const provHeading = /^### .+ <!-- \(from \.agentctx\/.+\) -->$/gm;
+  const countHeadings = (text) => (text.match(provHeading) ?? []).length;
+  if (countHeadings(actualPayload) !== countHeadings(expectedPayload)) {
+    return {
+      refusal:
+        "the set of generated block headings changed (a provenance heading was added, removed, or forged); only block bodies reconcile to source",
+    };
+  }
+
+  if (!actualPayload.startsWith(gaps[0])) {
+    return {
+      refusal:
+        "an edit lies outside any generated block body (the artifact prefix — title/notice/section heading — changed)",
+    };
+  }
+  const n = renderedBlocks.length;
+  const blocks = [];
+  let pos = gaps[0].length; // start of heading[0]
+  for (let k = 0; k < n; k += 1) {
+    const headingStart = pos;
+    let blockEnd;
+    if (k < n - 1) {
+      // The next fixed token is `gap[k+1] + heading[k+1]` — distinctive enough
+      // that a body's stray blank line cannot be mistaken for a boundary.
+      const needle = gaps[k + 1] + headings[k + 1];
+      const at = actualPayload.indexOf(needle, headingStart + headings[k].length);
+      if (at < 0) {
+        return {
+          refusal:
+            "could not align the edited artifact to its generated structure; a provenance heading, section heading, notice, or footer changed (only block bodies reconcile to source)",
+        };
+      }
+      blockEnd = at;
+      pos = at + gaps[k + 1].length; // start of heading[k+1]
+    } else {
+      const suffix = gaps[n];
+      blockEnd = actualPayload.length - suffix.length;
+      if (blockEnd < headingStart || actualPayload.slice(blockEnd) !== suffix) {
+        return {
+          refusal:
+            "an edit lies outside any generated block body (the artifact footer/suffix changed)",
+        };
+      }
+      pos = actualPayload.length;
+    }
+    const actualFull = actualPayload.slice(headingStart, blockEnd);
+    // The provenance heading line is the block's identity; it must be intact.
+    if (actualFull.split("\n", 1)[0] !== headings[k]) {
+      return {
+        refusal:
+          "a block provenance heading was edited; only the body of a generated block can be reconciled to its source",
+      };
+    }
+    blocks.push({
+      index: k,
+      expectedFull: renderedBlocks[k],
+      actualFull,
+      edited: actualFull !== renderedBlocks[k],
+    });
+  }
+  return { blocks };
+}
+
+// Strip the provenance heading line off a rendered block, returning the body
+// text (what the source block body would become). `renderBlock` joins
+// `${heading}\n${body}`, so a block with a body has exactly one heading line +
+// "\n" prefix; a body-less block is the heading alone (body "").
+function bodyOfRenderedBlock(fullText, headingLine) {
+  return fullText.length > headingLine.length ? fullText.slice(headingLine.length + 1) : "";
+}
+
+// Refusal sentence for a target that cannot be previewed because it is not a
+// reproducible HAND-EDITED artifact. Names the right manual/other path.
+function reconcileSourceRefusal(result) {
+  switch (result.status) {
+    case "ok":
+      return `${result.path} (${result.target}) is OK (fresh); nothing to reconcile to source.`;
+    case "missing":
+      return `${result.path} (${result.target}) is MISSING; there is no artifact to attribute to source. Run: mind-ontology emit --target ${result.target}`;
+    case "unmanaged":
+      return `${result.path} (${result.target}) is UNMANAGED (headerless); its content cannot be attributed to .agentctx/ blocks.`;
+    case "stale":
+      return `${result.path} (${result.target}) is STALE, not hand-edited; repair the artifact instead: mind-ontology emit --reconcile --target ${result.target}`;
+    default:
+      return `${result.path} (${result.target}) is not HAND-EDITED; nothing to reconcile to source.`;
+  }
+}
+
+/**
+ * Reconcile-source preview mode (Lane 3b). For each requested target, compute
+ * one of two per-target outcomes:
+ *   - "preview": the artifact is HAND-EDITED, reproducible, and every change is
+ *     isolated to one or more whole block BODIES; we attribute each edited block
+ *     to its source block and produce the would-be source patch (dry-run).
+ *   - "refused": anything else (not hand-edited, unreproducible recorded
+ *     profile, or a change that escapes a single block body / cannot be aligned).
+ * All-or-nothing: if ANY requested target is refused, the WHOLE run refuses
+ * (exit 1) and nothing is presented as apply-ready — matching `--reconcile`.
+ * Writes NOTHING in every path. Returns { exitCode, stdout, stderr }.
+ */
+export function runEmitReconcileSource(options) {
+  // Real source writeback is intentionally not built in this unit.
+  if (options.apply) {
+    return {
+      exitCode: 2,
+      stdout: "",
+      stderr:
+        "--apply is not implemented: writing block-level patches back to .agentctx/ sources is deferred to a separate, explicitly-gated lane. `emit --reconcile-source` previews only (writes nothing).\n",
+    };
+  }
+
+  validateAgentctxSources(options.cwd);
+  const sources = readAgentctx(options.cwd);
+  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
+
+  const records = results.map((r) => {
+    if (r.status !== "hand-edited") {
+      return { target: r.target, path: r.path, status: r.status, action: "refused", reason: reconcileSourceRefusal(r) };
+    }
+    // Reproducibility gate (single source of truth: the RECORDED header fields).
+    if (!(EMIT_TARGETS[r.recordedTarget]?.v1 && PROFILES[r.recordedProfile])) {
+      return {
+        target: r.target,
+        path: r.path,
+        status: r.status,
+        action: "refused",
+        reason: `${r.path} (${r.target}) records a target/profile that is no longer reproducible; it cannot be rebuilt to attribute the edit. Re-emit it explicitly with a known profile.`,
+      };
+    }
+
+    const expected = buildArtifact({ sources, target: r.recordedTarget, profile: r.recordedProfile });
+    const parsed = parseEmitHeader(canonicalize(readFileSync(resolve(options.cwd, r.path), "utf8")));
+    // Source-drift gate (critical): attribution diffs the hand-edited artifact
+    // against `expected`, rebuilt from the CURRENT sources. That is only a valid
+    // baseline when `expected` is byte-identical to what this artifact ORIGINALLY
+    // was — i.e. the recorded header (emit_version, source_digest, content_digest)
+    // matches the current regeneration. If the sources drifted (or the engine
+    // version bumped) since emit, a source block the user never touched would
+    // render differently in `expected` than on disk and be MIS-attributed as a
+    // hand edit, proposing to overwrite the newer source with the stale artifact
+    // body. The hand-edit cannot then be separated from the drift, so refuse.
+    if (
+      parsed.header.emit_version !== String(EMIT_VERSION) ||
+      parsed.header.source_digest !== expected.sourceDigest ||
+      parsed.header.content_digest !== expected.contentDigest
+    ) {
+      return {
+        target: r.target,
+        path: r.path,
+        status: r.status,
+        action: "refused",
+        reason: `${r.path} (${r.target}): .agentctx/ sources changed (or emit_version bumped) since this artifact was generated, so the hand-edit cannot be separated from source drift. Resolve the drift first (re-emit, or mind-ontology emit --reconcile --target ${r.target}) and re-apply the hand-edit, then retry.`,
+      };
+    }
+    const part = partitionEditedArtifact({
+      expectedPayload: expected.payload,
+      actualPayload: parsed.payload,
+      renderedBlocks: expected.renderedBlocks,
+    });
+    if (part.refusal) {
+      return { target: r.target, path: r.path, status: r.status, action: "refused", reason: `${r.path} (${r.target}): ${part.refusal}` };
+    }
+
+    const editedBlocks = part.blocks.filter((b) => b.edited);
+    if (editedBlocks.length === 0) {
+      return {
+        target: r.target,
+        path: r.path,
+        status: r.status,
+        action: "refused",
+        reason: `${r.path} (${r.target}): differs from its generated form, but no single block body change could be isolated; reconcile to source by hand.`,
+      };
+    }
+
+    const edits = [];
+    for (const b of editedBlocks) {
+      const entry = expected.blockManifest[b.index];
+      const headingLine = b.expectedFull.split("\n", 1)[0];
+      const expectedBody = bodyOfRenderedBlock(b.expectedFull, headingLine);
+      const newBody = bodyOfRenderedBlock(b.actualFull, headingLine);
+      const srcBlocks = parseMarkdownBlocks(canonicalize(sources[entry.source_file] ?? ""), entry.source_file);
+      const srcBlock = srcBlocks.find((sb) => sb.index === entry.source_block_index);
+      // Provenance integrity: the manifest must still point at a source block
+      // whose body equals the expected rendered body (expected was built from
+      // the current sources, so it does; a mismatch means stale provenance).
+      if (!srcBlock || srcBlock.body !== expectedBody) {
+        return {
+          target: r.target,
+          path: r.path,
+          status: r.status,
+          action: "refused",
+          reason: `${r.path} (${r.target}): provenance for ${entry.source_file} block ${entry.source_block_index} is stale or missing; reconcile by hand.`,
+        };
+      }
+      const label = `.agentctx/${entry.source_file} :: ${srcBlock.title} (block ${entry.source_block_index})`;
+      edits.push({
+        source_file: entry.source_file,
+        source_block_index: entry.source_block_index,
+        source_block_digest: entry.source_block_digest,
+        expected_rendered_digest: entry.rendered_digest,
+        actual_rendered_digest: sha256(b.actualFull),
+        forced: entry.forced,
+        heading: srcBlock.title,
+        old_body: srcBlock.body,
+        new_body: newBody,
+        diff: unifiedBlockDiff(srcBlock.body, newBody, { fromLabel: label, toLabel: label }),
+      });
+    }
+    return { target: r.target, path: r.path, status: r.status, action: "preview", edits };
+  });
+
+  const refused = records.filter((rec) => rec.action === "refused");
+  const ok = refused.length === 0;
+
+  if (options.format === "json") {
+    const stdout =
+      JSON.stringify(
+        {
+          ok,
+          mode: "reconcile-source-preview",
+          apply: false,
+          targets: records.map((rec) => {
+            if (rec.action !== "preview") {
+              return { target: rec.target, path: rec.path, status: rec.status, action: "refused", reason: rec.reason };
+            }
+            // All-or-nothing: if any target refused, a previewable target is NOT
+            // apply-ready. Report it as blocked WITHOUT its diffs so automation
+            // can never consume a partial patch set.
+            if (!ok) {
+              return {
+                target: rec.target,
+                path: rec.path,
+                status: rec.status,
+                action: "blocked",
+                reason: "another target refused; all-or-nothing — nothing is apply-ready",
+              };
+            }
+            return {
+              target: rec.target,
+              path: rec.path,
+              status: rec.status,
+              action: "preview",
+              edits: rec.edits.map(({ old_body, new_body, ...rest }) => rest),
+            };
+          }),
+        },
+        null,
+        2,
+      ) + "\n";
+    return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
+  }
+
+  // Text surface.
+  if (!ok) {
+    const stderr =
+      `Refusing to preview source reconcile: ${refused.length} target(s) need a human (nothing written; .agentctx/ untouched).\n` +
+      refused.map((rec) => `  ${rec.reason}`).join("\n") +
+      "\n";
+    return { exitCode: 1, stdout: "", stderr };
+  }
+
+  const lines = [];
+  let totalEdits = 0;
+  for (const rec of records) {
+    totalEdits += rec.edits.length;
+    lines.push(
+      `RECONCILE-SOURCE (preview)  ${rec.path} (${rec.target}) — ${rec.edits.length} block(s) would patch .agentctx/`,
+    );
+    for (const e of rec.edits) {
+      lines.push(`  → .agentctx/${e.source_file} :: ${e.heading} (block ${e.source_block_index})${e.forced ? "  [safety-forced]" : ""}`);
+      for (const dl of e.diff.split("\n")) lines.push(`    ${dl}`);
+    }
+  }
+  lines.push(
+    `PREVIEW - ${totalEdits} block(s) across ${records.length} target(s) would reconcile to source (dry-run; nothing written; --apply is not yet implemented).`,
+  );
+  return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
+}
+
 function printHelp() {
   return `mind-ontology emit — compile static per-tool artifacts from .agentctx/
 
@@ -1059,6 +1471,8 @@ Usage:
   mind-ontology emit [options]             write all v1 targets (AGENTS.md, CLAUDE.md)
   mind-ontology emit --check [options]     verify freshness; writes nothing
   mind-ontology emit --reconcile [options] safely re-emit only drifted targets
+  mind-ontology emit --reconcile-source    preview patching a hand-edit BACK to
+                                           .agentctx/ sources; writes nothing
 
 Options:
   --target <id>[,<id>]   Restrict to targets: agents-md, claude-md. Repeatable.
@@ -1075,6 +1489,16 @@ Options:
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
                          target). Writes artifacts only, never .agentctx/.
                          Exit 0 reconciled/clean, 1 refused, 2 error.
+  --reconcile-source     PREVIEW (dry-run) reconciling a HAND-EDITED artifact
+                         BACK to its .agentctx/ sources: attribute each edited
+                         block to its source block (via block-manifest
+                         provenance) and show the patch that WOULD apply. Reads
+                         only — writes NOTHING (not .agentctx/, not the artifact).
+                         All-or-nothing; refuses any edit it cannot isolate to a
+                         single block body. Exit 0 preview, 1 refused, 2 error.
+  --apply                With --reconcile-source: intentionally NOT implemented
+                         in this unit (real source writeback is a future gated
+                         lane). Exits 2.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.
@@ -1102,6 +1526,8 @@ if (isMain) {
     argv.includes("--check") ||
     argv.includes("--explain") ||
     argv.includes("--reconcile") ||
+    argv.includes("--reconcile-source") ||
+    argv.includes("--apply") ||
     argv.includes("--block-manifest");
   try {
     const options = parseEmitArgv(argv);
@@ -1113,7 +1539,9 @@ if (isMain) {
       ? runEmitCheck(options)
       : options.reconcile
         ? runEmitReconcile(options)
-        : runEmitWrite(options);
+        : options.reconcileSource
+          ? runEmitReconcileSource(options)
+          : runEmitWrite(options);
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
     process.exit(result.exitCode);
