@@ -873,6 +873,7 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     check: false,
     explain: false,
     reconcile: false,
+    blockLevel: false,
     blockManifest: false,
     blockReconcilePlan: false,
     force: false,
@@ -897,6 +898,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--reconcile") {
       parsed.reconcile = true;
+    } else if (arg === "--block-level") {
+      parsed.blockLevel = true;
     } else if (arg === "--block-manifest") {
       parsed.blockManifest = true;
     } else if (arg === "--block-reconcile-plan") {
@@ -952,6 +955,12 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   // (e.g. degrade or upgrade a target). Refuse the combination outright.
   if (parsed.reconcile && parsed.full) {
     throw new Error("--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)");
+  }
+  // --block-level is a modifier on --reconcile: it makes reconcile repair drift
+  // with a block-level patch (proven byte-identical to the file-level reconcile)
+  // instead of a whole-file rewrite. It is meaningless without --reconcile.
+  if (parsed.blockLevel && !parsed.reconcile) {
+    throw new Error("--block-level is only valid together with --reconcile (it selects the block-level reconcile patch path)");
   }
   // --block-manifest is an opt-in, read-only annotation that attaches per-block
   // provenance to the structured check verdict. It is structured data with no
@@ -1387,6 +1396,118 @@ export function runEmitReconcile(options) {
   return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
 }
 
+/**
+ * Block-level reconcile mode (lane 4, Phase 4; opt-in `--reconcile --block-level`).
+ * SAME safety contract and refusal rules as the file-level reconcile above —
+ * OK skip, MISSING/STALE repair, UNMANAGED/HAND-EDITED/unreproducible-STALE
+ * refuse, all-or-nothing, never `.agentctx/`. The ONLY difference is the repair
+ * mechanism: each drifted target is patched at block granularity and the result
+ * is proven byte-for-byte identical to what the file-level reconcile would write
+ * (applyBlockReconcilePlan's guard) BEFORE any file is touched. A guard failure
+ * anywhere refuses the whole run, so a block-patch bug can never emit corrupted
+ * bytes. Classification + every byte guard complete first; writes happen last.
+ */
+export function runEmitReconcileBlockLevel(options) {
+  validateAgentctxSources(options.cwd);
+  const sources = readAgentctx(options.cwd);
+
+  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
+
+  // Phase 1 — same refusal screen as file-level reconcile (single source of truth).
+  const refusals = results
+    .filter(
+      (r) =>
+        r.status === "unmanaged" ||
+        r.status === "hand-edited" ||
+        (r.status === "stale" && !staleIsReproducible(r)),
+    )
+    .map((r) => reconcileRefusal(r));
+  if (refusals.length > 0) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr:
+        `Refusing to reconcile: ${refusals.length} target(s) need a human (nothing written for any target).\n` +
+        refusals.map((m) => `  ${m}`).join("\n") +
+        "\n",
+    };
+  }
+
+  // Phase 2 — build the expected artifact, the read-only plan, and the patched
+  // bytes for every drifted target IN MEMORY. The same expected build the
+  // file-level reconcile uses is the oracle; applyBlockReconcilePlan proves the
+  // block patch reproduces it. A guard failure refuses the whole run.
+  const planned = [];
+  for (const r of results) {
+    if (r.status === "ok") continue;
+    const build =
+      r.status === "stale"
+        ? buildArtifact({ sources, target: r.recordedTarget, profile: r.recordedProfile })
+        : buildArtifact({ sources, target: r.target, profile: "default" });
+    const plan = planBlockReconcileTarget({ cwd: options.cwd, target: r.target, sources, result: r });
+    const artifactPath = resolve(options.cwd, build.path);
+    const current = existsSync(artifactPath) ? readFileSync(artifactPath, "utf8") : "";
+    const applied = applyBlockReconcilePlan(current, build.artifact, plan);
+    if (!applied.ok) {
+      return {
+        exitCode: 1,
+        stdout: "",
+        stderr:
+          `Refusing to reconcile: the block-level patch for ${build.path} (${r.target}) failed its byte-equality guard (nothing written for any target).\n  ${applied.error}\n`,
+      };
+    }
+    const changedBlocks = plan.blocks.filter((b) => b.kind !== "unchanged").length;
+    planned.push({ result: r, build, artifact: applied.artifact, changedBlocks });
+  }
+
+  // Phase 3 — write all patched artifacts. Each is byte-identical to a
+  // file-level reconcile; only v1 artifact paths are written, never `.agentctx/`.
+  for (const { build, artifact } of planned) {
+    const path = resolve(options.cwd, build.path);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, artifact, "utf8");
+  }
+
+  const byTarget = new Map(planned.map((p) => [p.result.target, p]));
+  if (options.format === "json") {
+    const stdout =
+      JSON.stringify(
+        {
+          ok: true,
+          mode: "block-level",
+          targets: results.map((r) => {
+            const p = byTarget.get(r.target);
+            return {
+              target: r.target,
+              path: r.path,
+              action: p ? "block-reconciled" : "skipped",
+              status: r.status,
+              profile: p ? p.build.profile : (r.profile ?? null),
+              changed_blocks: p ? p.changedBlocks : 0,
+            };
+          }),
+        },
+        null,
+        2,
+      ) + "\n";
+    return { exitCode: 0, stdout, stderr: "" };
+  }
+
+  const lines = results.map((r) => {
+    const p = byTarget.get(r.target);
+    if (!p) {
+      return `SKIP            ${r.path} (${r.target}, already ${TEXT_STATUS[r.status]})`;
+    }
+    return `BLOCK-RECONCILED ${r.path} (${r.target}, was ${TEXT_STATUS[r.status]}, profile ${p.build.profile}, ${p.changedBlocks} block(s))`;
+  });
+  lines.push(
+    byTarget.size === 0
+      ? `OK - ${results.length} of ${results.length} targets already fresh`
+      : `BLOCK-RECONCILED - ${byTarget.size} of ${results.length} targets repaired at block level`,
+  );
+  return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
+}
+
 function printHelp() {
   return `mind-ontology emit — compile static per-tool artifacts from .agentctx/
 
@@ -1413,6 +1534,10 @@ Options:
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
                          target). Writes artifacts only, never .agentctx/.
                          Exit 0 reconciled/clean, 1 refused, 2 error.
+  --block-level          With --reconcile only: repair drift with a block-level
+                         patch instead of a whole-file rewrite. Proven
+                         byte-identical to the file-level reconcile (a failed
+                         byte guard refuses the whole run). Same refusal rules.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.
@@ -1440,6 +1565,7 @@ if (isMain) {
     argv.includes("--check") ||
     argv.includes("--explain") ||
     argv.includes("--reconcile") ||
+    argv.includes("--block-level") ||
     argv.includes("--block-manifest") ||
     argv.includes("--block-reconcile-plan");
   try {
@@ -1451,7 +1577,9 @@ if (isMain) {
     const result = options.check
       ? runEmitCheck(options)
       : options.reconcile
-        ? runEmitReconcile(options)
+        ? options.blockLevel
+          ? runEmitReconcileBlockLevel(options)
+          : runEmitReconcile(options)
         : runEmitWrite(options);
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
