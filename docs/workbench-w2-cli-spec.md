@@ -314,6 +314,8 @@ mind-ontology emit [--target <id>[,<id>…]]…
                    [--check [--explain [--block-manifest] [--block-reconcile-plan]]]
                    [--reconcile [--block-level]] [--force] [--full]
                    [--format text|json] [--cwd <path>]
+mind-ontology emit --reconcile-source [--apply]
+                   [--target <id>[,<id>…]]… [--format text|json] [--cwd <path>]
 ```
 
 **The reconcile family (two axes).** The reconcile-related flags form a matrix
@@ -329,9 +331,8 @@ read-only provenance surface. This orients the per-flag rows below:
 whole-file; `--block-manifest` adds per-block provenance to the `--check`
 verdict. Artifact-ward modes write only the generated artifacts and never touch
 `.agentctx/`; the source-ward modes are the only ones that write `.agentctx/`
-(and never re-emit artifacts — run `emit` afterwards). The source-ward family
-(`--reconcile-source` / `--apply`) is specified in its own section and `emit
---help`; the rows below cover the artifact-ward and provenance flags.
+(and never re-emit artifacts — run `emit` afterwards). Every flag below —
+artifact-ward, source-ward, and provenance — is in the same table.
 
 | Flag | Meaning | Constraints |
 |---|---|---|
@@ -342,6 +343,8 @@ verdict. Artifact-ward modes write only the generated artifacts and never touch
 | `--block-reconcile-plan` | preview the per-block drift a block-level reconcile would repair: per target `{ reproducible, expected_profile, would_write_paths, refuse_reason, blocks }`, where each block change is `{ kind: unchanged\|replace\|insert\|delete, emitted_index, source_file, source_block_index, actual_rendered_digest, expected_rendered_digest }`; read-only (writes nothing) | valid **only** with `--check --explain --format json`; any other combination is a usage error (exit `2`). On-demand preview data — never persisted |
 | `--reconcile` | SAFE drift repair: re-emit `MISSING`/`STALE` targets (`STALE` keeps the **header's recorded** profile), skip `OK`, and REFUSE `UNMANAGED`/`HAND-EDITED` — all-or-nothing, writing artifacts only (never `.agentctx/`). Exit `0` reconciled/clean, `1` refused, `2` error. The header still records only **file-level** digests; plain `--reconcile` rewrites whole artifacts. | write mode; combining with `--check` is a usage error (opposite modes); combining with `--full` is a usage error (it would override the recorded profile) |
 | `--block-level` | with `--reconcile` only: repair drift with a **block-level patch** (splice only the drifted blocks) instead of a whole-file rewrite. The patched bytes are proven **byte-identical** to the file-level reconcile via a full-artifact guard applied before any write; a guard failure refuses the whole run. Same classes, same refusals, same all-or-nothing, never `.agentctx/`. JSON adds `mode: "block-level"` and a per-target `changed_blocks` count. | valid **only** with `--reconcile`; alone it is a usage error (exit `2`). Does not change the header, bump `emit_version`, or alter plain `--reconcile` |
+| `--reconcile-source` | source-ward PREVIEW (read-only): for each `HAND-EDITED` artifact, attribute each edited block body back to its `.agentctx/` source block (via block-manifest provenance) and show the patch that WOULD apply; writes nothing (not `.agentctx/`, not the artifact). All-or-nothing; refuses non-`HAND-EDITED` targets, unreproducible recorded profiles, and any change it cannot isolate to a single block body (a heading/section/footer/structure edit). Exit `0` preview, `1` refused, `2` error. | its own mode; combining with `--check`/`--reconcile`/`--explain`/`--force`/`--full`/`--block-manifest` is a usage error (exit `2`). `--apply` switches it from preview to write |
+| `--apply` | with `--reconcile-source` only: WRITE the previewed block-body patches into `.agentctx/` sources surgically (the only mode that writes sources; never re-emits artifacts — run `emit` afterwards). All-or-nothing; affected sources must be git-tracked and clean (recovery is via git); refuses symlinked/non-regular source paths; writes only when the patched sources re-emit to the **exact** hand-edited artifact. Exit `0` applied, `1` refused, `2` error. | valid **only** with `--reconcile-source`; alone it is a usage error (exit `2`) |
 | `--force` | overwrite an `UNMANAGED` (headerless) existing file — the only way emit replaces one (W1 §9) | write mode only; combining with `--check` is a usage error (`--check` never writes, so `--force` could only mislead) |
 | `--full` | whole-ontology dump profile (W1 §3) | write mode only; combining with `--check` is a usage error — `--check` recompiles with the **header's recorded** profile, never a flag |
 | `--format` | stdout format | per section 2.1 |
