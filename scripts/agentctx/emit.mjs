@@ -15,8 +15,9 @@
  * randomness, no network or model calls anywhere in this module.
  */
 
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -1100,9 +1101,9 @@ export function runEmitReconcile(options) {
 // READ-ONLY. For a HAND-EDITED artifact, attribute each edited block back to
 // the `.agentctx/` source block it was emitted from (via the block manifest's
 // source_file / source_block_index) and PREVIEW the patch a future writeback
-// WOULD apply to that source. Writes NOTHING — not `.agentctx/`, not the
-// artifact. Real apply (`--apply`) is intentionally deferred to a separate,
-// explicitly-gated lane. Determinism: every comparison rebuilds the expected
+// WOULD apply to that source. Without `--apply` this writes NOTHING — not
+// `.agentctx/`, not the artifact. The `--apply` write path (Lane 3c) lives
+// below and only runs once these same gates pass. Determinism: every comparison rebuilds the expected
 // artifact from current sources under the RECORDED profile (the same single
 // source of truth `--check`/`--reconcile`/`--explain` use); ambiguity always
 // REFUSES (all-or-nothing) rather than guess.
@@ -1238,6 +1239,19 @@ export function partitionEditedArtifact({ expectedPayload, actualPayload, render
           "a block provenance heading was edited; only the body of a generated block can be reconciled to its source",
       };
     }
+    // A block BODY must never itself contain a provenance-heading line. The
+    // first-occurrence boundary search above can otherwise be fooled by a
+    // FORGED next-heading planted in a body (paired with deleting the real one,
+    // which keeps the count guard happy): the parser would split one body
+    // across two source blocks and mis-attribute. A real generated body never
+    // carries this line, so its presence is always an attack/ambiguity → refuse.
+    const bodyAfterHeading = actualFull.slice(actualFull.indexOf("\n") + 1);
+    if (actualFull.includes("\n") && /^### .+ <!-- \(from \.agentctx\/.+\) -->$/m.test(bodyAfterHeading)) {
+      return {
+        refusal:
+          "a generated block body contains a provenance-heading line (a forged or moved heading); refusing to attribute it to source",
+      };
+    }
     blocks.push({
       index: k,
       expectedFull: renderedBlocks[k],
@@ -1286,16 +1300,6 @@ function reconcileSourceRefusal(result) {
  * Writes NOTHING in every path. Returns { exitCode, stdout, stderr }.
  */
 export function runEmitReconcileSource(options) {
-  // Real source writeback is intentionally not built in this unit.
-  if (options.apply) {
-    return {
-      exitCode: 2,
-      stdout: "",
-      stderr:
-        "--apply is not implemented: writing block-level patches back to .agentctx/ sources is deferred to a separate, explicitly-gated lane. `emit --reconcile-source` previews only (writes nothing).\n",
-    };
-  }
-
   validateAgentctxSources(options.cwd);
   const sources = readAgentctx(options.cwd);
   const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
@@ -1399,6 +1403,13 @@ export function runEmitReconcileSource(options) {
   const refused = records.filter((rec) => rec.action === "refused");
   const ok = refused.length === 0;
 
+  // --apply: actually write the previewed block-body patches back to the
+  // `.agentctx/` sources (the only place this command may write). All the
+  // attribution/refusal gates above must have passed first.
+  if (options.apply) {
+    return applyReconcileSource(options, records, ok, refused);
+  }
+
   if (options.format === "json") {
     const stdout =
       JSON.stringify(
@@ -1459,7 +1470,349 @@ export function runEmitReconcileSource(options) {
     }
   }
   lines.push(
-    `PREVIEW - ${totalEdits} block(s) across ${records.length} target(s) would reconcile to source (dry-run; nothing written; --apply is not yet implemented).`,
+    `PREVIEW - ${totalEdits} block(s) across ${records.length} target(s) would reconcile to source (dry-run; nothing written). Re-run with --apply to write these to .agentctx/.`,
+  );
+  return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
+}
+
+// ---------------------------------------------------------------------------
+// Lane 3c — `emit --reconcile-source --apply`: write the previewed block-body
+// patches back to `.agentctx/` SOURCE files. The ONLY command that writes
+// sources. Reuses every Lane-3b gate (this only runs once they pass), then
+// rewrites bytes SURGICALLY (one block body at a time, never reconstructing a
+// file from parsed blocks), all-or-nothing, behind a git-clean recoverability
+// gate. Artifacts are NOT re-emitted (the user runs `emit` next).
+
+// Recoverability gate: every affected `.agentctx/` source must be git-tracked
+// and clean, so the rewrite is trivially recoverable via `git checkout`.
+// Returns { ok } or { ok:false, reason, hint }. Never writes.
+function assertCleanTrackedSourcePaths(cwd, relPaths) {
+  let status;
+  try {
+    status = spawnSync("git", ["-C", cwd, "status", "--porcelain", "--", ...relPaths], { encoding: "utf8" });
+  } catch {
+    return { ok: false, reason: "git is not available", hint: "Commit or back up .agentctx/ manually, then retry." };
+  }
+  if (status.error || status.status !== 0) {
+    return { ok: false, reason: "the project is not a git repository", hint: "Initialize git and commit .agentctx/ so the rewrite is recoverable, then retry --apply." };
+  }
+  const dirty = status.stdout.trim();
+  if (dirty) {
+    return { ok: false, reason: `affected .agentctx/ source(s) have uncommitted or untracked changes:\n${dirty}`, hint: "Commit or stash them first so --apply is recoverable via git." };
+  }
+  const ls = spawnSync("git", ["-C", cwd, "ls-files", "--", ...relPaths], { encoding: "utf8" });
+  const tracked = new Set((ls.stdout ?? "").split("\n").map((s) => s.trim()).filter(Boolean));
+  for (const p of relPaths) {
+    if (!tracked.has(p)) return { ok: false, reason: `${p} is not tracked by git`, hint: "git add and commit it first so --apply is recoverable." };
+  }
+  return { ok: true };
+}
+
+// Mirror parseMarkdownBlocks' block-boundary + index logic on a canonical (LF)
+// line array, returning each pushed block's index and its raw body-line range
+// [regionStart, regionEnd) (the lines AFTER its `##` heading up to the next
+// `##` heading or EOF; the preamble block spans [0, firstHeading)). Index
+// assignment matches the parser exactly (empty preamble skipped), so a
+// manifest source_block_index maps to the same block here.
+function indexCanonicalBlocks(lines) {
+  const regions = [];
+  let count = 0;
+  let curHasHeading = false;
+  let curStart = 0; // first body line of the current block
+  let curBodyLines = [];
+  const flush = (endIdx) => {
+    const body = curBodyLines.join("\n").trim();
+    if (!body && !curHasHeading) return; // skip empty preamble (parser parity)
+    regions.push({ index: count, regionStart: curStart, regionEnd: endIdx });
+    count += 1;
+  };
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^##\s+(.+?)\s*$/.test(line)) {
+      flush(i);
+      curHasHeading = true;
+      curStart = i + 1;
+      curBodyLines = [];
+    } else if (!line.startsWith("# ")) {
+      curBodyLines.push(line);
+    }
+  }
+  flush(lines.length);
+  return regions;
+}
+
+// Replace a single block's body within its (canonical) region text. The parsed
+// body equals the region trimmed, so for a non-empty old body we require it to
+// occur exactly once with only whitespace framing around it, and swap only that
+// occurrence (framing bytes preserved). An empty old body requires an
+// all-whitespace region. Returns { newText } or { refusal }.
+function replaceRegionBody(regionText, oldBody, newBody) {
+  if (oldBody === "") {
+    if (regionText.trim() !== "") {
+      return { refusal: "expected an empty source block body but found content" };
+    }
+    return { newText: newBody };
+  }
+  const idx = regionText.indexOf(oldBody);
+  if (idx < 0) return { refusal: "could not locate the source block body to replace" };
+  if (regionText.indexOf(oldBody, idx + 1) !== -1) {
+    return { refusal: "source block body text is ambiguous (it appears more than once in the block)" };
+  }
+  const prefix = regionText.slice(0, idx);
+  const suffix = regionText.slice(idx + oldBody.length);
+  if (prefix.trim() !== "" || suffix.trim() !== "") {
+    return { refusal: "source block body is surrounded by unexpected content" };
+  }
+  return { newText: prefix + newBody + suffix };
+}
+
+// Build the new canonical (LF) content for one source file by splicing each
+// edited block's body region. Dedupes identical same-block edits, refuses
+// conflicting ones, and refuses overlapping regions. Returns { canonical } or
+// { refusal }.
+function applyEditsToCanonicalSource(canonical, editsForFile) {
+  const lines = canonical.split("\n");
+  const byIndex = new Map(indexCanonicalBlocks(lines).map((r) => [r.index, r]));
+  const seen = new Map();
+  const plan = [];
+  for (const e of editsForFile) {
+    if (seen.has(e.source_block_index)) {
+      const prev = seen.get(e.source_block_index);
+      if (prev.new_body !== e.new_body || prev.old_body !== e.old_body) {
+        return { refusal: `conflicting edits target source block ${e.source_block_index}` };
+      }
+      continue; // identical duplicate
+    }
+    seen.set(e.source_block_index, e);
+    const region = byIndex.get(e.source_block_index);
+    if (!region) return { refusal: `source block ${e.source_block_index} not found` };
+    const regionText = lines.slice(region.regionStart, region.regionEnd).join("\n");
+    const repl = replaceRegionBody(regionText, e.old_body, e.new_body);
+    if (repl.refusal) return repl;
+    plan.push({ regionStart: region.regionStart, regionEnd: region.regionEnd, newLines: repl.newText.split("\n") });
+  }
+  plan.sort((a, b) => b.regionStart - a.regionStart); // splice high→low
+  for (let i = 1; i < plan.length; i += 1) {
+    if (plan[i].regionEnd > plan[i - 1].regionStart) {
+      return { refusal: "edited block regions overlap" };
+    }
+  }
+  const out = lines.slice();
+  for (const p of plan) out.splice(p.regionStart, p.regionEnd - p.regionStart, ...p.newLines);
+  return { canonical: out.join("\n") };
+}
+
+// Self-check: the rewritten file must re-parse so the edited blocks carry the
+// new bodies and EVERY other block is unchanged (heading/title/body). This is
+// the correctness guarantee on top of the surgical splice.
+function verifySurgicalRewrite(origCanonical, newCanonical, editsForFile, sourceFile) {
+  const before = parseMarkdownBlocks(origCanonical, sourceFile);
+  const after = parseMarkdownBlocks(newCanonical, sourceFile);
+  if (before.length !== after.length) return { refusal: "rewrite changed the source block structure" };
+  const newBodyByIndex = new Map(editsForFile.map((e) => [e.source_block_index, e.new_body]));
+  for (let i = 0; i < before.length; i += 1) {
+    const b = before[i];
+    const a = after[i];
+    if (a.index !== b.index || a.heading !== b.heading || a.title !== b.title) {
+      return { refusal: `rewrite altered the structure of block ${b.index}` };
+    }
+    if (newBodyByIndex.has(b.index)) {
+      if (a.body !== newBodyByIndex.get(b.index)) {
+        return { refusal: `rewrite did not yield the expected new body for block ${b.index}` };
+      }
+    } else if (a.body !== b.body) {
+      return { refusal: `rewrite disturbed untouched block ${b.index}` };
+    }
+  }
+  return {};
+}
+
+// Construct the rewritten RAW bytes for one source file: detect & preserve EOL
+// (refuse mixed/lone-CR), preserve BOM, do the surgical replacement in
+// canonical space, self-check, then round-trip the EOL. Returns { newRaw } or
+// { refusal }.
+function buildEditedSourceFile(rawSource, editsForFile, sourceFile) {
+  const hasCRLF = rawSource.includes("\r\n");
+  if (/\r(?!\n)/.test(rawSource)) {
+    return { refusal: "source contains a lone CR (old-Mac line ending); refusing to rewrite" };
+  }
+  if (hasCRLF && /(?<!\r)\n/.test(rawSource)) {
+    return { refusal: "source has mixed CRLF/LF line endings; normalize them before --apply" };
+  }
+  const eol = hasCRLF ? "\r\n" : "\n";
+  const hadBOM = rawSource.charCodeAt(0) === 0xfeff;
+  const canonical = canonicalize(rawSource); // strips BOM + CRLF->LF
+
+  const applied = applyEditsToCanonicalSource(canonical, editsForFile);
+  if (applied.refusal) return applied;
+  const check = verifySurgicalRewrite(canonical, applied.canonical, editsForFile, sourceFile);
+  if (check.refusal) return check;
+
+  const newRaw = (hadBOM ? "\uFEFF" : "") + (eol === "\r\n" ? applied.canonical.replace(/\n/g, "\r\n") : applied.canonical);
+  return { newRaw };
+}
+
+// The --apply executor. Refuses (writing nothing) on any Lane-3b refusal, then
+// gates on git-cleanliness, builds every affected source file in memory,
+// re-verifies (TOCTOU), and writes all-or-nothing. Never re-emits artifacts.
+function applyReconcileSource(options, records, ok, refused) {
+  if (!ok) {
+    if (options.format === "json") {
+      const stdout =
+        JSON.stringify(
+          {
+            ok: false,
+            mode: "reconcile-source-apply",
+            apply: true,
+            targets: records.map((rec) => ({
+              target: rec.target,
+              path: rec.path,
+              status: rec.status,
+              action: rec.action === "preview" ? "blocked" : "refused",
+              reason: rec.action === "preview" ? "another target refused; all-or-nothing — nothing written" : rec.reason,
+            })),
+          },
+          null,
+          2,
+        ) + "\n";
+      return { exitCode: 1, stdout, stderr: "" };
+    }
+    const stderr =
+      `Refusing to apply source reconcile: ${refused.length} target(s) need a human (nothing written; .agentctx/ untouched).\n` +
+      refused.map((rec) => `  ${rec.reason}`).join("\n") +
+      "\n";
+    return { exitCode: 1, stdout: "", stderr };
+  }
+
+  // Group all edits by source file (across every target).
+  const editsByFile = new Map();
+  for (const rec of records) {
+    for (const e of rec.edits) {
+      if (!editsByFile.has(e.source_file)) editsByFile.set(e.source_file, []);
+      editsByFile.get(e.source_file).push(e);
+    }
+  }
+  const files = [...editsByFile.keys()];
+
+  // Recoverability gate.
+  const gate = assertCleanTrackedSourcePaths(options.cwd, files.map((f) => `.agentctx/${f}`));
+  if (!gate.ok) {
+    const message = `Refusing to apply: ${gate.reason}\n--apply rewrites .agentctx/ source files, so they must be committed to git first (recovery is via git). ${gate.hint ?? ""}`.trim();
+    if (options.format === "json") {
+      return { exitCode: 1, stdout: JSON.stringify({ ok: false, mode: "reconcile-source-apply", apply: true, error: "unrecoverable-source", reason: gate.reason }, null, 2) + "\n", stderr: "" };
+    }
+    return { exitCode: 1, stdout: "", stderr: message + "\n" };
+  }
+
+  const refuse = (reason, error, extra = {}) => {
+    if (options.format === "json") {
+      return { exitCode: 1, stdout: JSON.stringify({ ok: false, mode: "reconcile-source-apply", apply: true, error, reason, ...extra }, null, 2) + "\n", stderr: "" };
+    }
+    return { exitCode: 1, stdout: "", stderr: `Refusing to apply: ${reason} (nothing written).\n` };
+  };
+
+  // Write-scope guard: the git gate proves the PATH is tracked & clean, but
+  // writing through a symlink or hardlink could land OUTSIDE .agentctx/. Require
+  // each affected path to be a plain, single-link regular file. Checked before
+  // build and again right before write (TOCTOU).
+  const linkGuard = (f) => {
+    const p = resolve(options.cwd, ".agentctx", f);
+    let st;
+    try {
+      st = lstatSync(p);
+    } catch {
+      return `cannot stat .agentctx/${f}`;
+    }
+    if (st.isSymbolicLink() || !st.isFile()) return `.agentctx/${f} is a symlink or special file; refusing to write through it`;
+    if (st.nlink > 1) return `.agentctx/${f} has multiple hard links; refusing to write through it`;
+    return null;
+  };
+
+  // Build every affected file in memory (all-or-nothing).
+  const writes = [];
+  for (const f of files) {
+    const linkBad = linkGuard(f);
+    if (linkBad) return refuse(linkBad, "unsafe-source-path", { source_file: f });
+    const path = resolve(options.cwd, ".agentctx", f);
+    const rawSource = readFileSync(path, "utf8");
+    const built = buildEditedSourceFile(rawSource, editsByFile.get(f), f);
+    if (built.refusal) return refuse(`.agentctx/${f}: ${built.refusal}`, "surgical-refusal", { source_file: f });
+    writes.push({ source_file: f, path, newRaw: built.newRaw, rawSource, blocks: editsByFile.get(f).length });
+  }
+
+  // DECISIVE correctness gate: applying these edits must make the sources
+  // reproduce EXACTLY the hand-edited artifact for every target. We build the
+  // post-apply sources in memory and re-emit each target; if any re-emit does
+  // not byte-match the on-disk hand-edited payload, the attribution is not an
+  // exact body-only reconcile (e.g. a moved/forged heading scrambled block
+  // boundaries) — refuse and write nothing. This makes --apply provably safe:
+  // it only ever writes sources that regenerate the user's artifact verbatim.
+  const newSources = { ...readAgentctx(options.cwd) };
+  for (const w of writes) newSources[w.source_file] = w.newRaw;
+  for (const rec of records) {
+    const parsed = parseEmitHeader(canonicalize(readFileSync(resolve(options.cwd, rec.path), "utf8")));
+    const rebuilt = buildArtifact({ sources: newSources, target: parsed.header.target, profile: parsed.header.profile });
+    if (rebuilt.payload !== parsed.payload) {
+      return refuse(
+        `${rec.path} (${rec.target}): applying these edits would not reproduce the hand-edited artifact (the edit is not an exact, body-only reconcile — a heading or structure likely moved). Reconcile by hand.`,
+        "non-reproducing",
+        { source_file: rec.target },
+      );
+    }
+  }
+
+  // TOCTOU + link re-check just before writing.
+  for (const w of writes) {
+    const linkBad = linkGuard(w.source_file);
+    if (linkBad) return refuse(linkBad, "unsafe-source-path", { source_file: w.source_file });
+    if (readFileSync(w.path, "utf8") !== w.rawSource) {
+      return refuse(`.agentctx/${w.source_file} changed during the operation`, "toctou", { source_file: w.source_file });
+    }
+  }
+
+  // Transactional write: stage every file to a temp sibling first, then rename
+  // each into place (rename overwrites atomically per file). If staging throws,
+  // remove the temps and refuse — no source file is touched. This honors the
+  // all-or-nothing contract at write time, not just at planning time.
+  const staged = [];
+  try {
+    for (const w of writes) {
+      const tmp = `${w.path}.mo-apply-tmp`;
+      writeFileSync(tmp, w.newRaw, "utf8");
+      staged.push({ tmp, path: w.path });
+    }
+  } catch (e) {
+    for (const s of staged) {
+      try {
+        rmSync(s.tmp, { force: true });
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+    return refuse(`failed to stage source writes (${e.message})`, "write-failed");
+  }
+  for (const s of staged) renameSync(s.tmp, s.path);
+
+  const totalBlocks = writes.reduce((n, w) => n + w.blocks, 0);
+  if (options.format === "json") {
+    const stdout =
+      JSON.stringify(
+        {
+          ok: true,
+          mode: "reconcile-source-apply",
+          apply: true,
+          reemitted: false,
+          written: writes.map((w) => ({ source_file: w.source_file, blocks: w.blocks })),
+          note: "sources updated; artifacts left unchanged — run `mind-ontology emit` to regenerate.",
+        },
+        null,
+        2,
+      ) + "\n";
+    return { exitCode: 0, stdout, stderr: "" };
+  }
+  const lines = writes.map((w) => `APPLIED  .agentctx/${w.source_file}  (${w.blocks} block(s) patched)`);
+  lines.push(
+    `APPLIED - ${totalBlocks} block(s) across ${writes.length} source file(s) reconciled to .agentctx/. Artifacts were NOT re-emitted; run \`mind-ontology emit\` to regenerate AGENTS.md/CLAUDE.md.`,
   );
   return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
 }
@@ -1496,9 +1849,11 @@ Options:
                          only — writes NOTHING (not .agentctx/, not the artifact).
                          All-or-nothing; refuses any edit it cannot isolate to a
                          single block body. Exit 0 preview, 1 refused, 2 error.
-  --apply                With --reconcile-source: intentionally NOT implemented
-                         in this unit (real source writeback is a future gated
-                         lane). Exits 2.
+  --apply                With --reconcile-source: WRITE the previewed block-body
+                         patches into .agentctx/ sources (the only writes; never
+                         re-emits artifacts — run emit afterwards). All-or-nothing;
+                         affected sources must be git-tracked and clean
+                         (recovery via git). Exit 0 applied, 1 refused, 2 error.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.

@@ -20,8 +20,8 @@ import { parseEmitArgv, unifiedBlockDiff } from "../../scripts/agentctx/emit.mjs
 // HAND-EDITED artifact, attribute each edited block back to the .agentctx/
 // source block it came from (via block-manifest provenance) and PREVIEW the
 // patch a future writeback WOULD apply. Reads only — writes NOTHING (not
-// .agentctx/, not the artifact). All-or-nothing; ambiguity refuses. Real apply
-// (--apply) is intentionally not implemented in this unit.
+// .agentctx/, not the artifact). All-or-nothing; ambiguity refuses. The
+// `--apply` write path is covered in emit-reconcile-source-apply.test.mjs.
 
 vi.setConfig({ testTimeout: 60_000 });
 
@@ -410,16 +410,20 @@ describe("--reconcile-source is all-or-nothing across targets", () => {
   });
 });
 
-describe("--reconcile-source --apply is intentionally not implemented", () => {
-  it("exits 2 and writes nothing", () => {
+describe("--reconcile-source --apply refuses without a clean git source", () => {
+  // Full --apply behavior lives in emit-reconcile-source-apply.test.mjs (it
+  // needs a git repo). Here we only confirm the preview path's temp projects —
+  // which are NOT git repos — refuse --apply via the recoverability gate and
+  // still write nothing.
+  it("a non-git project refuses --apply (exit 1) and writes nothing", () => {
     const cwd = emitted(TEMPLATE_AGENTCTX, ["--target", "agents-md"]);
     editFirstBlockBody(join(cwd, "AGENTS.md"));
     const before = snapshot(cwd);
 
     const r = runCli(["emit", "--cwd", cwd, "--target", "agents-md", "--reconcile-source", "--apply"]);
-    expect(r.status).toBe(2);
+    expect(r.status).toBe(1);
     expect(r.stdout).toBe("");
-    expect(r.stderr).toContain("--apply is not implemented");
+    expect(r.stderr).toContain("Refusing to apply");
     expectUnchanged(cwd, before);
   });
 
