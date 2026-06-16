@@ -586,15 +586,26 @@ const EMITTED_BLOCK_HEADING = /^### .* <!-- \(from \.agentctx\/(.+?)\) -->$/;
 /**
  * Parse an emitted artifact payload (the bytes AFTER the header terminator)
  * into its emitted block spans, in document order. Each span is one rendered
- * block: { emittedIndex, sourceFile, renderedText, renderedDigest }. A block
- * runs from its heading line to the next structural marker (another block
- * heading, a generated '## ' section heading, or the '---' footer); the
+ * block: { emittedIndex, sourceFile, renderedText, renderedDigest, start, end }.
+ * A block runs from its heading line to the next structural marker (another
+ * block heading, a generated '## ' section heading, or the '---' footer); the
  * trailing '\n\n' join blank line is stripped, so renderedText is exactly
  * renderBlock's output and sha256(renderedText) reproduces the manifest's
- * rendered_digest. Pure.
+ * rendered_digest. `start`/`end` are char offsets into `payload` such that
+ * payload.slice(start, end) === renderedText (used by the patch primitive to
+ * splice a single block in place). Pure.
  */
 export function parseEmittedBlockSpans(payload) {
-  const lines = String(payload).split("\n");
+  const text = String(payload);
+  const lines = text.split("\n");
+  // Char offset of the start of each line in `text`.
+  const lineStart = new Array(lines.length);
+  let acc = 0;
+  for (let k = 0; k < lines.length; k += 1) {
+    lineStart[k] = acc;
+    acc += lines[k].length + 1; // +1 for the '\n' join
+  }
+
   const spans = [];
   let i = 0;
   while (i < lines.length) {
@@ -622,11 +633,14 @@ export function parseEmittedBlockSpans(payload) {
       blockLines.pop();
     }
     const renderedText = blockLines.join("\n");
+    const start = lineStart[i];
     spans.push({
       emittedIndex: spans.length,
       sourceFile,
       renderedText,
       renderedDigest: sha256(renderedText),
+      start,
+      end: start + renderedText.length,
     });
     i = j;
   }
@@ -785,6 +799,67 @@ export function planBlockReconcileTarget({ cwd, target, sources, result }) {
   const expectedSpans = parseEmittedBlockSpans(expected.payload);
   const blocks = compareBlockDrift(actualSpans, expectedSpans, expected.blockManifest);
   return { ...base, reproducible: true, expected_profile: result.recordedProfile, would_write_paths: [path], refuse_reason: null, blocks };
+}
+
+/**
+ * Patch-application primitive (Phase 3). Produce the reconciled artifact bytes
+ * for one target from its current on-disk artifact, the EXPECTED full artifact
+ * (the oracle a file-level reconcile would write), and the read-only `plan`.
+ *
+ * Safety is proven, not assumed: the surgical block splice is only a mechanism,
+ * and the result is ALWAYS checked byte-for-byte against `expectedArtifact`
+ * before it is returned. On any mismatch this returns { ok: false } with no
+ * artifact, so a caller can never write unverified bytes. Returns
+ * { ok, artifact, error }. Pure (string in / data out, no I/O, no writes).
+ *
+ * Surgical path: when the current artifact is managed and the drift is
+ * replace-only (same block structure), only the changed block substrings and
+ * the header are swapped in the current bytes — a minimal patch. Otherwise it
+ * falls back to the expected bytes wholesale (structural change: insert/delete/
+ * reorder/MISSING). Either way the byte guard is the final word.
+ */
+export function applyBlockReconcilePlan(currentArtifact, expectedArtifact, plan) {
+  const exp = canonicalize(expectedArtifact);
+  let patched = exp; // default: reproduce the oracle wholesale.
+
+  const cur = canonicalize(currentArtifact);
+  const curParsed = parseEmitHeader(cur);
+  const expParsed = parseEmitHeader(exp);
+
+  const replaceOnly =
+    plan &&
+    Array.isArray(plan.blocks) &&
+    plan.blocks.length > 0 &&
+    plan.blocks.every((b) => b.kind === "unchanged" || b.kind === "replace");
+
+  if (curParsed && expParsed && replaceOnly) {
+    const curSpans = parseEmittedBlockSpans(curParsed.payload);
+    const expSpans = parseEmittedBlockSpans(expParsed.payload);
+    if (curSpans.length === expSpans.length && curSpans.length === plan.blocks.length) {
+      // Header text = everything up to and including the '-->' + '\n' separator.
+      const expHeaderText = exp.slice(0, exp.length - expParsed.payload.length);
+      let payload = curParsed.payload;
+      // Splice changed blocks from last to first so earlier offsets stay valid.
+      for (let k = curSpans.length - 1; k >= 0; k -= 1) {
+        if (plan.blocks[k].kind === "replace") {
+          payload =
+            payload.slice(0, curSpans[k].start) +
+            expSpans[k].renderedText +
+            payload.slice(curSpans[k].end);
+        }
+      }
+      patched = expHeaderText + payload;
+    }
+  }
+
+  if (patched !== exp) {
+    return {
+      ok: false,
+      artifact: null,
+      error: "block-level reconcile patch did not reproduce the expected artifact bytes",
+    };
+  }
+  return { ok: true, artifact: exp, error: null };
 }
 
 // ---------------------------------------------------------------------------
