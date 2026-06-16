@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   EMIT_VERSION,
+  REQUIRED_HEADER_KEYS,
   buildArtifact,
   canonicalize,
   parseEmitHeader,
@@ -226,6 +227,55 @@ describe("payload byte-equality across targets (freeze 13)", () => {
     const claude = sharedSections(golden("template-default/CLAUDE.md"));
     expect(agents).toBe(claude);
     expect(agents.length).toBeGreaterThan(100); // not trivially empty
+  });
+});
+
+describe("block-manifest provenance: backward-compat invariants (Phase 3)", () => {
+  // The block-manifest work is opt-in only. These pins fail loudly if a later
+  // change lets it touch the frozen surfaces: the emit version, the header key
+  // set, the artifact bytes, or the base check JSON.
+
+  it("EMIT_VERSION is unchanged (the manifest never forces a version bump)", () => {
+    expect(EMIT_VERSION).toBe(2);
+  });
+
+  it("the header still carries exactly the seven required keys, in order", () => {
+    expect(REQUIRED_HEADER_KEYS).toEqual([
+      "target",
+      "profile",
+      "emit_version",
+      "source",
+      "source_digest",
+      "content_digest",
+      "note",
+    ]);
+    // And the emitted header advertises no manifest/digest keys of its own.
+    const parsed = parseEmitHeader(golden("template-default/AGENTS.md"));
+    expect(Object.keys(parsed.header)).toEqual(REQUIRED_HEADER_KEYS);
+  });
+
+  it("buildArtifact exposes blockManifest in memory but never in the artifact bytes", () => {
+    const cwd = projectFrom(TEMPLATE_AGENTCTX);
+    const r = runCli(["emit", "--cwd", cwd]);
+    expect(r.status, r.stderr).toBe(0);
+    // Bytes are still the frozen golden (re-asserting the freeze under this lens).
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(golden("template-default/AGENTS.md"));
+    const build = buildArtifact({ sources: readSources(TEMPLATE_AGENTCTX), target: "agents-md" });
+    expect(Array.isArray(build.blockManifest)).toBe(true);
+    expect(build.blockManifest.length).toBeGreaterThan(0);
+    for (const needle of ["block_manifest", "blockManifest", "source_block_digest"]) {
+      expect(build.artifact).not.toContain(needle);
+    }
+  });
+
+  it("the base emit --check --format json shape gains no manifest/explain keys", () => {
+    const cwd = projectFrom(TEMPLATE_AGENTCTX);
+    expect(runCli(["emit", "--cwd", cwd]).status).toBe(0);
+    const check = JSON.parse(runCli(["emit", "--cwd", cwd, "--check", "--format", "json"]).stdout);
+    expect(Object.keys(check)).toEqual(["ok", "targets"]);
+    for (const t of check.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "status", "detail"]);
+    }
   });
 });
 
