@@ -376,6 +376,102 @@ export function classifyTarget({ cwd, target, sources }) {
   return { target, path: spec.path, status: "ok", detail: null, profile: parsed.header.profile };
 }
 
+/**
+ * Drift explanation for one target (read-only; W2 §13 item 15). Reuses the
+ * SAME primitives the classifier uses (parseEmitHeader, sha256, buildArtifact)
+ * to surface WHY a target landed in its class and WHAT a reconcile would do —
+ * never re-classifying and never writing. Driven by an already-computed
+ * `result` from classifyTarget so the two can never disagree.
+ *
+ * Block-level provenance note: the artifact header records only file-level
+ * digests (source_digest over included files, content_digest over the whole
+ * payload), with no per-block manifest, so wouldWritePaths and reconcileCommand
+ * are necessarily file-level (the single artifact path), not block-level.
+ */
+export function explainTarget({ cwd, target, sources, result }) {
+  const spec = EMIT_TARGETS[target];
+  const path = resolve(cwd, spec.path);
+  const exists = existsSync(path);
+
+  let parsed = null;
+  if (exists) {
+    parsed = parseEmitHeader(canonicalize(readFileSync(path, "utf8")));
+  }
+  const headerPresent = parsed !== null;
+  const managed = headerPresent;
+
+  // The profile a reconcile would recompile against: the one recorded in a
+  // managed header, else the default profile a fresh emit uses.
+  const expectedProfile = headerPresent ? parsed.header.profile : "default";
+
+  let payloadDigestMatchesHeader = null;
+  let emitVersionMatches = null;
+  let sourceDigestMatchesCurrent = null;
+  if (headerPresent) {
+    payloadDigestMatchesHeader = sha256(parsed.payload) === parsed.header.content_digest;
+    emitVersionMatches = parsed.header.emit_version === String(EMIT_VERSION);
+    // Recompute the source fingerprint the current sources would produce under
+    // the header's recorded profile and compare it to the header's record. A
+    // reproducible profile is required to rebuild; otherwise the comparison is
+    // undefined (null), mirroring the classifier treating it as stale.
+    if (EMIT_TARGETS[parsed.header.target]?.v1 && PROFILES[parsed.header.profile]) {
+      const expected = buildArtifact({
+        sources,
+        target: parsed.header.target,
+        profile: parsed.header.profile,
+      });
+      sourceDigestMatchesCurrent = expected.sourceDigest === parsed.header.source_digest;
+    }
+  }
+
+  // UNMANAGED is the only class a plain re-emit refuses; it needs --force.
+  // Every other reconcile is a plain re-emit of just this target.
+  const reconcileCommand =
+    result.status === "unmanaged"
+      ? `mind-ontology emit --force --target ${target}`
+      : `mind-ontology emit --target ${target}`;
+
+  // A reconcile rewrites exactly this target's artifact. OK needs no reconcile,
+  // so nothing would be written.
+  const wouldWritePaths = result.status === "ok" ? [] : [spec.path];
+
+  return {
+    status: result.status,
+    managed,
+    headerPresent,
+    payloadDigestMatchesHeader,
+    sourceDigestMatchesCurrent,
+    emitVersionMatches,
+    expectedProfile,
+    reconcileCommand,
+    wouldWritePaths,
+  };
+}
+
+// Human-readable explanation sentence(s) for the text surface (W2 §13 item
+// 15): why this class, and what a reconcile would involve. Keyed by status so
+// the wording stays in lock-step with the classifier.
+export function explainText(result, explain) {
+  switch (result.status) {
+    case "missing":
+      return `why: no artifact on disk (header absent). A reconcile would emit it, writing ${explain.wouldWritePaths.join(", ")}: ${explain.reconcileCommand}`;
+    case "unmanaged":
+      return `why: file exists but has no emit header, so emit will not claim it. Move the hand-written content into .agentctx/ sources, then reconcile (writes ${explain.wouldWritePaths.join(", ")}): ${explain.reconcileCommand}`;
+    case "hand-edited":
+      return `why: the payload no longer matches the header's content_digest (edited after generation). Re-emit overwrites the file, so move the hand-edit into the .agentctx/ source first, then re-emit (writes ${explain.wouldWritePaths.join(", ")}): ${explain.reconcileCommand}`;
+    case "stale": {
+      const reason = explain.emitVersionMatches === false
+        ? "emit_version bumped since last emit"
+        : explain.sourceDigestMatchesCurrent === false
+          ? ".agentctx/ sources changed since last emit"
+          : "the recorded target/profile is no longer reproducible";
+      return `why: ${reason} (profile ${explain.expectedProfile}). A reconcile re-emits it, writing ${explain.wouldWritePaths.join(", ")}: ${explain.reconcileCommand}`;
+    }
+    default:
+      return `why: payload and source digests both match the header under profile ${explain.expectedProfile}; nothing to reconcile.`;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // CLI surface (W2 §7)
 // ---------------------------------------------------------------------------
@@ -385,6 +481,7 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     targets: [],
     targetFlagGiven: false,
     check: false,
+    explain: false,
     force: false,
     full: false,
     format: "text",
@@ -403,6 +500,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.targets.push(...ids);
     } else if (arg === "--check") {
       parsed.check = true;
+    } else if (arg === "--explain") {
+      parsed.explain = true;
     } else if (arg === "--force") {
       parsed.force = true;
     } else if (arg === "--full") {
@@ -438,6 +537,11 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   }
   if (parsed.force && parsed.check) {
     throw new Error("--force cannot be combined with --check (--check never writes)");
+  }
+  // --explain is a read-only annotation on the check verdict; it has no meaning
+  // in write mode and must never write, so it is valid only alongside --check.
+  if (parsed.explain && !parsed.check) {
+    throw new Error("--explain is only valid together with --check (it never writes)");
   }
 
   // Default target set: all v1 targets (W1 §2, W2 §8 ruling). Explicit
@@ -564,16 +668,25 @@ const TEXT_STATUS = {
  * The check verdict as data (W2 §7.4 shape) — one shape, two consumers:
  * `emit --check --format json` prints it verbatim, and the W7 `status`
  * command embeds it verbatim as its emit section.
+ *
+ * `explainByTarget` (a Map target -> explain object) is opt-in: when omitted
+ * the shape is byte-for-byte the frozen base shape (mandatory back-compat, and
+ * what `status` always embeds). When present, each target gains an `explain`
+ * key. It is never set on the `status` path.
  */
-export function checkResultJson(results) {
+export function checkResultJson(results, explainByTarget = null) {
   return {
     ok: results.every((r) => r.status === "ok"),
-    targets: results.map((r) => ({
-      target: r.target,
-      path: r.path,
-      status: r.status,
-      detail: r.detail,
-    })),
+    targets: results.map((r) => {
+      const base = {
+        target: r.target,
+        path: r.path,
+        status: r.status,
+        detail: r.detail,
+      };
+      if (explainByTarget) base.explain = explainByTarget.get(r.target);
+      return base;
+    }),
   };
 }
 
@@ -583,13 +696,22 @@ export function checkResultJson(results) {
  * attention"). Shared with `status` so both screens render freshness
  * identically.
  */
-export function renderCheckText(results) {
+export function renderCheckText(results, explainByTarget = null) {
   const drifted = results.filter((r) => r.status !== "ok");
-  const lines = results.map((r) =>
-    r.status === "ok"
-      ? `${TEXT_STATUS.ok.padEnd(13)}${r.path} (${r.target}, profile ${r.profile})`
-      : `${TEXT_STATUS[r.status].padEnd(13)}${r.path} (${r.target}) - ${r.detail}`,
-  );
+  const lines = [];
+  for (const r of results) {
+    lines.push(
+      r.status === "ok"
+        ? `${TEXT_STATUS.ok.padEnd(13)}${r.path} (${r.target}, profile ${r.profile})`
+        : `${TEXT_STATUS[r.status].padEnd(13)}${r.path} (${r.target}) - ${r.detail}`,
+    );
+    // --explain only: an indented explanation line after each classification.
+    // Absent explainByTarget (the default and the `status` embed) leaves the
+    // existing output byte-for-byte unchanged.
+    if (explainByTarget) {
+      lines.push(`             ${explainText(r, explainByTarget.get(r.target))}`);
+    }
+  }
   lines.push(
     drifted.length === 0
       ? `OK - ${results.length} of ${results.length} targets fresh`
@@ -618,10 +740,22 @@ export function runEmitCheck(options) {
   const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
   const ok = results.every((r) => r.status === "ok");
 
+  // --explain (read-only): derive the per-target explanation from the same
+  // sources and the already-computed classification. Off by default, so the
+  // base text/json output stays byte-for-byte unchanged.
+  const explainByTarget = options.explain
+    ? new Map(
+        results.map((r) => [
+          r.target,
+          explainTarget({ cwd: options.cwd, target: r.target, sources, result: r }),
+        ]),
+      )
+    : null;
+
   const stdout =
     options.format === "json"
-      ? JSON.stringify(checkResultJson(results), null, 2) + "\n"
-      : renderCheckText(results);
+      ? JSON.stringify(checkResultJson(results, explainByTarget), null, 2) + "\n"
+      : renderCheckText(results, explainByTarget);
 
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
 }
@@ -637,6 +771,8 @@ Options:
   --target <id>[,<id>]   Restrict to targets: agents-md, claude-md. Repeatable.
   --check                Classify each target (OK/MISSING/UNMANAGED/HAND-EDITED/STALE).
                          Exit 0 fresh, 1 drift, 2 error.
+  --explain              With --check only: explain why each target got its class
+                         and what a reconcile would write. Read-only; never writes.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.
@@ -656,7 +792,10 @@ if (isMain) {
   // three-way split — 0 fresh, 1 drift, 2 hard error (usage errors and
   // compile failures included, so `1` means exactly "re-emit needed").
   const argv = process.argv.slice(2);
-  const checkMode = argv.includes("--check");
+  // --explain implies check-mode intent (it is only valid with --check), so a
+  // usage error mentioning either gets the check-mode exit 2, keeping 1 reserved
+  // for "re-emit needed".
+  const checkMode = argv.includes("--check") || argv.includes("--explain");
   try {
     const options = parseEmitArgv(argv);
     if (options.help) {

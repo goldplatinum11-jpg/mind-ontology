@@ -89,6 +89,14 @@ describe("argv contract (W2 §7.1)", () => {
       /--format must be "text" or "json", got: xml/,
     );
   });
+
+  it("--explain parses only with --check; in write mode it is a usage error", () => {
+    expect(parseEmitArgv(["--check", "--explain"]).explain).toBe(true);
+    expect(parseEmitArgv(["--check"]).explain).toBe(false);
+    expect(() => parseEmitArgv(["--explain"])).toThrow(
+      /--explain is only valid together with --check/,
+    );
+  });
 });
 
 describe("determinism and idempotency (freeze 8, W1 §7/§9)", () => {
@@ -222,6 +230,150 @@ describe("--check classification matrix (freeze 9, W1 §8)", () => {
     expect(parsed.targets[0]).toEqual({ target: "agents-md", path: "AGENTS.md", status: "ok", detail: null });
     expect(parsed.targets[1].status).toBe("missing");
     expect(parsed.targets[1].detail).toContain("run: mind-ontology emit --target claude-md");
+  });
+});
+
+describe("--check --explain drift explanation (read-only, W2 §13 item 15)", () => {
+  const EXPLAIN_KEYS = [
+    "status",
+    "managed",
+    "headerPresent",
+    "payloadDigestMatchesHeader",
+    "sourceDigestMatchesCurrent",
+    "emitVersionMatches",
+    "expectedProfile",
+    "reconcileCommand",
+    "wouldWritePaths",
+  ];
+
+  it("without --explain the base text output is byte-for-byte unchanged", () => {
+    const cwd = emitted();
+    const base = runCli(["emit", "--cwd", cwd, "--check"]);
+    expect(base.status).toBe(0);
+    // No explanation lines, no "why:" annotations leak in.
+    expect(base.stdout).not.toContain("why:");
+  });
+
+  it("without --explain the base json shape has no targets[].explain", () => {
+    const cwd = emitted();
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--format", "json"]);
+    const parsed = JSON.parse(r.stdout);
+    expect(Object.keys(parsed)).toEqual(["ok", "targets"]);
+    for (const t of parsed.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "status", "detail"]);
+      expect(t).not.toHaveProperty("explain");
+    }
+  });
+
+  it("text mode: prints an explanation line after each classification", () => {
+    const cwd = emitted();
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--explain"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("OK           AGENTS.md (agents-md, profile default)");
+    // One explanation per target.
+    expect((r.stdout.match(/why:/g) ?? []).length).toBe(2);
+    expect(r.stdout).toContain("nothing to reconcile");
+  });
+
+  it("text mode STALE: explanation names the source change and the reconcile command", () => {
+    const cwd = emitted();
+    appendFileSync(join(cwd, ".agentctx", "constraints.md"), "\n## Extra rule\n\nAdded.\n");
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--target", "agents-md", "--explain"]);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain("STALE");
+    expect(r.stdout).toContain(".agentctx/ sources changed since last emit");
+    expect(r.stdout).toContain("writing AGENTS.md: mind-ontology emit --target agents-md");
+  });
+
+  it("text mode HAND-EDITED: explanation says to move the edit into the source first", () => {
+    const cwd = emitted();
+    appendFileSync(join(cwd, "AGENTS.md"), "\nA hand edit.\n");
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--target", "agents-md", "--explain"]);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain("HAND-EDITED");
+    expect(r.stdout).toContain("move the hand-edit into the .agentctx/ source first");
+  });
+
+  it("json mode: each target gains a fully-populated explain object", () => {
+    const cwd = emitted();
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--format", "json", "--explain"]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout);
+    expect(Object.keys(parsed)).toEqual(["ok", "targets"]); // base shape preserved
+    for (const t of parsed.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "status", "detail", "explain"]);
+      expect(Object.keys(t.explain)).toEqual(EXPLAIN_KEYS);
+      expect(t.explain.status).toBe(t.status);
+    }
+    const agents = parsed.targets.find((t) => t.target === "agents-md");
+    expect(agents.explain).toMatchObject({
+      status: "ok",
+      managed: true,
+      headerPresent: true,
+      payloadDigestMatchesHeader: true,
+      sourceDigestMatchesCurrent: true,
+      emitVersionMatches: true,
+      expectedProfile: "default",
+      reconcileCommand: "mind-ontology emit --target agents-md",
+      wouldWritePaths: [],
+    });
+  });
+
+  it("json explain reflects MISSING/UNMANAGED facts and reconcile commands", () => {
+    const cwd = emitted();
+    unlinkSync(join(cwd, "AGENTS.md"));
+    // Strip the header off CLAUDE.md to make it UNMANAGED.
+    const claudePath = join(cwd, "CLAUDE.md");
+    const claude = readFileSync(claudePath, "utf8");
+    writeFileSync(claudePath, claude.slice(claude.indexOf("-->\n") + 4));
+
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--format", "json", "--explain"]);
+    expect(r.status).toBe(1);
+    const parsed = JSON.parse(r.stdout);
+    const agents = parsed.targets.find((t) => t.target === "agents-md");
+    const claudeT = parsed.targets.find((t) => t.target === "claude-md");
+
+    expect(agents.explain).toMatchObject({
+      status: "missing",
+      managed: false,
+      headerPresent: false,
+      payloadDigestMatchesHeader: null,
+      sourceDigestMatchesCurrent: null,
+      emitVersionMatches: null,
+      expectedProfile: "default",
+      reconcileCommand: "mind-ontology emit --target agents-md",
+      wouldWritePaths: ["AGENTS.md"],
+    });
+    expect(claudeT.explain).toMatchObject({
+      status: "unmanaged",
+      managed: false,
+      headerPresent: false,
+      reconcileCommand: "mind-ontology emit --force --target claude-md",
+      wouldWritePaths: ["CLAUDE.md"],
+    });
+  });
+
+  it("--check --explain writes nothing, even for MISSING and HAND-EDITED targets", () => {
+    const cwd = emitted();
+    unlinkSync(join(cwd, "AGENTS.md")); // MISSING
+    appendFileSync(join(cwd, "CLAUDE.md"), "\nA hand edit.\n"); // HAND-EDITED
+    const claudeBefore = readFileSync(join(cwd, "CLAUDE.md"), "utf8");
+
+    const r = runCli(["emit", "--cwd", cwd, "--check", "--explain"]);
+    expect(r.status).toBe(1);
+    // The missing target is NOT created; the hand-edited one is NOT rewritten.
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe(claudeBefore);
+  });
+
+  it("--explain without --check is a usage error: exit 2, nothing written", () => {
+    const cwd = project();
+    const r = runCli(["emit", "--cwd", cwd, "--explain"]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toMatch(/--explain is only valid together with --check/);
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(cwd, "CLAUDE.md"))).toBe(false);
   });
 });
 
