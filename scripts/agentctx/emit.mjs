@@ -160,10 +160,50 @@ function renderBlock(block) {
   return block.body ? `${heading}\n${block.body}` : heading;
 }
 
+// Canonical source-block text a block-manifest entry digests: the parsed
+// block's raw heading and trimmed body, exactly the fields parseMarkdownBlocks
+// produced from already-canonicalized source bytes. Deterministic by
+// construction (no time, randomness, absolute path, or locale input), so the
+// digest is a pure function of the source block's content — the same
+// determinism contract the artifact bytes obey (W1 §7).
+function blockSourceCanonical(block) {
+  if (!block.heading) return block.body;
+  return block.body ? `${block.heading}\n${block.body}` : block.heading;
+}
+
+/**
+ * One block-manifest entry (Phase 1 provenance core): the traceability record
+ * for a single emitted block. `source_file` is the block's TRUE origin file
+ * (preserved across the safety sweep), `source_block_index` its position
+ * within that source file, `source_block_digest` a content fingerprint of the
+ * source block, `rendered_digest` the fingerprint of the emitted text,
+ * `emitted_index` its position in the emitted block sequence, `section` the
+ * generated section it renders under, and `forced` whether the safety sweep
+ * pulled it into Constraints from an excluded file.
+ *
+ * Pure: derived from the same `renderBlock` primitive and the parsed block,
+ * with no I/O. The manifest is computed alongside the artifact but never mixed
+ * into the artifact bytes (backward-compat / determinism).
+ */
+function buildBlockManifestEntry(block, renderedText, { emittedIndex, section, forced }) {
+  return {
+    source_file: block.file,
+    source_block_index: block.index,
+    source_block_digest: sha256(blockSourceCanonical(block)),
+    rendered_digest: sha256(renderedText),
+    emitted_index: emittedIndex,
+    section,
+    forced,
+  };
+}
+
 /**
  * Build one target artifact entirely in memory.
  * Returns { target, path, profile, payload, artifact, sourceDigest,
- *           contentDigest, payloadLines, lineContributions }.
+ *           contentDigest, payloadLines, lineContributions, blockManifest }.
+ * `blockManifest` is an in-memory provenance array (one entry per emitted
+ * block); it is NOT serialized into `artifact`/`payload` and does not affect
+ * the emitted bytes.
  */
 export function buildArtifact({ sources, target, profile = "default" }) {
   const spec = EMIT_TARGETS[target];
@@ -200,8 +240,12 @@ export function buildArtifact({ sources, target, profile = "default" }) {
   }
 
   // Sections in SOURCE_FILES order; a section with zero blocks is omitted
-  // entirely, heading included (W1 §4 empty-section rule).
+  // entirely, heading included (W1 §4 empty-section rule). The block manifest
+  // is accumulated in lock-step with the rendered blocks so emitted_index and
+  // ordering are guaranteed consistent with the artifact bytes; it never feeds
+  // back into `sections`/`payload`.
   const sections = [];
+  const blockManifest = [];
   const lineContributions = new Map();
   const countLines = (file, text) => {
     lineContributions.set(
@@ -211,12 +255,23 @@ export function buildArtifact({ sources, target, profile = "default" }) {
   };
   for (const file of SOURCE_FILES) {
     if (rules[file] === "none") continue;
+    const nativeCount = blocksByFile[file].length;
     const blocks = [...blocksByFile[file]];
     if (file === "constraints.md") blocks.push(...forcedBlocks);
     if (blocks.length === 0) continue;
-    const rendered = blocks.map((block) => {
+    const rendered = blocks.map((block, i) => {
       const text = renderBlock(block);
       countLines(block.file, text);
+      // A constraints.md slot past the native blocks is a safety-forced block
+      // swept in from an excluded file (W1 principle 4).
+      const forced = file === "constraints.md" && i >= nativeCount;
+      blockManifest.push(
+        buildBlockManifestEntry(block, text, {
+          emittedIndex: blockManifest.length,
+          section: SECTION_TITLES[file],
+          forced,
+        }),
+      );
       return text;
     });
     sections.push(`## ${SECTION_TITLES[file]}\n\n${rendered.join("\n\n")}`);
@@ -264,6 +319,7 @@ export function buildArtifact({ sources, target, profile = "default" }) {
     contentDigest,
     payloadLines,
     lineContributions,
+    blockManifest,
   };
 }
 
