@@ -160,10 +160,50 @@ function renderBlock(block) {
   return block.body ? `${heading}\n${block.body}` : heading;
 }
 
+// Canonical source-block text a block-manifest entry digests: the parsed
+// block's raw heading and trimmed body, exactly the fields parseMarkdownBlocks
+// produced from already-canonicalized source bytes. Deterministic by
+// construction (no time, randomness, absolute path, or locale input), so the
+// digest is a pure function of the source block's content — the same
+// determinism contract the artifact bytes obey (W1 §7).
+function blockSourceCanonical(block) {
+  if (!block.heading) return block.body;
+  return block.body ? `${block.heading}\n${block.body}` : block.heading;
+}
+
+/**
+ * One block-manifest entry (Phase 1 provenance core): the traceability record
+ * for a single emitted block. `source_file` is the block's TRUE origin file
+ * (preserved across the safety sweep), `source_block_index` its position
+ * within that source file, `source_block_digest` a content fingerprint of the
+ * source block, `rendered_digest` the fingerprint of the emitted text,
+ * `emitted_index` its position in the emitted block sequence, `section` the
+ * generated section it renders under, and `forced` whether the safety sweep
+ * pulled it into Constraints from an excluded file.
+ *
+ * Pure: derived from the same `renderBlock` primitive and the parsed block,
+ * with no I/O. The manifest is computed alongside the artifact but never mixed
+ * into the artifact bytes (backward-compat / determinism).
+ */
+function buildBlockManifestEntry(block, renderedText, { emittedIndex, section, forced }) {
+  return {
+    source_file: block.file,
+    source_block_index: block.index,
+    source_block_digest: sha256(blockSourceCanonical(block)),
+    rendered_digest: sha256(renderedText),
+    emitted_index: emittedIndex,
+    section,
+    forced,
+  };
+}
+
 /**
  * Build one target artifact entirely in memory.
  * Returns { target, path, profile, payload, artifact, sourceDigest,
- *           contentDigest, payloadLines, lineContributions }.
+ *           contentDigest, payloadLines, lineContributions, blockManifest }.
+ * `blockManifest` is an in-memory provenance array (one entry per emitted
+ * block); it is NOT serialized into `artifact`/`payload` and does not affect
+ * the emitted bytes.
  */
 export function buildArtifact({ sources, target, profile = "default" }) {
   const spec = EMIT_TARGETS[target];
@@ -200,8 +240,12 @@ export function buildArtifact({ sources, target, profile = "default" }) {
   }
 
   // Sections in SOURCE_FILES order; a section with zero blocks is omitted
-  // entirely, heading included (W1 §4 empty-section rule).
+  // entirely, heading included (W1 §4 empty-section rule). The block manifest
+  // is accumulated in lock-step with the rendered blocks so emitted_index and
+  // ordering are guaranteed consistent with the artifact bytes; it never feeds
+  // back into `sections`/`payload`.
   const sections = [];
+  const blockManifest = [];
   const lineContributions = new Map();
   const countLines = (file, text) => {
     lineContributions.set(
@@ -211,12 +255,23 @@ export function buildArtifact({ sources, target, profile = "default" }) {
   };
   for (const file of SOURCE_FILES) {
     if (rules[file] === "none") continue;
+    const nativeCount = blocksByFile[file].length;
     const blocks = [...blocksByFile[file]];
     if (file === "constraints.md") blocks.push(...forcedBlocks);
     if (blocks.length === 0) continue;
-    const rendered = blocks.map((block) => {
+    const rendered = blocks.map((block, i) => {
       const text = renderBlock(block);
       countLines(block.file, text);
+      // A constraints.md slot past the native blocks is a safety-forced block
+      // swept in from an excluded file (W1 principle 4).
+      const forced = file === "constraints.md" && i >= nativeCount;
+      blockManifest.push(
+        buildBlockManifestEntry(block, text, {
+          emittedIndex: blockManifest.length,
+          section: SECTION_TITLES[file],
+          forced,
+        }),
+      );
       return text;
     });
     sections.push(`## ${SECTION_TITLES[file]}\n\n${rendered.join("\n\n")}`);
@@ -264,6 +319,7 @@ export function buildArtifact({ sources, target, profile = "default" }) {
     contentDigest,
     payloadLines,
     lineContributions,
+    blockManifest,
   };
 }
 
@@ -522,6 +578,7 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     check: false,
     explain: false,
     reconcile: false,
+    blockManifest: false,
     force: false,
     full: false,
     format: "text",
@@ -544,6 +601,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.explain = true;
     } else if (arg === "--reconcile") {
       parsed.reconcile = true;
+    } else if (arg === "--block-manifest") {
+      parsed.blockManifest = true;
     } else if (arg === "--force") {
       parsed.force = true;
     } else if (arg === "--full") {
@@ -595,6 +654,18 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   // (e.g. degrade or upgrade a target). Refuse the combination outright.
   if (parsed.reconcile && parsed.full) {
     throw new Error("--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)");
+  }
+  // --block-manifest is an opt-in, read-only annotation that attaches per-block
+  // provenance to the structured check verdict. It is structured data with no
+  // text rendering, and it never writes, so it is valid ONLY alongside
+  // --check --explain --format json. Any other combination is a usage error.
+  if (
+    parsed.blockManifest &&
+    !(parsed.check && parsed.explain && parsed.format === "json")
+  ) {
+    throw new Error(
+      "--block-manifest is only valid with --check --explain --format json (it is read-only structured provenance and never writes)",
+    );
   }
 
   // Default target set: all v1 targets (W1 §2, W2 §8 ruling). Explicit
@@ -726,8 +797,14 @@ const TEXT_STATUS = {
  * the shape is byte-for-byte the frozen base shape (mandatory back-compat, and
  * what `status` always embeds). When present, each target gains an `explain`
  * key. It is never set on the `status` path.
+ *
+ * `manifestByTarget` (a Map target -> block-manifest array | null) is a further
+ * opt-in: when present each target gains a `block_manifest` key carrying the
+ * per-block provenance (Phase 2), or null when the recorded profile is not
+ * reproducible. Only ever set under --check --explain --format json
+ * --block-manifest; never on the `status` path.
  */
-export function checkResultJson(results, explainByTarget = null) {
+export function checkResultJson(results, explainByTarget = null, manifestByTarget = null) {
   return {
     ok: results.every((r) => r.status === "ok"),
     targets: results.map((r) => {
@@ -738,6 +815,7 @@ export function checkResultJson(results, explainByTarget = null) {
         detail: r.detail,
       };
       if (explainByTarget) base.explain = explainByTarget.get(r.target);
+      if (manifestByTarget) base.block_manifest = manifestByTarget.get(r.target);
       return base;
     }),
   };
@@ -805,9 +883,40 @@ export function runEmitCheck(options) {
       )
     : null;
 
+  // --block-manifest (read-only, opt-in; requires --explain --format json):
+  // attach the per-block provenance the current sources produce for each target
+  // under the profile --explain already reports (recorded profile if managed,
+  // else default). It is null whenever the recorded header is NOT reproducible
+  // — an unknown recorded profile OR a non-v1 recorded target — so it stays in
+  // lock-step with --explain's own reproducibility signal
+  // (sourceDigestMatchesCurrent === null while a header is present) and never
+  // claims provenance for an artifact it cannot rebuild. Reuses buildArtifact;
+  // no writes.
+  const manifestByTarget = options.blockManifest
+    ? new Map(
+        results.map((r) => {
+          const explain = explainByTarget.get(r.target);
+          // A header is present but its recorded target/profile cannot be
+          // reproduced (the same gate classify/reconcile/explain apply): the
+          // on-disk artifact's provenance is unrecomputable -> null.
+          if (explain.headerPresent && explain.sourceDigestMatchesCurrent === null) {
+            return [r.target, null];
+          }
+          // Otherwise expectedProfile is reproducible: the recorded profile for
+          // a managed target, or the default for a fresh (MISSING/UNMANAGED)
+          // emit. PROFILES guard is defensive — this branch only sees known
+          // profiles.
+          const manifest = PROFILES[explain.expectedProfile]
+            ? buildArtifact({ sources, target: r.target, profile: explain.expectedProfile }).blockManifest
+            : null;
+          return [r.target, manifest];
+        }),
+      )
+    : null;
+
   const stdout =
     options.format === "json"
-      ? JSON.stringify(checkResultJson(results, explainByTarget), null, 2) + "\n"
+      ? JSON.stringify(checkResultJson(results, explainByTarget, manifestByTarget), null, 2) + "\n"
       : renderCheckText(results, explainByTarget);
 
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
@@ -957,6 +1066,10 @@ Options:
                          Exit 0 fresh, 1 drift, 2 error.
   --explain              With --check only: explain why each target got its class
                          and what a reconcile would write. Read-only; never writes.
+  --block-manifest       With --check --explain --format json only: attach
+                         per-block provenance (source_file/source_block_index/
+                         source_block_digest/rendered_digest/...) to each target.
+                         Read-only; never writes.
   --reconcile            Repair drift safely: re-emit MISSING/STALE targets
                          (STALE keeps its recorded profile), SKIP OK ones, and
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
@@ -986,7 +1099,10 @@ if (isMain) {
   // for usage errors (1 stays reserved for a reconcile refusal — a real verdict,
   // not a usage mistake). Plain write-mode usage errors stay exit 1.
   const usageExit2 =
-    argv.includes("--check") || argv.includes("--explain") || argv.includes("--reconcile");
+    argv.includes("--check") ||
+    argv.includes("--explain") ||
+    argv.includes("--reconcile") ||
+    argv.includes("--block-manifest");
   try {
     const options = parseEmitArgv(argv);
     if (options.help) {

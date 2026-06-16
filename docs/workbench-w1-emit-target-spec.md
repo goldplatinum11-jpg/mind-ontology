@@ -290,6 +290,22 @@ The header is deliberately redundant with the visible notice line (section 4):
 the comment is for machines (`--check`, `status`), the blockquote is for the
 human who opens the file. Both ship in every target.
 
+**Block-level provenance is on-demand, never persisted.** The header records
+only the two *file-level* digests above (`source_digest` over included files,
+`content_digest` over the whole payload). The per-block manifest —
+`source_file` / `source_block_index` / `source_block_digest` / `rendered_digest`
+/ `emitted_index` / `section` / `forced` for each emitted block — is recomputed
+from the sources only when a reader asks for it (`emit --check --explain
+--format json --block-manifest`, W2 §7.4). It is **not** a header field and
+**not** a sidecar file: persisting a second source of truth is the same
+`config/manifest file` non-feature ruled out in section 1, and adding a header
+field would change the artifact bytes and force an `emit_version` bump. Because
+the manifest derives from the same `(canonicalized source bytes, target,
+profile, emit_version)` inputs as the artifact, it inherits the section 7
+determinism guarantee for free. A future **block-level reconcile** (patching
+only the drifted blocks rather than rewriting the whole artifact) will consume
+this same manifest; until then `--reconcile` stays file-level.
+
 ## 7. Determinism guarantee
 
 **Guarantee:** emitted artifact bytes are a pure function of
