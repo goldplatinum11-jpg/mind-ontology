@@ -153,6 +153,13 @@ export const COMMANDS = {
     group: "operator",
     summary: "Configure auto-harvesting: write a Claude Code Stop hook to .claude/settings.json.",
   },
+  "import-sirt": {
+    script: "import-sirt.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Fetch SIRT nodes and harvest ontology candidates into .agentctx/ (requires SIRT_API_KEY).",
+  },
 };
 
 const HELP_FLAGS = new Set(["help", "--help", "-h"]);
