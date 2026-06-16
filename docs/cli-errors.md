@@ -158,6 +158,47 @@ error (usage / flag-combo / compile failure). Refusal messages (stderr):
 Each refusal is prefixed by a `Refusing to reconcile: <n> target(s) need a
 human (nothing written for any target).` summary line.
 
+## `mind-ontology emit --reconcile-source [--apply]`
+
+The **source-ward** direction (the opposite of `--reconcile`): instead of
+re-emitting the artifact from `.agentctx/`, it folds a `HAND-EDITED` artifact's
+block-body edits BACK into the `.agentctx/` source blocks they came from (via
+block-manifest provenance). `--reconcile-source` alone is a read-only PREVIEW
+(writes nothing); adding `--apply` writes the patches — and it is the **only**
+mode that writes `.agentctx/` (it never re-emits artifacts; run `mind-ontology
+emit` afterwards). All-or-nothing; ambiguity always refuses. Exit `0`
+preview/applied, `1` refused, `2` usage error.
+
+Usage errors (stderr, exit `2`):
+
+| Combination | Message (stderr) | Next safe action |
+|---|---|---|
+| `--reconcile-source` with `--check`/`--reconcile`/`--explain`/`--force`/`--full`/`--block-manifest` | `--reconcile-source cannot be combined with --check/--reconcile/--explain/--force/--full/--block-manifest (it is a read-only preview mode of its own)` | Run `--reconcile-source` on its own (optionally with `--apply`). |
+| `--apply` without `--reconcile-source` | `--apply is only valid with --reconcile-source` | Add `--reconcile-source`, or drop `--apply`. |
+
+Refusals (stderr, exit `1`, nothing written). Preview refusals are prefixed by
+`Refusing to preview source reconcile: <n> target(s) need a human (nothing
+written; .agentctx/ untouched).`; `--apply` refusals by `Refusing to apply
+source reconcile: <n> …` (same suffix), plus the apply-only gates below:
+
+| Refusal | Message (stderr) | Next safe action |
+|---|---|---|
+| Target is `OK` | `<path> (<id>) is OK (fresh); nothing to reconcile to source.` | Nothing to do. |
+| Target is `MISSING` | `<path> (<id>) is MISSING; there is no artifact to attribute to source. Run: mind-ontology emit --target <id>` | Emit it first. |
+| Target is `UNMANAGED` | `<path> (<id>) is UNMANAGED (headerless); its content cannot be attributed to .agentctx/ blocks.` | Adopt it with `emit --force`, or hand-port. |
+| Target is `STALE`, not hand-edited | `<path> (<id>) is STALE, not hand-edited; repair the artifact instead: mind-ontology emit --reconcile --target <id>` | Use artifact-ward `--reconcile`. |
+| Recorded profile unreproducible | `<path> (<id>) records a target/profile that is no longer reproducible; it cannot be rebuilt to attribute the edit. Re-emit it explicitly with a known profile.` | Re-emit with a known profile. |
+| Sources drifted since emit | `<path> (<id>): .agentctx/ sources changed (or emit_version bumped) since this artifact was generated, so the hand-edit cannot be separated from source drift. …` | Resolve the drift (`--reconcile`/re-emit), re-apply the hand-edit, retry. |
+| Edit not isolated to one block body (heading/section/footer/structure or a forged provenance heading) | e.g. `<path> (<id>): could not align the edited artifact to its generated structure; a provenance heading, section heading, notice, or footer changed (only block bodies reconcile to source)` | Move the structural edit into `.agentctx/` by hand, or re-emit. |
+
+`--apply`-only gates (stderr, exit `1`, nothing written), prefixed `Refusing to apply:`:
+
+| Gate | Message (stderr) | Next safe action |
+|---|---|---|
+| Source not git-tracked / not clean / not a repo | `… .agentctx/ source(s) have uncommitted or untracked changes: …` / `… the project is not a git repository …` (recovery is via git) | Commit/track the affected `.agentctx/` files first. |
+| Source path is a symlink / non-regular / multi-hardlink | `.agentctx/<file> is a symlink or special file; refusing to write through it` | Replace the link with a real file. |
+| Patches would not reproduce the artifact | `<path> (<id>): applying these edits would not reproduce the hand-edited artifact (the edit is not an exact, body-only reconcile — a heading or structure likely moved). Reconcile by hand.` | Reconcile by hand. |
+
 ## `mind-ontology status`
 
 `status` is a **report command** ([W2 §2.3](workbench-w2-cli-spec.md)): an
