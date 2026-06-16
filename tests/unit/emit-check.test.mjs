@@ -282,7 +282,7 @@ describe("--check --explain drift explanation (read-only, W2 §13 item 15)", () 
     expect(r.status).toBe(1);
     expect(r.stdout).toContain("STALE");
     expect(r.stdout).toContain(".agentctx/ sources changed since last emit");
-    expect(r.stdout).toContain("writing AGENTS.md: mind-ontology emit --target agents-md");
+    expect(r.stdout).toContain("writing AGENTS.md: mind-ontology emit --reconcile --target agents-md");
   });
 
   it("text mode HAND-EDITED: explanation says to move the edit into the source first", () => {
@@ -341,7 +341,9 @@ describe("--check --explain drift explanation (read-only, W2 §13 item 15)", () 
       sourceDigestMatchesCurrent: null,
       emitVersionMatches: null,
       expectedProfile: "default",
-      reconcileCommand: "mind-ontology emit --target agents-md",
+      // MISSING is safe to auto-reconcile -> the explain command points at the
+      // --reconcile flow (Lane 2).
+      reconcileCommand: "mind-ontology emit --reconcile --target agents-md",
       wouldWritePaths: ["AGENTS.md"],
     });
     expect(claudeT.explain).toMatchObject({

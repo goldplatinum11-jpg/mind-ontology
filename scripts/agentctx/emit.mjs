@@ -342,6 +342,16 @@ export function classifyTarget({ cwd, target, sources }) {
     };
   }
 
+  // Carry the RECORDED header fields (target + profile, as written on disk) on
+  // every header-present result. These can diverge from the requested `target`
+  // / current generator (e.g. a header recording `target: cursor`), so both
+  // explain and reconcile must judge reproducibility from these, not from the
+  // requested target — single source of truth, no fork.
+  const recorded = {
+    recordedTarget: parsed.header.target,
+    recordedProfile: parsed.header.profile,
+  };
+
   if (sha256(parsed.payload) !== parsed.header.content_digest) {
     return {
       target,
@@ -349,6 +359,7 @@ export function classifyTarget({ cwd, target, sources }) {
       status: "hand-edited",
       detail: detailFor("hand-edited", target, spec.path),
       profile: parsed.header.profile,
+      ...recorded,
     };
   }
 
@@ -358,6 +369,7 @@ export function classifyTarget({ cwd, target, sources }) {
     status: "stale",
     detail: detailFor("stale", target, spec.path),
     profile: parsed.header.profile,
+    ...recorded,
   };
   if (parsed.header.emit_version !== String(EMIT_VERSION)) return stale;
   // A header naming an unknown target or profile cannot be reproduced by the
@@ -373,7 +385,14 @@ export function classifyTarget({ cwd, target, sources }) {
   });
   if (expected.artifact !== content) return stale;
 
-  return { target, path: spec.path, status: "ok", detail: null, profile: parsed.header.profile };
+  return {
+    target,
+    path: spec.path,
+    status: "ok",
+    detail: null,
+    profile: parsed.header.profile,
+    ...recorded,
+  };
 }
 
 /**
@@ -424,12 +443,28 @@ export function explainTarget({ cwd, target, sources, result }) {
     }
   }
 
-  // UNMANAGED is the only class a plain re-emit refuses; it needs --force.
-  // Every other reconcile is a plain re-emit of just this target.
+  // A STALE artifact is only safe to auto-reconcile when its RECORDED
+  // target/profile is still reproducible — judged from the threaded recorded
+  // fields, the SAME test `--reconcile` applies (single source of truth). An
+  // unreproducible STALE (header records an unknown profile / non-v1 target) is
+  // one reconcile REFUSES, so explain must not advertise --reconcile for it.
+  const staleReproducible = result.status === "stale" && staleIsReproducible(result);
+
+  // The command a user runs to fix this target, by class:
+  //   MISSING / reproducible STALE -> safe to auto-reconcile. `emit --reconcile`
+  //     re-emits respecting the recorded profile, so a `full` artifact stays
+  //     `full` (it never silently degrades to default).
+  //   unreproducible STALE         -> reconcile refuses; re-emit explicitly with
+  //     a known profile.
+  //   UNMANAGED                    -> needs --force (headerless file).
+  //   HAND-EDITED                  -> port the edit into .agentctx/, then emit.
+  //   OK                           -> nothing to reconcile; plain emit refreshes.
   const reconcileCommand =
-    result.status === "unmanaged"
-      ? `mind-ontology emit --force --target ${target}`
-      : `mind-ontology emit --target ${target}`;
+    result.status === "missing" || staleReproducible
+      ? `mind-ontology emit --reconcile --target ${target}`
+      : result.status === "unmanaged"
+        ? `mind-ontology emit --force --target ${target}`
+        : `mind-ontology emit --target ${target}`;
 
   // A reconcile rewrites exactly this target's artifact. OK needs no reconcile,
   // so nothing would be written.
@@ -460,11 +495,15 @@ export function explainText(result, explain) {
     case "hand-edited":
       return `why: the payload no longer matches the header's content_digest (edited after generation). Re-emit overwrites the file, so move the hand-edit into the .agentctx/ source first, then re-emit (writes ${explain.wouldWritePaths.join(", ")}): ${explain.reconcileCommand}`;
     case "stale": {
+      // An unreproducible STALE cannot be auto-reconciled (reconcile refuses
+      // it); explain must say so and point at the manual re-emit, not advertise
+      // --reconcile. The reproducible reasons keep the auto-reconcile wording.
+      if (!staleIsReproducible(result)) {
+        return `why: the recorded target/profile is no longer reproducible, so this CANNOT be auto-reconciled; re-emit it explicitly with a known profile (writes ${explain.wouldWritePaths.join(", ")}): ${explain.reconcileCommand}`;
+      }
       const reason = explain.emitVersionMatches === false
         ? "emit_version bumped since last emit"
-        : explain.sourceDigestMatchesCurrent === false
-          ? ".agentctx/ sources changed since last emit"
-          : "the recorded target/profile is no longer reproducible";
+        : ".agentctx/ sources changed since last emit";
       return `why: ${reason} (profile ${explain.expectedProfile}). A reconcile re-emits it, writing ${explain.wouldWritePaths.join(", ")}: ${explain.reconcileCommand}`;
     }
     default:
@@ -482,6 +521,7 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     targetFlagGiven: false,
     check: false,
     explain: false,
+    reconcile: false,
     force: false,
     full: false,
     format: "text",
@@ -502,6 +542,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.check = true;
     } else if (arg === "--explain") {
       parsed.explain = true;
+    } else if (arg === "--reconcile") {
+      parsed.reconcile = true;
     } else if (arg === "--force") {
       parsed.force = true;
     } else if (arg === "--full") {
@@ -542,6 +584,17 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   // in write mode and must never write, so it is valid only alongside --check.
   if (parsed.explain && !parsed.check) {
     throw new Error("--explain is only valid together with --check (it never writes)");
+  }
+  // --reconcile is a write mode; --check is read-only. They are opposite modes,
+  // so combining them is a usage error.
+  if (parsed.reconcile && parsed.check) {
+    throw new Error("--reconcile cannot be combined with --check (--check never writes; --reconcile is the write side)");
+  }
+  // --reconcile re-emits each STALE target against the profile recorded in its
+  // header, so honoring --full would silently override that recorded profile
+  // (e.g. degrade or upgrade a target). Refuse the combination outright.
+  if (parsed.reconcile && parsed.full) {
+    throw new Error("--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)");
   }
 
   // Default target set: all v1 targets (W1 §2, W2 §8 ruling). Explicit
@@ -760,12 +813,143 @@ export function runEmitCheck(options) {
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
 }
 
+// A reconcile refuses any class where a re-emit could destroy unrecoverable
+// work or cannot be reproduced safely. The message names the manual fix.
+function reconcileRefusal(result) {
+  switch (result.status) {
+    case "unmanaged":
+      return `${result.path} (${result.target}) is UNMANAGED (a headerless file emit will not claim); reconcile will not overwrite it. Move its content into .agentctx/ sources, then run: mind-ontology emit --force --target ${result.target}`;
+    case "hand-edited":
+      return `${result.path} (${result.target}) is HAND-EDITED; a re-emit would discard the hand edit. Move the edit into the .agentctx/ source, then run: mind-ontology emit --target ${result.target}`;
+    default:
+      // A STALE target whose recorded target/profile is no longer reproducible
+      // (unknown profile / non-v1 target in the header): re-emitting would have
+      // to invent a profile, which could silently change the artifact's scope.
+      return `${result.path} (${result.target}) records a target/profile that is no longer reproducible; reconcile will not guess a profile. Re-emit it explicitly with a known profile.`;
+  }
+}
+
+// Whether a STALE artifact can be reconciled by rebuilding against the
+// target/profile RECORDED IN ITS HEADER. emit_version-only staleness is
+// reproducible (the recorded names are still known); a header recording an
+// unknown profile or a non-v1 target is NOT — judged from the recorded fields,
+// never the requested target (the same test classifyTarget itself applies, and
+// what --check --explain reports). A missing/headerless result has no recorded
+// fields and is handled by other branches, never reaches here.
+function staleIsReproducible(result) {
+  return Boolean(
+    EMIT_TARGETS[result.recordedTarget]?.v1 && PROFILES[result.recordedProfile],
+  );
+}
+
+/**
+ * Reconcile mode (Lane 2). SAFE drift repair: writes generated artifacts
+ * (AGENTS.md / CLAUDE.md) only — never `.agentctx/` sources — and only for
+ * classes where nothing is lost:
+ *   OK          -> skip (already fresh).
+ *   MISSING     -> emit at the default profile (nothing on disk to honor).
+ *   STALE       -> re-emit against the profile RECORDED IN THE HEADER, so a
+ *                  `full` artifact stays `full` (never degraded to default).
+ *   UNMANAGED   -> refuse (headerless file; needs --force).
+ *   HAND-EDITED -> refuse (a re-emit would discard the hand edit).
+ * All-or-nothing: if ANY requested target is in a refuse class, nothing is
+ * written for any target. Classification happens first, every write second.
+ * Returns { exitCode, stdout, stderr }: 0 reconciled/clean, 1 refused.
+ */
+export function runEmitReconcile(options) {
+  validateAgentctxSources(options.cwd);
+  const sources = readAgentctx(options.cwd);
+
+  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
+
+  // Phase 1 — classify and screen. A refuse class anywhere blocks the whole
+  // run; collect every reason so the operator sees all of them at once.
+  const refusals = results
+    .filter(
+      (r) =>
+        r.status === "unmanaged" ||
+        r.status === "hand-edited" ||
+        (r.status === "stale" && !staleIsReproducible(r)),
+    )
+    .map((r) => reconcileRefusal(r));
+  if (refusals.length > 0) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr:
+        `Refusing to reconcile: ${refusals.length} target(s) need a human (nothing written for any target).\n` +
+        refusals.map((m) => `  ${m}`).join("\n") +
+        "\n",
+    };
+  }
+
+  // Phase 2 — build every artifact in memory. STALE rebuilds against the
+  // target/profile RECORDED IN THE HEADER (the same fields the reproducibility
+  // gate and classifyTarget use), so a `full` artifact stays `full`. MISSING
+  // has no header, so it emits the requested target at the default profile.
+  // No write has happened yet.
+  const planned = [];
+  for (const r of results) {
+    if (r.status === "ok") continue;
+    const build =
+      r.status === "stale"
+        ? buildArtifact({ sources, target: r.recordedTarget, profile: r.recordedProfile })
+        : buildArtifact({ sources, target: r.target, profile: "default" });
+    planned.push({ result: r, build });
+  }
+
+  // Phase 3 — write all planned artifacts. Reconcile only ever writes the v1
+  // artifact paths (AGENTS.md / CLAUDE.md), never `.agentctx/`.
+  for (const { build } of planned) {
+    const path = resolve(options.cwd, build.path);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, build.artifact, "utf8");
+  }
+
+  const reconciled = new Set(planned.map((p) => p.result.target));
+  if (options.format === "json") {
+    const stdout =
+      JSON.stringify(
+        {
+          ok: true,
+          targets: results.map((r) => ({
+            target: r.target,
+            path: r.path,
+            action: reconciled.has(r.target) ? "reconciled" : "skipped",
+            status: r.status,
+            profile: reconciled.has(r.target)
+              ? planned.find((p) => p.result.target === r.target).build.profile
+              : (r.profile ?? null),
+          })),
+        },
+        null,
+        2,
+      ) + "\n";
+    return { exitCode: 0, stdout, stderr: "" };
+  }
+
+  const lines = results.map((r) => {
+    if (!reconciled.has(r.target)) {
+      return `SKIP        ${r.path} (${r.target}, already ${TEXT_STATUS[r.status]})`;
+    }
+    const build = planned.find((p) => p.result.target === r.target).build;
+    return `RECONCILED  ${r.path} (${r.target}, was ${TEXT_STATUS[r.status]}, profile ${build.profile})`;
+  });
+  lines.push(
+    reconciled.size === 0
+      ? `OK - ${results.length} of ${results.length} targets already fresh`
+      : `RECONCILED - ${reconciled.size} of ${results.length} targets re-emitted`,
+  );
+  return { exitCode: 0, stdout: lines.join("\n") + "\n", stderr: "" };
+}
+
 function printHelp() {
   return `mind-ontology emit — compile static per-tool artifacts from .agentctx/
 
 Usage:
-  mind-ontology emit [options]            write all v1 targets (AGENTS.md, CLAUDE.md)
-  mind-ontology emit --check [options]    verify freshness; writes nothing
+  mind-ontology emit [options]             write all v1 targets (AGENTS.md, CLAUDE.md)
+  mind-ontology emit --check [options]     verify freshness; writes nothing
+  mind-ontology emit --reconcile [options] safely re-emit only drifted targets
 
 Options:
   --target <id>[,<id>]   Restrict to targets: agents-md, claude-md. Repeatable.
@@ -773,6 +957,11 @@ Options:
                          Exit 0 fresh, 1 drift, 2 error.
   --explain              With --check only: explain why each target got its class
                          and what a reconcile would write. Read-only; never writes.
+  --reconcile            Repair drift safely: re-emit MISSING/STALE targets
+                         (STALE keeps its recorded profile), SKIP OK ones, and
+                         REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
+                         target). Writes artifacts only, never .agentctx/.
+                         Exit 0 reconciled/clean, 1 refused, 2 error.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.
@@ -792,22 +981,28 @@ if (isMain) {
   // three-way split — 0 fresh, 1 drift, 2 hard error (usage errors and
   // compile failures included, so `1` means exactly "re-emit needed").
   const argv = process.argv.slice(2);
-  // --explain implies check-mode intent (it is only valid with --check), so a
-  // usage error mentioning either gets the check-mode exit 2, keeping 1 reserved
-  // for "re-emit needed".
-  const checkMode = argv.includes("--check") || argv.includes("--explain");
+  // Exit code on a thrown usage/parse error. --check and --explain imply
+  // check-mode intent; --reconcile is a distinct mode that also reserves exit 2
+  // for usage errors (1 stays reserved for a reconcile refusal — a real verdict,
+  // not a usage mistake). Plain write-mode usage errors stay exit 1.
+  const usageExit2 =
+    argv.includes("--check") || argv.includes("--explain") || argv.includes("--reconcile");
   try {
     const options = parseEmitArgv(argv);
     if (options.help) {
       process.stdout.write(printHelp());
       process.exit(0);
     }
-    const result = options.check ? runEmitCheck(options) : runEmitWrite(options);
+    const result = options.check
+      ? runEmitCheck(options)
+      : options.reconcile
+        ? runEmitReconcile(options)
+        : runEmitWrite(options);
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
     process.exit(result.exitCode);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
-    process.exit(checkMode ? 2 : 1);
+    process.exit(usageExit2 ? 2 : 1);
   }
 }
