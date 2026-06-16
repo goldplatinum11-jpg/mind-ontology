@@ -316,6 +316,23 @@ mind-ontology emit [--target <id>[,<id>…]]…
                    [--format text|json] [--cwd <path>]
 ```
 
+**The reconcile family (two axes).** The reconcile-related flags form a matrix
+of *direction* (which side a change lands on) × *granularity*, plus a
+read-only provenance surface. This orients the per-flag rows below:
+
+| | preview (read-only) | write |
+|---|---|---|
+| **artifact-ward** (re-emit AGENTS.md/CLAUDE.md from `.agentctx/`) | `--check --explain --format json [--block-reconcile-plan]` | `--reconcile [--block-level]` |
+| **source-ward** (fold a hand-edit of the generated file BACK into `.agentctx/`) | `emit --reconcile-source` | `emit --reconcile-source --apply` |
+
+`--block-level` / `--block-reconcile-plan` act at block granularity rather than
+whole-file; `--block-manifest` adds per-block provenance to the `--check`
+verdict. Artifact-ward modes write only the generated artifacts and never touch
+`.agentctx/`; the source-ward modes are the only ones that write `.agentctx/`
+(and never re-emit artifacts — run `emit` afterwards). The source-ward family
+(`--reconcile-source` / `--apply`) is specified in its own section and `emit
+--help`; the rows below cover the artifact-ward and provenance flags.
+
 | Flag | Meaning | Constraints |
 |---|---|---|
 | `--target` | restrict to a subset of the registry (W1 §2): `agents-md`, `claude-md` | repeatable **and** CSV (mirrors `--scope`); duplicates are deduped; processing order is always registry order regardless of flag order (determinism) |

@@ -1366,47 +1366,70 @@ function staleIsReproducible(result) {
  * written for any target. Classification happens first, every write second.
  * Returns { exitCode, stdout, stderr }: 0 reconciled/clean, 1 refused.
  */
+// The artifact-ward reconcile screen (single source of truth, shared by the
+// file-level and block-level reconcile modes): a target is REFUSED when a
+// re-emit could lose work or cannot be reproduced. Returns the exact refusal
+// sentence, or null when the target is safe to reconcile.
+function artifactReconcileRefusalReason(result) {
+  if (
+    result.status === "unmanaged" ||
+    result.status === "hand-edited" ||
+    (result.status === "stale" && !staleIsReproducible(result))
+  ) {
+    return reconcileRefusal(result);
+  }
+  return null;
+}
+
+// Phases 1 + 2 of an artifact-ward reconcile, shared verbatim by both the
+// file-level (`--reconcile`) and block-level (`--reconcile --block-level`)
+// modes so the safety screen and the expected-artifact build can never drift
+// apart. Returns { results, refusals, planned: [{result, build}] }. A non-empty
+// `refusals` means the whole run must refuse (all-or-nothing); `planned` lists
+// the drifted targets to repair (OK targets are skipped). Reads only — the
+// caller owns the write phase. STALE rebuilds against the RECORDED
+// target/profile (so a `full` artifact stays `full`); MISSING emits the
+// requested target at the default profile.
+function planArtifactReconciliation({ cwd, targets, sources }) {
+  const results = checkTargets({ cwd, targets, sources });
+  const refusals = results.map(artifactReconcileRefusalReason).filter(Boolean);
+  if (refusals.length > 0) return { results, refusals, planned: [] };
+
+  const planned = [];
+  for (const result of results) {
+    if (result.status === "ok") continue;
+    const build =
+      result.status === "stale"
+        ? buildArtifact({ sources, target: result.recordedTarget, profile: result.recordedProfile })
+        : buildArtifact({ sources, target: result.target, profile: "default" });
+    planned.push({ result, build });
+  }
+  return { results, refusals: [], planned };
+}
+
+// The shared refusal response for both reconcile modes (byte-identical stderr).
+function renderArtifactReconcileRefusal(refusals) {
+  return {
+    exitCode: 1,
+    stdout: "",
+    stderr:
+      `Refusing to reconcile: ${refusals.length} target(s) need a human (nothing written for any target).\n` +
+      refusals.map((m) => `  ${m}`).join("\n") +
+      "\n",
+  };
+}
+
 export function runEmitReconcile(options) {
   validateAgentctxSources(options.cwd);
   const sources = readAgentctx(options.cwd);
 
-  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
-
-  // Phase 1 — classify and screen. A refuse class anywhere blocks the whole
-  // run; collect every reason so the operator sees all of them at once.
-  const refusals = results
-    .filter(
-      (r) =>
-        r.status === "unmanaged" ||
-        r.status === "hand-edited" ||
-        (r.status === "stale" && !staleIsReproducible(r)),
-    )
-    .map((r) => reconcileRefusal(r));
-  if (refusals.length > 0) {
-    return {
-      exitCode: 1,
-      stdout: "",
-      stderr:
-        `Refusing to reconcile: ${refusals.length} target(s) need a human (nothing written for any target).\n` +
-        refusals.map((m) => `  ${m}`).join("\n") +
-        "\n",
-    };
-  }
-
-  // Phase 2 — build every artifact in memory. STALE rebuilds against the
-  // target/profile RECORDED IN THE HEADER (the same fields the reproducibility
-  // gate and classifyTarget use), so a `full` artifact stays `full`. MISSING
-  // has no header, so it emits the requested target at the default profile.
-  // No write has happened yet.
-  const planned = [];
-  for (const r of results) {
-    if (r.status === "ok") continue;
-    const build =
-      r.status === "stale"
-        ? buildArtifact({ sources, target: r.recordedTarget, profile: r.recordedProfile })
-        : buildArtifact({ sources, target: r.target, profile: "default" });
-    planned.push({ result: r, build });
-  }
+  // Phases 1 + 2 (shared): classify/screen, then build the drifted targets.
+  const { results, refusals, planned } = planArtifactReconciliation({
+    cwd: options.cwd,
+    targets: options.targets,
+    sources,
+  });
+  if (refusals.length > 0) return renderArtifactReconcileRefusal(refusals);
 
   // Phase 3 — write all planned artifacts. Reconcile only ever writes the v1
   // artifact paths (AGENTS.md / CLAUDE.md), never `.agentctx/`.
@@ -1468,39 +1491,22 @@ export function runEmitReconcileBlockLevel(options) {
   validateAgentctxSources(options.cwd);
   const sources = readAgentctx(options.cwd);
 
-  const results = checkTargets({ cwd: options.cwd, targets: options.targets, sources });
+  // Phases 1 + 2 (shared with file-level reconcile): identical refusal screen
+  // and expected-artifact build, so the two modes can never diverge on safety.
+  const { results, refusals, planned: basePlanned } = planArtifactReconciliation({
+    cwd: options.cwd,
+    targets: options.targets,
+    sources,
+  });
+  if (refusals.length > 0) return renderArtifactReconcileRefusal(refusals);
 
-  // Phase 1 — same refusal screen as file-level reconcile (single source of truth).
-  const refusals = results
-    .filter(
-      (r) =>
-        r.status === "unmanaged" ||
-        r.status === "hand-edited" ||
-        (r.status === "stale" && !staleIsReproducible(r)),
-    )
-    .map((r) => reconcileRefusal(r));
-  if (refusals.length > 0) {
-    return {
-      exitCode: 1,
-      stdout: "",
-      stderr:
-        `Refusing to reconcile: ${refusals.length} target(s) need a human (nothing written for any target).\n` +
-        refusals.map((m) => `  ${m}`).join("\n") +
-        "\n",
-    };
-  }
-
-  // Phase 2 — build the expected artifact, the read-only plan, and the patched
-  // bytes for every drifted target IN MEMORY. The same expected build the
-  // file-level reconcile uses is the oracle; applyBlockReconcilePlan proves the
-  // block patch reproduces it. A guard failure refuses the whole run.
+  // Phase 2b — derive the block-level patch for each drifted target and PROVE
+  // it reproduces the file-level expected artifact byte-for-byte
+  // (applyBlockReconcilePlan's guard) before any write. The same expected build
+  // the file-level reconcile uses is the oracle. A guard failure anywhere
+  // refuses the whole run, so a block-patch bug can never emit corrupted bytes.
   const planned = [];
-  for (const r of results) {
-    if (r.status === "ok") continue;
-    const build =
-      r.status === "stale"
-        ? buildArtifact({ sources, target: r.recordedTarget, profile: r.recordedProfile })
-        : buildArtifact({ sources, target: r.target, profile: "default" });
+  for (const { result: r, build } of basePlanned) {
     const plan = planBlockReconcileTarget({ cwd: options.cwd, target: r.target, sources, result: r });
     const artifactPath = resolve(options.cwd, build.path);
     const current = existsSync(artifactPath) ? readFileSync(artifactPath, "utf8") : "";
@@ -2337,6 +2343,18 @@ Options:
   --format text|json     Output format (default: text).
   --cwd <path>           Project root containing .agentctx/ (default: cwd).
   -h, --help             Show this help message.
+
+The reconcile family, by direction (which side it changes) x granularity:
+                       preview (read-only)            write
+  artifact-ward    --check --explain --format json   --reconcile
+  (re-emit AGENTS  [--block-reconcile-plan]           [--block-level]
+   /CLAUDE.md)
+  source-ward      --reconcile-source                 --reconcile-source --apply
+  (edit .agentctx/)
+  provenance: --check --explain --format json --block-manifest (read-only)
+Artifact-ward repairs the generated file from .agentctx/; source-ward folds a
+hand-edit of the generated file BACK into .agentctx/. --block-level / -plan act
+at block granularity; --block-manifest adds per-block provenance.
 
 Both files carry identical payloads by design; if every tool you run reads
 AGENTS.md, emit only it: mind-ontology emit --target agents-md
