@@ -410,3 +410,51 @@ describe("--reconcile --block-level (block-level repair, opt-in)", () => {
     expect(r.stdout).not.toContain("BLOCK-RECONCILED");
   });
 });
+
+// Lane 4 / Phase 5 — result-shape lock and compatibility guards. The opt-in
+// block-level result shape is frozen; the file-level result shape stays exactly
+// as Lane 2 shipped it.
+describe("--reconcile result shapes: file-level frozen, block-level locked (Phase 5)", () => {
+  function staleProject() {
+    const cwd = emitted();
+    appendFileSync(join(cwd, ".agentctx", "constraints.md"), "Shape lock drift.\n");
+    return cwd;
+  }
+
+  it("file-level --reconcile --format json keeps its exact Lane-2 shape (no mode/changed_blocks)", () => {
+    const cwd = staleProject();
+    const j = JSON.parse(runCli(["emit", "--cwd", cwd, "--reconcile", "--format", "json"]).stdout);
+    expect(Object.keys(j)).toEqual(["ok", "targets"]); // no top-level `mode`
+    for (const t of j.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "action", "status", "profile"]);
+      expect(["reconciled", "skipped"]).toContain(t.action); // never "block-reconciled"
+      expect(t).not.toHaveProperty("changed_blocks");
+    }
+  });
+
+  it("block-level --reconcile --format json has the locked opt-in shape", () => {
+    const cwd = staleProject();
+    const j = JSON.parse(runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level", "--format", "json"]).stdout);
+    expect(Object.keys(j)).toEqual(["ok", "mode", "targets"]);
+    expect(j.mode).toBe("block-level");
+    for (const t of j.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "action", "status", "profile", "changed_blocks"]);
+      expect(["block-reconciled", "skipped"]).toContain(t.action);
+      expect(Number.isInteger(t.changed_blocks)).toBe(true);
+    }
+  });
+
+  it("a block-level reconciled artifact is a clean managed file: exactly the seven header keys", () => {
+    const cwd = staleProject();
+    expect(runCli(["emit", "--cwd", cwd, "--reconcile", "--block-level"]).status).toBe(0);
+    const parsed = parseEmitHeader(readFileSync(join(cwd, "AGENTS.md"), "utf8"));
+    expect(parsed).not.toBeNull();
+    expect(Object.keys(parsed.header)).toEqual([
+      "target", "profile", "emit_version", "source", "source_digest", "content_digest", "note",
+    ]);
+    // No block-reconcile data leaked into the written artifact bytes.
+    for (const needle of ["block_reconcile", "changed_blocks", "block-level"]) {
+      expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).not.toContain(needle);
+    }
+  });
+});
