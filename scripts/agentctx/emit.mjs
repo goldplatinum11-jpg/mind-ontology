@@ -568,6 +568,226 @@ export function explainText(result, explain) {
 }
 
 // ---------------------------------------------------------------------------
+// Block-level reconcile — read-only drift planner (lane 4, Phase 1)
+//
+// All pure (string in, data out): no I/O, no writes. These let a caller see
+// WHICH emitted blocks drifted, as the read-only foundation for an opt-in
+// block-level reconcile whose safety is proven by a full-artifact byte guard
+// (the surgical patch is the mechanism; byte-equality with a full re-emit is
+// the proof). Nothing here changes the artifact bytes or the existing surfaces.
+// ---------------------------------------------------------------------------
+
+// A rendered block heading in an emitted payload: '### <title> <!-- (from
+// .agentctx/<file>) -->'. The trailing provenance comment is renderBlock's
+// signature (W1 §4) and the reliable anchor for an emitted block start — far
+// more robust than a blank line, since a block body may contain blank lines.
+const EMITTED_BLOCK_HEADING = /^### .* <!-- \(from \.agentctx\/(.+?)\) -->$/;
+
+/**
+ * Parse an emitted artifact payload (the bytes AFTER the header terminator)
+ * into its emitted block spans, in document order. Each span is one rendered
+ * block: { emittedIndex, sourceFile, renderedText, renderedDigest }. A block
+ * runs from its heading line to the next structural marker (another block
+ * heading, a generated '## ' section heading, or the '---' footer); the
+ * trailing '\n\n' join blank line is stripped, so renderedText is exactly
+ * renderBlock's output and sha256(renderedText) reproduces the manifest's
+ * rendered_digest. Pure.
+ */
+export function parseEmittedBlockSpans(payload) {
+  const lines = String(payload).split("\n");
+  const spans = [];
+  let i = 0;
+  while (i < lines.length) {
+    const m = lines[i].match(EMITTED_BLOCK_HEADING);
+    if (!m) {
+      i += 1;
+      continue;
+    }
+    const sourceFile = m[1];
+    const blockLines = [lines[i]];
+    let j = i + 1;
+    for (; j < lines.length; j += 1) {
+      const line = lines[j];
+      // A new block heading, a section heading ('## ' but not '### '), or the
+      // footer ends the current block. EMITTED_BLOCK_HEADING is checked first
+      // so a rendered heading is never mistaken for a section heading.
+      if (EMITTED_BLOCK_HEADING.test(line)) break;
+      if (line.startsWith("## ")) break;
+      if (line === "---") break;
+      blockLines.push(line);
+    }
+    // The single '\n\n' join blank line trails every block; a parsed body is
+    // trimmed, so a trailing empty line is always separator, never content.
+    while (blockLines.length > 1 && blockLines[blockLines.length - 1] === "") {
+      blockLines.pop();
+    }
+    const renderedText = blockLines.join("\n");
+    spans.push({
+      emittedIndex: spans.length,
+      sourceFile,
+      renderedText,
+      renderedDigest: sha256(renderedText),
+    });
+    i = j;
+  }
+  return spans;
+}
+
+// One block-drift entry (read-only report). kind ∈ unchanged|replace|insert|
+// delete. emitted_index is the position in the EXPECTED sequence (null for a
+// delete, which exists only in the actual artifact). digests are null on the
+// side where the block is absent.
+function blockChange(kind, { emittedIndex, sourceFile, sourceBlockIndex, actual, expected }) {
+  return {
+    kind,
+    emitted_index: emittedIndex,
+    source_file: sourceFile,
+    source_block_index: sourceBlockIndex ?? null,
+    actual_rendered_digest: actual ?? null,
+    expected_rendered_digest: expected ?? null,
+  };
+}
+
+/**
+ * Per-block drift between an actual artifact's emitted spans and the expected
+ * build's spans. When both sides have the same length and same source-file
+ * sequence (the dominant STALE case: in-place edits / an emit_version bump),
+ * the comparison is positional — clean unchanged/replace. Otherwise it falls
+ * back to an LCS alignment over rendered digests, collapsing an in-place
+ * delete+insert into a replace. `expectedManifest` (buildArtifact().blockManifest,
+ * index-aligned with expectedSpans) supplies source_block_index. Pure.
+ */
+export function compareBlockDrift(actualSpans, expectedSpans, expectedManifest = null) {
+  const srcIdx = (k) => expectedManifest?.[k]?.source_block_index ?? null;
+  const sameStructure =
+    actualSpans.length === expectedSpans.length &&
+    actualSpans.every((s, k) => s.sourceFile === expectedSpans[k].sourceFile);
+
+  if (sameStructure) {
+    return expectedSpans.map((b, k) => {
+      const a = actualSpans[k];
+      const same = a.renderedDigest === b.renderedDigest;
+      return blockChange(same ? "unchanged" : "replace", {
+        emittedIndex: k,
+        sourceFile: b.sourceFile,
+        sourceBlockIndex: srcIdx(k),
+        actual: a.renderedDigest,
+        expected: b.renderedDigest,
+      });
+    });
+  }
+
+  // LCS over rendered digests (deterministic; ties resolve toward delete-first).
+  const a = actualSpans;
+  const b = expectedSpans;
+  const n = a.length;
+  const m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i][j] =
+        a[i].renderedDigest === b[j].renderedDigest
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const raw = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i].renderedDigest === b[j].renderedDigest) {
+      raw.push(blockChange("unchanged", { emittedIndex: j, sourceFile: b[j].sourceFile, sourceBlockIndex: srcIdx(j), actual: a[i].renderedDigest, expected: b[j].renderedDigest }));
+      i += 1;
+      j += 1;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      raw.push(blockChange("delete", { emittedIndex: null, sourceFile: a[i].sourceFile, sourceBlockIndex: null, actual: a[i].renderedDigest, expected: null }));
+      i += 1;
+    } else {
+      raw.push(blockChange("insert", { emittedIndex: j, sourceFile: b[j].sourceFile, sourceBlockIndex: srcIdx(j), actual: null, expected: b[j].renderedDigest }));
+      j += 1;
+    }
+  }
+  while (i < n) {
+    raw.push(blockChange("delete", { emittedIndex: null, sourceFile: a[i].sourceFile, sourceBlockIndex: null, actual: a[i].renderedDigest, expected: null }));
+    i += 1;
+  }
+  while (j < m) {
+    raw.push(blockChange("insert", { emittedIndex: j, sourceFile: b[j].sourceFile, sourceBlockIndex: srcIdx(j), actual: null, expected: b[j].renderedDigest }));
+    j += 1;
+  }
+  // Collapse an adjacent delete+insert (an in-place edit the LCS split) into a
+  // single replace, preserving the expected emitted_index.
+  const changes = [];
+  for (let k = 0; k < raw.length; k += 1) {
+    const cur = raw[k];
+    const next = raw[k + 1];
+    if (cur.kind === "delete" && next?.kind === "insert") {
+      changes.push(blockChange("replace", {
+        emittedIndex: next.emitted_index,
+        sourceFile: next.source_file,
+        sourceBlockIndex: next.source_block_index,
+        actual: cur.actual_rendered_digest,
+        expected: next.expected_rendered_digest,
+      }));
+      k += 1;
+    } else {
+      changes.push(cur);
+    }
+  }
+  return changes;
+}
+
+/**
+ * Read-only block-reconcile plan for one target, driven by an already-computed
+ * classifyTarget `result` (single source of truth — never re-classifies). It
+ * reports what a block-level reconcile WOULD do without writing:
+ *   OK        -> reproducible, no drift (blocks empty).
+ *   MISSING   -> reproducible create at the default profile (every expected
+ *                block is an insert).
+ *   STALE     -> if reproducible, the per-block drift against the recorded
+ *                profile's expected build; if not, a refuse (no blocks).
+ *   UNMANAGED / HAND-EDITED -> refuse (no blocks), mirroring file-level reconcile.
+ * Pure aside from reading the on-disk artifact (never writes).
+ */
+export function planBlockReconcileTarget({ cwd, target, sources, result }) {
+  const spec = EMIT_TARGETS[target];
+  const path = spec.path;
+  const base = { target, path, status: result.status };
+
+  // Refuse classes: same boundary file-level reconcile enforces. No block patch.
+  if (result.status === "unmanaged" || result.status === "hand-edited") {
+    return { ...base, reproducible: false, expected_profile: null, would_write_paths: [], refuse_reason: reconcileRefusal(result), blocks: [] };
+  }
+  if (result.status === "stale" && !staleIsReproducible(result)) {
+    return { ...base, reproducible: false, expected_profile: null, would_write_paths: [], refuse_reason: reconcileRefusal(result), blocks: [] };
+  }
+
+  if (result.status === "ok") {
+    // Reproducible and already fresh: nothing to reconcile.
+    return { ...base, reproducible: true, expected_profile: result.recordedProfile, would_write_paths: [], refuse_reason: null, blocks: [] };
+  }
+
+  if (result.status === "missing") {
+    const expected = buildArtifact({ sources, target, profile: "default" });
+    const expectedSpans = parseEmittedBlockSpans(expected.payload);
+    const blocks = expectedSpans.map((b, k) =>
+      blockChange("insert", { emittedIndex: k, sourceFile: b.sourceFile, sourceBlockIndex: expected.blockManifest[k]?.source_block_index, actual: null, expected: b.renderedDigest }),
+    );
+    return { ...base, reproducible: true, expected_profile: "default", would_write_paths: [path], refuse_reason: null, blocks };
+  }
+
+  // STALE + reproducible: diff the on-disk artifact against the recorded
+  // target/profile's expected build (the same build a file-level reconcile uses).
+  const expected = buildArtifact({ sources, target: result.recordedTarget, profile: result.recordedProfile });
+  const actualContent = canonicalize(readFileSync(resolve(cwd, path), "utf8"));
+  const actualParsed = parseEmitHeader(actualContent);
+  const actualSpans = actualParsed ? parseEmittedBlockSpans(actualParsed.payload) : [];
+  const expectedSpans = parseEmittedBlockSpans(expected.payload);
+  const blocks = compareBlockDrift(actualSpans, expectedSpans, expected.blockManifest);
+  return { ...base, reproducible: true, expected_profile: result.recordedProfile, would_write_paths: [path], refuse_reason: null, blocks };
+}
+
+// ---------------------------------------------------------------------------
 // CLI surface (W2 §7)
 // ---------------------------------------------------------------------------
 
