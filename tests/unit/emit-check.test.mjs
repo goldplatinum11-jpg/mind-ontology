@@ -493,6 +493,89 @@ describe("--block-manifest opt-in provenance (Phase 2, read-only)", () => {
   });
 });
 
+describe("--block-reconcile-plan opt-in drift preview (lane4 Phase 2, read-only)", () => {
+  const PLAN_KEYS = ["reproducible", "expected_profile", "would_write_paths", "refuse_reason", "blocks"];
+
+  it("attaches a block_reconcile_plan per target, after explain, base shape intact", () => {
+    const cwd = emitted();
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-reconcile-plan",
+    ]);
+    expect(r.status).toBe(0); // fresh -> OK
+    const parsed = JSON.parse(r.stdout);
+    expect(Object.keys(parsed)).toEqual(["ok", "targets"]);
+    for (const t of parsed.targets) {
+      expect(Object.keys(t)).toEqual(["target", "path", "status", "detail", "explain", "block_reconcile_plan"]);
+      expect(Object.keys(t.block_reconcile_plan).sort()).toEqual([...PLAN_KEYS].sort());
+      // OK target: reproducible, no drift, nothing to write.
+      expect(t.block_reconcile_plan.reproducible).toBe(true);
+      expect(t.block_reconcile_plan.would_write_paths).toEqual([]);
+      expect(t.block_reconcile_plan.blocks).toEqual([]);
+    }
+  });
+
+  it("a STALE target previews per-block drift and the path it would write", () => {
+    const cwd = emitted();
+    // Append to a source so the on-disk artifact is STALE (line-ending agnostic).
+    const cpath = join(cwd, ".agentctx", "constraints.md");
+    writeFileSync(cpath, `${readFileSync(cpath, "utf8")}Drift preview line.\n`);
+    const before = readFileSync(join(cwd, "AGENTS.md"), "utf8");
+
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-reconcile-plan", "--target", "agents-md",
+    ]);
+    expect(r.status).toBe(1); // drift
+    const agents = JSON.parse(r.stdout).targets.find((t) => t.target === "agents-md");
+    expect(agents.block_reconcile_plan.reproducible).toBe(true);
+    expect(agents.block_reconcile_plan.would_write_paths).toEqual(["AGENTS.md"]);
+    expect(agents.block_reconcile_plan.blocks.some((b) => b.kind === "replace")).toBe(true);
+    expect(agents.block_reconcile_plan.refuse_reason).toBeNull();
+    // Read-only.
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(before);
+  });
+
+  it("a HAND-EDITED target previews a refusal with no block patch", () => {
+    const cwd = emitted();
+    appendFileSync(join(cwd, "AGENTS.md"), "\nA hand edit.\n");
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-reconcile-plan", "--target", "agents-md",
+    ]);
+    expect(r.status).toBe(1);
+    const agents = JSON.parse(r.stdout).targets.find((t) => t.target === "agents-md");
+    expect(agents.block_reconcile_plan.reproducible).toBe(false);
+    expect(agents.block_reconcile_plan.blocks).toEqual([]);
+    expect(agents.block_reconcile_plan.would_write_paths).toEqual([]);
+    expect(agents.block_reconcile_plan.refuse_reason).toMatch(/HAND-EDITED/);
+  });
+
+  it("writes nothing, even with a MISSING target in the set", () => {
+    const cwd = emitted();
+    unlinkSync(join(cwd, "AGENTS.md"));
+    const claudeBefore = readFileSync(join(cwd, "CLAUDE.md"), "utf8");
+    const r = runCli([
+      "emit", "--cwd", cwd, "--check", "--format", "json", "--explain", "--block-reconcile-plan",
+    ]);
+    expect(r.status).toBe(1);
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe(claudeBefore);
+  });
+
+  it("is a usage error without --explain / json / --check (exit 2, nothing written)", () => {
+    const cwd = project();
+    for (const argv of [
+      ["emit", "--cwd", cwd, "--check", "--format", "json", "--block-reconcile-plan"],
+      ["emit", "--cwd", cwd, "--check", "--explain", "--block-reconcile-plan"],
+      ["emit", "--cwd", cwd, "--block-reconcile-plan"],
+    ]) {
+      const r = runCli(argv);
+      expect(r.status, argv.join(" ")).toBe(2);
+      expect(r.stdout).toBe("");
+      expect(r.stderr).toMatch(/--block-reconcile-plan is only valid with --check --explain --format json/);
+    }
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+  });
+});
+
 describe("CRLF round-trip immunity (freeze 10, W1 §9)", () => {
   it("an artifact rewritten with CRLF line endings still checks OK", () => {
     const cwd = emitted();

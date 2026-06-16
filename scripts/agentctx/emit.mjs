@@ -799,6 +799,7 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     explain: false,
     reconcile: false,
     blockManifest: false,
+    blockReconcilePlan: false,
     force: false,
     full: false,
     format: "text",
@@ -823,6 +824,8 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
       parsed.reconcile = true;
     } else if (arg === "--block-manifest") {
       parsed.blockManifest = true;
+    } else if (arg === "--block-reconcile-plan") {
+      parsed.blockReconcilePlan = true;
     } else if (arg === "--force") {
       parsed.force = true;
     } else if (arg === "--full") {
@@ -885,6 +888,17 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
   ) {
     throw new Error(
       "--block-manifest is only valid with --check --explain --format json (it is read-only structured provenance and never writes)",
+    );
+  }
+  // --block-reconcile-plan is the read-only preview of a block-level reconcile:
+  // per-target drift (which emitted blocks would change) with no write. Same
+  // opt-in surface as --block-manifest.
+  if (
+    parsed.blockReconcilePlan &&
+    !(parsed.check && parsed.explain && parsed.format === "json")
+  ) {
+    throw new Error(
+      "--block-reconcile-plan is only valid with --check --explain --format json (it is a read-only drift preview and never writes)",
     );
   }
 
@@ -1023,8 +1037,19 @@ const TEXT_STATUS = {
  * per-block provenance (Phase 2), or null when the recorded profile is not
  * reproducible. Only ever set under --check --explain --format json
  * --block-manifest; never on the `status` path.
+ *
+ * `planByTarget` (a Map target -> block-reconcile-plan object) is a further
+ * opt-in: when present each target gains a `block_reconcile_plan` key (lane 4)
+ * previewing the per-block drift a block-level reconcile would repair. Only ever
+ * set under --check --explain --format json --block-reconcile-plan; never on the
+ * `status` path.
  */
-export function checkResultJson(results, explainByTarget = null, manifestByTarget = null) {
+export function checkResultJson(
+  results,
+  explainByTarget = null,
+  manifestByTarget = null,
+  planByTarget = null,
+) {
   return {
     ok: results.every((r) => r.status === "ok"),
     targets: results.map((r) => {
@@ -1036,6 +1061,7 @@ export function checkResultJson(results, explainByTarget = null, manifestByTarge
       };
       if (explainByTarget) base.explain = explainByTarget.get(r.target);
       if (manifestByTarget) base.block_manifest = manifestByTarget.get(r.target);
+      if (planByTarget) base.block_reconcile_plan = planByTarget.get(r.target);
       return base;
     }),
   };
@@ -1134,9 +1160,23 @@ export function runEmitCheck(options) {
       )
     : null;
 
+  // --block-reconcile-plan (read-only, opt-in; requires --explain --format json):
+  // preview the per-block drift a block-level reconcile would repair. Derived
+  // from planBlockReconcileTarget on the same classification; no writes. The
+  // target/path are already on the parent entry, so embed only the plan body.
+  const planByTarget = options.blockReconcilePlan
+    ? new Map(
+        results.map((r) => {
+          const { reproducible, expected_profile, would_write_paths, refuse_reason, blocks } =
+            planBlockReconcileTarget({ cwd: options.cwd, target: r.target, sources, result: r });
+          return [r.target, { reproducible, expected_profile, would_write_paths, refuse_reason, blocks }];
+        }),
+      )
+    : null;
+
   const stdout =
     options.format === "json"
-      ? JSON.stringify(checkResultJson(results, explainByTarget, manifestByTarget), null, 2) + "\n"
+      ? JSON.stringify(checkResultJson(results, explainByTarget, manifestByTarget, planByTarget), null, 2) + "\n"
       : renderCheckText(results, explainByTarget);
 
   return { exitCode: ok ? 0 : 1, stdout, stderr: "" };
@@ -1290,6 +1330,9 @@ Options:
                          per-block provenance (source_file/source_block_index/
                          source_block_digest/rendered_digest/...) to each target.
                          Read-only; never writes.
+  --block-reconcile-plan With --check --explain --format json only: preview the
+                         per-block drift a block-level reconcile would repair
+                         (unchanged/replace/insert/delete). Read-only; never writes.
   --reconcile            Repair drift safely: re-emit MISSING/STALE targets
                          (STALE keeps its recorded profile), SKIP OK ones, and
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
@@ -1322,7 +1365,8 @@ if (isMain) {
     argv.includes("--check") ||
     argv.includes("--explain") ||
     argv.includes("--reconcile") ||
-    argv.includes("--block-manifest");
+    argv.includes("--block-manifest") ||
+    argv.includes("--block-reconcile-plan");
   try {
     const options = parseEmitArgv(argv);
     if (options.help) {
