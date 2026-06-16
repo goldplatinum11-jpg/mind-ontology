@@ -60,6 +60,46 @@ describe("parseEmittedBlockSpans", () => {
     });
   });
 
+  it("keeps a Markdown horizontal rule ('---') inside a block body (not the footer)", () => {
+    const sources = readSources(TEMPLATE_AGENTCTX);
+    const withRule = {
+      ...sources,
+      "constraints.md": "# Constraints\n\n## Rule with a rule #safety\n\nIntro line.\n\n---\n\nAfter the horizontal rule.\n",
+    };
+    const build = buildArtifact({ sources: withRule, target: "agents-md" });
+    const spans = parseEmittedBlockSpans(build.payload);
+    // 1:1 with the manifest — the body '---' did not spuriously split the block
+    // or get mistaken for the frame footer.
+    expect(spans.length).toBe(build.blockManifest.length);
+    const ruleBlock = spans.find((s) => s.renderedText.includes("Rule with a rule"));
+    expect(ruleBlock.renderedText).toContain("Intro line.");
+    expect(ruleBlock.renderedText).toContain("---");
+    expect(ruleBlock.renderedText).toContain("After the horizontal rule.");
+    expect(sha256(ruleBlock.renderedText)).toBe(ruleBlock.renderedDigest);
+  });
+
+  it("a STALE edit to a block containing '---' still reconciles at block level (byte guard passes)", () => {
+    const base = {
+      ...readSources(TEMPLATE_AGENTCTX),
+      "constraints.md": "# Constraints\n\n## Has a rule #safety\n\nBefore.\n\n---\n\nAfter.\n",
+    };
+    const current = buildArtifact({ sources: base, target: "agents-md" });
+    const edited = {
+      ...base,
+      "constraints.md": "# Constraints\n\n## Has a rule #safety\n\nBefore EDITED.\n\n---\n\nAfter.\n",
+    };
+    const expected = buildArtifact({ sources: edited, target: "agents-md" });
+    const blocks = compareBlockDrift(
+      parseEmittedBlockSpans(current.payload),
+      parseEmittedBlockSpans(expected.payload),
+      expected.blockManifest,
+    );
+    // The edit is a clean single replace, not a spurious insert/delete from a
+    // '---' mis-split — so the surgical patch reproduces the oracle.
+    expect(blocks.filter((b) => b.kind === "replace")).toHaveLength(1);
+    expect(blocks.some((b) => b.kind === "insert" || b.kind === "delete")).toBe(false);
+  });
+
   it("keeps a block body's blank lines inside the block (not a separator)", () => {
     const sources = readSources(TEMPLATE_AGENTCTX);
     const withBlank = {

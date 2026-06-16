@@ -581,6 +581,14 @@ export function explainText(result, explain) {
 // .agentctx/<file>) -->'. The trailing provenance comment is renderBlock's
 // signature (W1 §4) and the reliable anchor for an emitted block start — far
 // more robust than a blank line, since a block body may contain blank lines.
+//
+// Residual edge (accepted, byte-guard-protected): a block BODY that itself
+// contains a line shaped EXACTLY like a rendered heading would be mis-split
+// here. This can only mis-report the read-only --block-reconcile-plan preview;
+// the --reconcile --block-level WRITE path is never corrupted, because
+// applyBlockReconcilePlan proves the patched bytes equal the file-level oracle
+// and refuses the whole run on any mismatch (the surgical splice is only a
+// mechanism; byte-equality is the proof).
 const EMITTED_BLOCK_HEADING = /^### .* <!-- \(from \.agentctx\/(.+?)\) -->$/;
 
 /**
@@ -620,11 +628,15 @@ export function parseEmittedBlockSpans(payload) {
     for (; j < lines.length; j += 1) {
       const line = lines[j];
       // A new block heading, a section heading ('## ' but not '### '), or the
-      // footer ends the current block. EMITTED_BLOCK_HEADING is checked first
-      // so a rendered heading is never mistaken for a section heading.
+      // generated footer ends the current block. EMITTED_BLOCK_HEADING is
+      // checked first so a rendered heading is never mistaken for a section
+      // heading. The footer is matched specifically — a bare '---' rule inside a
+      // block BODY must NOT end the block, so a '---' only terminates when it is
+      // the frame footer (always immediately followed by the '*Source:' line,
+      // FRAMES.*.footer). This keeps Markdown horizontal rules inside bodies.
       if (EMITTED_BLOCK_HEADING.test(line)) break;
       if (line.startsWith("## ")) break;
-      if (line === "---") break;
+      if (line === "---" && (lines[j + 1] ?? "").startsWith("*Source:")) break;
       blockLines.push(line);
     }
     // The single '\n\n' join blank line trails every block; a parsed body is
