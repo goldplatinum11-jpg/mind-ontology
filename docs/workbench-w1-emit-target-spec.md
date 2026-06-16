@@ -302,9 +302,13 @@ from the sources only when a reader asks for it (`emit --check --explain
 field would change the artifact bytes and force an `emit_version` bump. Because
 the manifest derives from the same `(canonicalized source bytes, target,
 profile, emit_version)` inputs as the artifact, it inherits the section 7
-determinism guarantee for free. A future **block-level reconcile** (patching
-only the drifted blocks rather than rewriting the whole artifact) will consume
-this same manifest; until then `--reconcile` stays file-level.
+determinism guarantee for free. The opt-in **block-level reconcile**
+(`emit --reconcile --block-level`, W2 §7) consumes this same provenance: it
+patches only the drifted blocks rather than rewriting the whole artifact, and
+proves the result **byte-identical** to the file-level reconcile with a
+full-artifact guard before any write (a guard failure refuses the whole run).
+Plain `--reconcile` remains a file-level whole-artifact rewrite; the header
+stays file-level either way and `emit_version` never bumps for this.
 
 ## 7. Determinism guarantee
 

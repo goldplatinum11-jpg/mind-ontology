@@ -310,8 +310,10 @@ JSON shape (normative keys):
 ### 7.1 Synopsis and flags
 
 ```text
-mind-ontology emit [--target <id>[,<id>…]]… [--check [--explain [--block-manifest]]]
-                   [--reconcile] [--force] [--full] [--format text|json] [--cwd <path>]
+mind-ontology emit [--target <id>[,<id>…]]…
+                   [--check [--explain [--block-manifest] [--block-reconcile-plan]]]
+                   [--reconcile [--block-level]] [--force] [--full]
+                   [--format text|json] [--cwd <path>]
 ```
 
 | Flag | Meaning | Constraints |
@@ -320,7 +322,9 @@ mind-ontology emit [--target <id>[,<id>…]]… [--check [--explain [--block-man
 | `--check` | classify instead of write (W1 §8); writes nothing | — |
 | `--explain` | annotate each `--check` verdict with WHY the target got its class and WHAT a reconcile would do; read-only (writes nothing) | valid **only** with `--check`; using it in write mode is a usage error (exit `2`) |
 | `--block-manifest` | attach per-block provenance (`source_file` / `source_block_index` / `source_block_digest` / `rendered_digest` / `emitted_index` / `section` / `forced`) to each target, recomputed **on demand** from the current sources under the profile `--explain` reports (or `null` when that profile is no longer reproducible); read-only (writes nothing) | valid **only** with `--check --explain --format json`; any other combination is a usage error (exit `2`). It is on-demand explain data — never persisted to a header or sidecar |
-| `--reconcile` | SAFE drift repair: re-emit `MISSING`/`STALE` targets (`STALE` keeps the **header's recorded** profile), skip `OK`, and REFUSE `UNMANAGED`/`HAND-EDITED` — all-or-nothing, writing artifacts only (never `.agentctx/`). Exit `0` reconciled/clean, `1` refused, `2` error. The header still records only **file-level** digests, so reconcile rewrites whole artifacts; **block-level** reconcile (patching only the drifted blocks) is a future lane that will consume this same block manifest. | write mode; combining with `--check` is a usage error (opposite modes); combining with `--full` is a usage error (it would override the recorded profile) |
+| `--block-reconcile-plan` | preview the per-block drift a block-level reconcile would repair: per target `{ reproducible, expected_profile, would_write_paths, refuse_reason, blocks }`, where each block change is `{ kind: unchanged\|replace\|insert\|delete, emitted_index, source_file, source_block_index, actual_rendered_digest, expected_rendered_digest }`; read-only (writes nothing) | valid **only** with `--check --explain --format json`; any other combination is a usage error (exit `2`). On-demand preview data — never persisted |
+| `--reconcile` | SAFE drift repair: re-emit `MISSING`/`STALE` targets (`STALE` keeps the **header's recorded** profile), skip `OK`, and REFUSE `UNMANAGED`/`HAND-EDITED` — all-or-nothing, writing artifacts only (never `.agentctx/`). Exit `0` reconciled/clean, `1` refused, `2` error. The header still records only **file-level** digests; plain `--reconcile` rewrites whole artifacts. | write mode; combining with `--check` is a usage error (opposite modes); combining with `--full` is a usage error (it would override the recorded profile) |
+| `--block-level` | with `--reconcile` only: repair drift with a **block-level patch** (splice only the drifted blocks) instead of a whole-file rewrite. The patched bytes are proven **byte-identical** to the file-level reconcile via a full-artifact guard applied before any write; a guard failure refuses the whole run. Same classes, same refusals, same all-or-nothing, never `.agentctx/`. JSON adds `mode: "block-level"` and a per-target `changed_blocks` count. | valid **only** with `--reconcile`; alone it is a usage error (exit `2`). Does not change the header, bump `emit_version`, or alter plain `--reconcile` |
 | `--force` | overwrite an `UNMANAGED` (headerless) existing file — the only way emit replaces one (W1 §9) | write mode only; combining with `--check` is a usage error (`--check` never writes, so `--force` could only mislead) |
 | `--full` | whole-ontology dump profile (W1 §3) | write mode only; combining with `--check` is a usage error — `--check` recompiles with the **header's recorded** profile, never a flag |
 | `--format` | stdout format | per section 2.1 |
@@ -350,11 +354,17 @@ Options:
   --block-manifest       With --check --explain --format json only: attach per-block
                          provenance to each target (on-demand; never persisted).
                          Read-only; never writes.
+  --block-reconcile-plan With --check --explain --format json only: preview the
+                         per-block drift a block-level reconcile would repair
+                         (unchanged/replace/insert/delete). Read-only; never writes.
   --reconcile            Repair drift safely: re-emit MISSING/STALE targets
                          (STALE keeps its recorded profile), SKIP OK ones, and
                          REFUSE UNMANAGED/HAND-EDITED (writing nothing for any
                          target). Writes artifacts only, never .agentctx/.
                          Exit 0 reconciled/clean, 1 refused, 2 error.
+  --block-level          With --reconcile only: repair drift with a block-level
+                         patch instead of a whole-file rewrite, proven byte-
+                         identical to the file-level reconcile. Same refusals.
   --force                Overwrite an existing un-managed file (one without an emit
                          header). Never needed for refreshing managed artifacts.
   --full                 Emit the whole ontology instead of the default profile.
