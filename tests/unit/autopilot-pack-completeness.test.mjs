@@ -96,9 +96,7 @@ const LIVE_PENDING = HEADER_DOCS.filter((doc) => !pinsHeader(doc)).sort();
 // pin the exact link. Captured 2026-06-14. Entries leave only by being fixed
 // (pin the exact link in the owner test, then delete the entry here). No entry
 // may be added without a real, pre-existing gap.
-const KNOWN_PENDING = [
-  "mind-ontology-autopilot-result-pack-v1.md",
-].sort();
+const KNOWN_PENDING = [].sort();
 
 describe("autopilot top-of-doc header — aggregate owner-test coverage (A25)", () => {
   it("discovers a non-trivial set of header docs", () => {
