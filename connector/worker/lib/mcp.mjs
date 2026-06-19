@@ -2,11 +2,17 @@
 //
 // Streamable-HTTP JSON-RPC for `POST /mcp`, over the SAME bundled-snapshot
 // adapter PR1 uses. It mirrors the local stdio server
-// (scripts/agentctx/mcp-server.mjs): same serverInfo, protocol version, the two
-// tools, JSON-RPC method set, and tool-output shapes — but the sources come from
-// the snapshot, not the filesystem, and dispatch returns plain objects instead
-// of writing to stdout. The engine renderers are reused verbatim so tool output
-// cannot diverge from the stdio server.
+// (scripts/agentctx/mcp-server.mjs) on the parts a client actually consumes:
+// same serverInfo, the two tools and their schemas, the JSON-RPC method set,
+// tool-output shapes, and error codes — but the sources come from the snapshot,
+// not the filesystem, and dispatch returns plain objects instead of writing to
+// stdout. The engine renderers are reused verbatim, so **tool output** cannot
+// diverge from the stdio server.
+//
+// One intentional difference: protocolVersion. The stdio server pins a single
+// version; this transport NEGOTIATES per the MCP Streamable-HTTP spec — it echoes
+// the client's requested protocolVersion when supported, else returns the latest
+// it supports. So the modules are not byte-identical, and that is correct.
 //
 // This module never imports node:fs and never mutates the stdio server.
 
@@ -19,7 +25,20 @@ import {
 import { loadSnapshot } from "./source-snapshot.mjs";
 
 export const SERVER_INFO = { name: "agentctx", version: "0.1.0" };
-export const PROTOCOL_VERSION = "2024-11-05";
+
+// Protocol versions this hosted transport speaks, newest first. The stdio server
+// pins "2024-11-05"; hosted Streamable-HTTP clients (Claude.ai, ChatGPT) commonly
+// request "2025-03-26", so both are supported and negotiated at initialize.
+export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-03-26", "2024-11-05"];
+// The version assumed when the client requests none / an unsupported one, and the
+// version a missing `MCP-Protocol-Version` HTTP header is treated as.
+export const DEFAULT_PROTOCOL_VERSION = "2025-03-26";
+
+// MCP negotiation: echo the client's requested version when supported, else fall
+// back to the latest the server supports.
+export function negotiateProtocolVersion(requested) {
+  return SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : DEFAULT_PROTOCOL_VERSION;
+}
 
 // Mirrors the TOOLS manifest in scripts/agentctx/mcp-server.mjs — KEEP IN SYNC.
 // `cwd` is accepted for schema parity with the stdio server but ignored here: a
@@ -148,10 +167,11 @@ export function dispatchMcp(snapshot, request) {
   const { id, method, params } = request ?? {};
 
   if (method === "initialize") {
+    const protocolVersion = negotiateProtocolVersion(params?.protocolVersion);
     return {
       jsonrpc: "2.0",
       id,
-      result: { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: {} }, serverInfo: SERVER_INFO },
+      result: { protocolVersion, capabilities: { tools: {} }, serverInfo: SERVER_INFO },
     };
   }
 

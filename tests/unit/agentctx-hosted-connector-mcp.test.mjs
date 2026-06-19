@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { createConnector } from "../../connector/worker/lib/index.mjs";
-import { TOOLS, SERVER_INFO } from "../../connector/worker/lib/mcp.mjs";
+import {
+  TOOLS,
+  SERVER_INFO,
+  DEFAULT_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from "../../connector/worker/lib/mcp.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -163,5 +168,62 @@ describe("hosted connector remote MCP (/mcp, PR2)", () => {
     const raw = readFileSync(resolve(REPO_ROOT, "connector/worker/lib/mcp.mjs"), "utf8");
     expect(raw).not.toMatch(/bearer\s+[A-Za-z0-9._-]{12,}/i);
     expect(raw).not.toMatch(/https:\/\/[a-z0-9.-]+\.(workers\.dev|com)\//i);
+  });
+});
+
+describe("remote MCP protocol-version negotiation + transport headers (PR2)", () => {
+  it("echoes a supported requested protocolVersion", async () => {
+    for (const requested of SUPPORTED_PROTOCOL_VERSIONS) {
+      const { json } = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: requested } });
+      expect(json.result.protocolVersion).toBe(requested);
+    }
+  });
+
+  it("falls back to the default when the requested version is unsupported or absent", async () => {
+    const unsupported = await rpc({ jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "1999-01-01" } });
+    expect(unsupported.json.result.protocolVersion).toBe(DEFAULT_PROTOCOL_VERSION);
+
+    const absent = await rpc({ jsonrpc: "2.0", id: 3, method: "initialize", params: {} });
+    expect(absent.json.result.protocolVersion).toBe(DEFAULT_PROTOCOL_VERSION);
+  });
+
+  it("the hosted default differs from the stdio server's pinned 2024-11-05 (intentional)", () => {
+    // The stdio server (scripts/agentctx/mcp-server.mjs) pins 2024-11-05; hosted
+    // Streamable-HTTP defaults to a newer negotiated version. This asserts the
+    // documented divergence so the "cannot drift" claim stays scoped to output.
+    expect(DEFAULT_PROTOCOL_VERSION).not.toBe("2024-11-05");
+    expect(SUPPORTED_PROTOCOL_VERSIONS).toContain("2024-11-05");
+  });
+
+  it("accepts the Streamable-HTTP Accept header (application/json, text/event-stream)", async () => {
+    const res = await connector.fetch(
+      new Request("https://connector.test/mcp", {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+        headers: { accept: "application/json, text/event-stream" },
+      }),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("treats a missing MCP-Protocol-Version header as compatible (no rejection), and accepts it when present", async () => {
+    // Missing header — must not be rejected.
+    const missing = await connector.fetch(
+      new Request("https://connector.test/mcp", {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      }),
+    );
+    expect(missing.status).toBe(200);
+
+    // Present header — also accepted.
+    const present = await connector.fetch(
+      new Request("https://connector.test/mcp", {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        headers: { "mcp-protocol-version": DEFAULT_PROTOCOL_VERSION },
+      }),
+    );
+    expect(present.status).toBe(200);
   });
 });
