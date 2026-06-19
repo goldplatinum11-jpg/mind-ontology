@@ -83,7 +83,9 @@ export function createConnector(snapshot, env = {}) {
         }
         // Streamable-HTTP MCP-Protocol-Version header: a missing header is treated
         // as compatible (the negotiated default), but a present-but-unsupported
-        // value is a 400 per the spec — don't silently serve a mismatched client.
+        // value is a 400 — don't silently serve a mismatched client. Per the MCP
+        // spec, basic/transports (the header on every post-initialize request) and
+        // basic/lifecycle (version negotiation at initialize), rev 2025-06-18.
         const protocolHeader = request.headers.get("mcp-protocol-version");
         if (protocolHeader && !SUPPORTED_PROTOCOL_VERSIONS.includes(protocolHeader)) {
           return json(400, {
