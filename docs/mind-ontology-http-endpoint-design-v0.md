@@ -122,5 +122,7 @@ Worker has no filesystem, so it serves a deploy-time JSON snapshot instead of
 reading `.agentctx/` directly. PR1 reuses the engine's `compileContext` /
 `parseMarkdownBlocks` / `renderContextPackJson` verbatim, so the hosted JSON
 cannot diverge from the local stdio server. PR1 covers `POST /get_context`,
-`POST /list_constraints`, and `GET /health` only; the Remote MCP transport stays
-a later PR.
+`POST /list_constraints`, and `GET /health`. PR2 adds the Remote MCP transport
+(`POST /mcp`, Streamable-HTTP JSON-RPC: `initialize` / `notifications/initialized`
+/ `tools/list` / `tools/call`) over the same snapshot adapter — see
+`connector/worker/lib/mcp.mjs`.

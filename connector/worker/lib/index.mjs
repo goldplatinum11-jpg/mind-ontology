@@ -1,19 +1,21 @@
-// Mind Ontology hosted connector — Worker entry (PR1).
+// Mind Ontology hosted connector — Worker entry (PR1 + PR2).
 //
-// Scope of PR1: a GPT-Action-shaped HTTP JSON surface over a bundled .agentctx
-// snapshot. It exposes the two read-only operations and a health probe:
+// Routes over a bundled .agentctx snapshot:
 //   GET  /health            -> { ok, service, version }
-//   POST /get_context       -> ContextPack JSON   (body { task, scope? })
-//   POST /list_constraints  -> { file, blockCount, blocks }
+//   POST /get_context       -> ContextPack JSON   (GPT Action; JSON-only, body { task, scope? })
+//   POST /list_constraints  -> { file, blockCount, blocks }   (GPT Action)
+//   POST /mcp               -> Streamable-HTTP JSON-RPC (PR2): initialize,
+//                              notifications/initialized, tools/list, tools/call
+//                              (get_context, list_constraints). See lib/mcp.mjs.
 //   *                       -> 404 { error: "not_found" }
 //
-// NOT in PR1 (deferred to PR2 / later, by design):
-//   - remote MCP `/mcp` JSON-RPC  (returns 501 here so it is explicit, not 404)
+// Still out of scope (later PRs, by design):
 //   - any deploy, real endpoint URL, KV/R2/GitHub source loading, multi-workspace
 //   - any committed secret. Bearer auth is enforced ONLY when the operator sets
 //     the CONNECTOR_BEARER_TOKEN env var (a Worker secret); no token is stored here.
 
 import { httpGetContext, httpListConstraints } from "./http-handlers.mjs";
+import { dispatchMcp } from "./mcp.mjs";
 // The workspace snapshot is bundled with the Worker. The committed file is an
 // EXAMPLE; an operator regenerates it for their workspace before deploy
 // (scripts/build-agentctx-snapshot.mjs) and points this import at the result.
@@ -62,16 +64,30 @@ export function createConnector(snapshot, env = {}) {
         return json(200, { ok: true, service: "agentctx-connector", version: VERSION });
       }
 
-      // Remote MCP transport is PR2 — explicit, not a silent 404.
-      if (pathname === "/mcp") {
-        return json(501, { error: "not_implemented", detail: "remote MCP /mcp is deferred to PR2" });
-      }
-
-      const dataRoute =
+      // Data routes (auth-gated when CONNECTOR_BEARER_TOKEN is set): the remote
+      // MCP transport and the GPT-Action endpoints.
+      const isMcp = pathname === "/mcp";
+      const isHttpData =
         method === "POST" && (pathname === "/get_context" || pathname === "/list_constraints");
 
-      if (dataRoute && !authorized(request)) {
+      if ((isMcp || isHttpData) && !authorized(request)) {
         return json(401, { error: "unauthorized" });
+      }
+
+      // Remote MCP (PR2): Streamable-HTTP JSON-RPC over the same snapshot adapter.
+      // One JSON-RPC message per POST — a request gets a JSON-RPC response; a
+      // notification gets 202 with no body. Malformed JSON is a -32700 parse error.
+      if (isMcp) {
+        if (method !== "POST") {
+          return json(405, { error: "method_not_allowed", detail: "POST a JSON-RPC message to /mcp" });
+        }
+        const body = await readJsonBody(request);
+        if (body === null) {
+          return json(200, { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error: invalid JSON" } });
+        }
+        const response = dispatchMcp(snapshot, body);
+        if (response === null) return new Response(null, { status: 202 });
+        return json(200, response);
       }
 
       if (method === "POST" && pathname === "/get_context") {
