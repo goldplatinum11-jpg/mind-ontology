@@ -94,3 +94,18 @@ Same contract, same read-only surface.
 - **P3-PR07** — example connector manifests (GPT Action import + Claude.ai
   connector) using placeholders that point at *this* design, no secrets.
 - **P3-PR08** — multi-client adoption closeout.
+
+## PR1 implementation note (snapshot adapter)
+
+The hosted connector's first implementation lands in `connector/worker/` as a
+**bundled snapshot adapter**. Because a Cloudflare Worker has no filesystem, the
+engine's `readAgentctx` cannot run there; instead, at deploy time the connector's
+snapshot build step (under `connector/worker/`) serializes a project's
+`.agentctx/` into a JSON snapshot, and the Worker serves `get_context` /
+`list_constraints` from that snapshot — read-only, no second compiler.
+
+PR1 implements only the GPT-Action HTTP JSON surface (`POST /get_context`,
+`POST /list_constraints`, `GET /health`) plus a `wrangler.toml.example` template.
+Remote MCP `/mcp`, real deploy, KV/R2/GitHub sourcing, multi-workspace hosting,
+and any bearer/secret value stay out of scope and are never committed. This plan
+doc itself still **ships no runtime**; the runtime is the separately-reviewed PR1.

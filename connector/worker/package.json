@@ -1,0 +1,10 @@
+{
+  "name": "@mind-ontology/connector-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin hosted HTTP connector for Mind Ontology. PR1: GPT-Action JSON endpoints (get_context, list_constraints, health) over a bundled .agentctx snapshot. No deploy, no remote MCP, no secrets in this package.",
+  "scripts": {
+    "build:snapshot": "node scripts/build-agentctx-snapshot.mjs"
+  }
+}

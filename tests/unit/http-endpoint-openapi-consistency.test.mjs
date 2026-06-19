@@ -18,12 +18,13 @@ describe("http-endpoint design doc agrees with the OpenAPI (M54)", () => {
     expect(ops.map(([, op]) => op.operationId).sort()).toEqual(["get_context", "list_constraints"]);
   });
 
-  it("get_context request shape {task, scope?, format?} matches the schema", () => {
-    expect(DOC).toContain("{ task, scope?, format? }");
+  it("get_context request shape {task, scope?} matches the schema (JSON-only in PR1)", () => {
+    expect(DOC).toContain("{ task, scope? }");
     const req = API.components.schemas.GetContextRequest;
     expect(req.required).toEqual(["task"]);
     expect(req.properties).toHaveProperty("scope");
-    expect(req.properties).toHaveProperty("format");
+    // PR1's HTTP Action surface is JSON-only: no `format` negotiation here.
+    expect(req.properties).not.toHaveProperty("format");
   });
 
   it("ContextPack output the doc promises (incl. risk) exists in the schema", () => {

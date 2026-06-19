@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://YOUR-CONNECTOR-HOST.example/mco",
+      "url": "https://YOUR-CONNECTOR-HOST.example",
       "description": "Self-hosted agentctx connector. Replace with your own endpoint; the OSS project hosts nothing."
     }
   ],
@@ -21,7 +21,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/GetContextRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/GetContextRequest"
+              }
             }
           }
         },
@@ -30,14 +32,20 @@
             "description": "A compiled context pack.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ContextPack" }
+                "schema": {
+                  "$ref": "#/components/schemas/ContextPack"
+                }
               }
             }
           },
           "400": {
             "description": "Invalid request (e.g. missing task).",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
             }
           }
         }
@@ -52,7 +60,9 @@
           "required": false,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/ListConstraintsRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/ListConstraintsRequest"
+              }
             }
           }
         },
@@ -61,7 +71,9 @@
             "description": "The constraints block set.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ConstraintsResult" }
+                "schema": {
+                  "$ref": "#/components/schemas/ConstraintsResult"
+                }
               }
             }
           }
@@ -80,69 +92,154 @@
     "schemas": {
       "GetContextRequest": {
         "type": "object",
-        "required": ["task"],
+        "required": [
+          "task"
+        ],
         "properties": {
-          "task": { "type": "string", "description": "Task description to compile context for." },
+          "task": {
+            "type": "string",
+            "description": "Task description to compile context for."
+          },
           "scope": {
             "description": "Optional scope tag(s); comma-separated string or array of strings.",
             "oneOf": [
-              { "type": "string" },
-              { "type": "array", "items": { "type": "string" } }
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             ]
-          },
-          "format": { "type": "string", "enum": ["markdown", "json"], "default": "json" }
+          }
         }
       },
       "ListConstraintsRequest": {
         "type": "object",
-        "properties": {
-          "format": { "type": "string", "enum": ["markdown", "json"], "default": "json" }
-        }
+        "properties": {}
       },
       "ContextPack": {
         "type": "object",
         "properties": {
-          "task": { "type": "string" },
-          "scopes": { "type": "array", "items": { "type": "string" } },
-          "generatedAt": { "type": "string", "format": "date-time" },
-          "selected": { "type": "array", "items": { "$ref": "#/components/schemas/Block" } },
-          "omittedCount": { "type": "integer" },
-          "sourceFiles": { "type": "array", "items": { "type": "string" } },
-          "risk": { "$ref": "#/components/schemas/Risk" }
+          "task": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          },
+          "omittedCount": {
+            "type": "integer"
+          },
+          "sourceFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "risk": {
+            "$ref": "#/components/schemas/Risk"
+          }
         }
       },
       "Block": {
         "type": "object",
         "properties": {
-          "file": { "type": "string" },
-          "title": { "type": "string" },
-          "tags": { "type": "array", "items": { "type": "string" } },
-          "score": { "description": "Numeric relevance score, or \"always\" for constraints." },
-          "reason": { "type": "string", "enum": ["always", "matched", "risk-forced"] },
-          "body": { "type": "string" }
+          "file": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "score": {
+            "description": "Numeric relevance score, or \"always\" for constraints."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "always",
+              "matched",
+              "risk-forced"
+            ]
+          },
+          "body": {
+            "type": "string"
+          }
         }
       },
       "Risk": {
         "type": "object",
         "properties": {
-          "level": { "type": "string", "enum": ["safe", "risky"] },
-          "mode": { "type": "string", "enum": ["auto", "safe", "risky"] },
-          "signals": { "type": "array", "items": { "type": "string" } }
+          "level": {
+            "type": "string",
+            "enum": [
+              "safe",
+              "risky"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "safe",
+              "risky"
+            ]
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "ConstraintsResult": {
         "type": "object",
         "properties": {
-          "file": { "type": "string", "const": "constraints.md" },
-          "blockCount": { "type": "integer" },
+          "file": {
+            "type": "string",
+            "const": "constraints.md"
+          },
+          "blockCount": {
+            "type": "integer"
+          },
           "blocks": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "title": { "type": "string" },
-                "tags": { "type": "array", "items": { "type": "string" } },
-                "body": { "type": "string" }
+                "title": {
+                  "type": "string"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "body": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -151,7 +248,9 @@
       "Error": {
         "type": "object",
         "properties": {
-          "error": { "type": "string" }
+          "error": {
+            "type": "string"
+          }
         }
       }
     }
