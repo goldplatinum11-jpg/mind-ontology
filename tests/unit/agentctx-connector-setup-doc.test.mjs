@@ -49,4 +49,20 @@ describe("hosted connector setup & troubleshooting doc (PR5)", () => {
     // No committed credential value.
     expect(t).not.toMatch(/bearer\s+[A-Za-z0-9._-]{12,}/i);
   });
+
+  it("guides a non-engineer operator (which-surface table, paste-into-UI, no-tools, no code-reading)", () => {
+    const t = read();
+    // "Which surface do I use?" maps each client to its surface.
+    expect(t).toMatch(/which surface do i use/i);
+    expect(t).toMatch(/stdio MCP/i);
+    expect(t).toContain("agent-setup --target");
+    // "What to paste into your client's UI" covers all three manifests by client.
+    expect(t).toMatch(/what to paste into your client/i);
+    expect(t).toMatch(/Settings\s*→\s*Connectors|Add custom connector/i);
+    expect(t).toContain("developer mode");
+    // Troubleshooting covers tools not appearing.
+    expect(t).toMatch(/no tools showing up/i);
+    // The operator is never told to read source code to proceed.
+    expect(t).not.toMatch(/read the (source|code)|inspect the (source|code)|see the code/i);
+  });
 });
