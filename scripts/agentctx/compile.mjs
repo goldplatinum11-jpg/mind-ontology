@@ -133,7 +133,7 @@ export function parseArgv(argv = process.argv.slice(2)) {
     } else if (arg === "-h" || arg === "--help") {
       parsed.command = "help";
     } else {
-      throw new Error(`Unknown argument: ${arg}`);
+      throw new Error(`Unknown argument: ${arg}. Run "mind-ontology compile --help" for the list of options.`);
     }
   }
 

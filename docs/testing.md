@@ -10,7 +10,7 @@ network, no account, no hosted backend — and runs in a few seconds.
 | **Proof** | `npm run agentctx:proof` | Smallest viable validation — one file (`tests/unit/agentctx-proof.test.mjs`). Fast smoke that the core compile/validate contract holds. Run this first. |
 | **Validate** | `npm run agentctx:validate` | The shipped `.agentctx/` template conforms to the schema (`0 errors`). |
 | **Smoke** | `npm run agentctx:smoke` | End-to-end free-layer journey (init → compile → idempotency guard → friendly errors) in a throwaway temp dir: `SMOKE PASS`. |
-| **Full** | `npm test` | The entire `tests/unit` suite (407 tests across 77 files at last count). The release gate. |
+| **Full** | `npm test` | The entire `tests/unit` suite — every `*.test.mjs` under `tests/unit/`; the runner's summary line reports the live file and test totals, so the run itself is the count of record. The release gate. |
 
 Run order before a release is in [`../RELEASE-CHECKLIST.md`](../RELEASE-CHECKLIST.md).
 

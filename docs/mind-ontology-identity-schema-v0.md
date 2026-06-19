@@ -23,6 +23,9 @@ work is going), and `projects.md` (what is being worked on).
   extracted as tags and stripped from the rendered title.
 - Block body is the prose beneath the heading, up to the next `##`.
 
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
+
 ```md
 # Identity
 
@@ -65,7 +68,8 @@ source; they surface only when relevant.
 
 ## Tag conventions
 
-- Every block SHOULD carry at least one tag.
+- Every block MUST carry at least one tag; `agentctx:validate` rejects an
+  untagged block (`every-block-has-tag` error).
 - Prefer the `#identity` namespace tag on identity blocks so scope queries
   (`--scope identity`) select them reliably.
 - Tags are lower-cased and matched case-insensitively by the compiler.
@@ -93,6 +97,24 @@ source; they surface only when relevant.
   when the source list expands.
 - Once wired, identity blocks are selected by task/scope relevance, capped by
   `--max-blocks-per-file`, the same as `direction.md` / `decisions.md`.
+
+---
+
+## Validator enforcement
+
+`npm run agentctx:validate` applies the `identity.md` entry of
+`ONTOLOGY_SCHEMA` (`scripts/agentctx/schema.mjs`). Rules apply only when the
+file is present; a project without `identity.md` still validates.
+
+| Rule | Level | What it checks |
+|---|---|---|
+| `every-block-has-tag` | error | Every block carries at least one tag. |
+| `required-tag` | error | A block tagged `#identity` and a block tagged `#style` exist. |
+| `recommended-tag` | warning | Blocks tagged `#operator` and `#collaboration` are recommended; absence warns but does not fail. |
+| `no-credentials` | error | No credential-shaped `key: value` line anywhere in the file. |
+
+The validator does not check body emptiness for `identity.md`; non-empty bodies
+are an authoring convention pinned by the template conformance test.
 
 ---
 

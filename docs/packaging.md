@@ -18,16 +18,21 @@ locally with a **dry-run only** — nothing here publishes anything.
 npm pack --dry-run    # lists would-be contents; writes no tarball, publishes nothing
 ```
 
-Before release prep this bundled **everything not gitignored** — a broad tree of
-~161 files including the whole test suite, the worked examples, and internal
-phase-closeout docs. The applied allowlist (below) narrows the tarball to the
-product surface: **47 files** — the engine, the init templates, and the
-user-facing docs.
+Before release prep this bundled **everything not gitignored** — a broad tree
+spanning the whole test suite, the worked examples, and internal phase-closeout
+docs. The applied allowlist (below) narrows the tarball to the product surface —
+the engine, the init templates, and the user-facing docs. Run the dry-run for
+the exact contents; that listing is the count of record (regressed by
+[`../tests/unit/packaging-dry-run-contract.test.mjs`](../tests/unit/packaging-dry-run-contract.test.mjs)),
+so this doc states no file total that could rot.
 
 ## Applied `files` allowlist
 
-`package.json` ships an explicit allowlist so the tarball contains only the
-product, not the workshop:
+`package.json` is the source of truth for the allowlist; the snippet below is a
+reader's copy of it, regression-locked to the manifest by
+[`../tests/unit/packaging-doc-allowlist-sync.test.mjs`](../tests/unit/packaging-doc-allowlist-sync.test.mjs)
+(they must match exactly, so this copy cannot silently drift). Edit
+`package.json`, not this snippet:
 
 ```jsonc
 // package.json (applied)
@@ -39,9 +44,12 @@ product, not the workshop:
   "NOTICE",
   "docs/mind-ontology-quickstart.md",
   "docs/mind-ontology-quickstart-examples-v0.md",
+  "docs/agent-setup.md",
   "docs/agentctx-mcp.md",
   "docs/agentctx-mcp-setup.md",
   "docs/cli-errors.md",
+  "docs/init-from-repo.md",
+  "docs/import-sirt.md",
   "docs/schema-authoring.md",
   "docs/testing.md"
 ]
@@ -71,13 +79,22 @@ publish anything: nothing in this repo runs `npm publish`, and no
 
 ## Tested contract (dry-run pack inspection)
 
-The packaging posture is not just documented — it is regressed. Two test files
-hold it against drift:
+The packaging posture is not just documented — it is regressed. Several test
+files hold it against drift:
 
 - `tests/unit/packaging-plan.test.mjs` and `tests/unit/package-metadata.test.mjs`
   assert the *static* posture from `package.json` and this doc (publish-ready —
   no `private` flag, applied `files` allowlist, no `publishConfig`, Apache-2.0
   SPDX, every script-cited file exists).
+- `tests/unit/packaging-doc-allowlist-sync.test.mjs` keeps the allowlist snippet
+  above equal to `package.json` `files` (so this doc cannot drift from the
+  manifest) and bans any exact tarball file total (the dry-run listing is the
+  count of record).
+- `tests/unit/packaging-allowlist-files-exist.test.mjs` checks the manifest
+  against the working tree: every concrete `files` entry resolves to a real
+  file and every glob's base directory exists and is non-empty — so a
+  renamed/deleted path in the allowlist fails loudly instead of silently
+  thinning the tarball.
 - `tests/unit/packaging-dry-run-contract.test.mjs` executes
   `npm pack --dry-run --json` live and inspects the would-be tarball:
   - the dry-run **leaves no `.tgz` behind** — it is non-publishing by construction;
@@ -105,7 +122,8 @@ the package stays fail-closed until that decision is made.
    decision to run `npm publish`** (after the public GitHub repository exists
    and its URL is added to `package.json`).
 3. ~~`"files"` allowlist added; `npm pack --dry-run` shows only the intended
-   files~~ — **done** (47-file product tarball, regressed by test).
+   files~~ — **done** (product-surface tarball only, regressed by
+   `tests/unit/packaging-dry-run-contract.test.mjs`).
 4. Full suite green; `agentctx:smoke` `SMOKE PASS` (re-run before tagging).
 5. ~~Version bumped per semver~~ — **done: `0.1.0`** (first public release).
 

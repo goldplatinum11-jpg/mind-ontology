@@ -12,6 +12,12 @@ describe("autopilot state of the pack v1 (A82)", () => {
   it("ships the state-of-the-pack doc", () => {
     expect(existsSync(DOC)).toBe(true);
   });
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    const header = text().split(/\r?\n/).slice(0, 10).join("\n");
+    expect(header).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
   it("summarises what v1 ships: docs, fixtures, kit, guards", () => {
     const lower = text().toLowerCase();
     expect(lower).toMatch(/\*\*docs\.\*\*/);

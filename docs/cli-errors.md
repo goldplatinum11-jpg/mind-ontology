@@ -43,7 +43,7 @@ to the operator, and apply the named fix. Do not retry verbatim.
 | Bad `--format` | `--format must be "markdown", "json", or "compact", got: <x>` | Use `markdown`, `json`, or `compact`. |
 | Bad `--risk` | `--risk must be "auto", "safe", or "risky", got: <x>` | Use `auto`, `safe`, or `risky`. |
 | Bad `--max-tokens` | `--max-tokens must be a positive integer, got: <x>` | Pass a positive integer, e.g. `--max-tokens 400`. |
-| Unknown flag | `Unknown argument: <arg>` | Remove the unknown flag (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology compile --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 | Unknown command | `Unknown command: <x>` | Use `compile`. |
 
 ## `agentctx:init`
@@ -51,8 +51,8 @@ to the operator, and apply the named fix. Do not retry verbatim.
 | Failure | Message (stderr) | Next safe action |
 |---|---|---|
 | `.agentctx/` already exists | `.agentctx/ already exists. Re-run with --force to overwrite template files.` | Pass `--force` (preserves your own non-template files). |
-| Unknown template | `Template not found: <name>` | Use an existing template under `templates/` (default `mind-ontology`). |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown template | `Template not found: <name>. Available templates: <list>. Pass one with --template <name>.` | Use one of the listed templates (default `mind-ontology`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology init --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `agentctx:metrics`
 
@@ -65,23 +65,32 @@ to the operator, and apply the named fix. Do not retry verbatim.
 
 `validate` never throws on a clean tree; it prints a **report to stdout** and
 exits non-zero only when there are errors. So unlike compile/init, the message
-to act on is on **stdout**, prefixed by its severity and rule name, e.g.:
+to act on is on **stdout**, prefixed by its severity and rule name. Every issue
+line carries an indented `fix:` continuation line naming the concrete next
+action, and a failing report ends with a pointer to the authoring doc, e.g.:
 
-```
-  ERROR  [missing-dir] Missing .agentctx/ in <cwd>. Run "npm run agentctx:init" to scaffold starter files.
-  ERROR  [empty-required] Required source is empty: .agentctx/constraints.md
-INVALID — 1 error(s), 0 warning(s)
+```text
+  ERROR  [missing-dir] Missing .agentctx/ in <cwd>
+         fix: Run "npm run agentctx:init" to scaffold starter files.
+  ERROR  [required-tag] identity.md is missing a block tagged #style
+         fix: Add a block headed "## <title> #style" to identity.md.
+INVALID — 2 error(s), 0 warning(s)
+See docs/schema-authoring.md for the block format and per-file rules.
 ```
 
-| Failure | Issue line (stdout) | Next safe action |
+| Failure | Issue line (stdout) | Next safe action (the `fix:` line) |
 |---|---|---|
-| No `.agentctx/` | `[missing-dir] Missing .agentctx/ …` | Run `agentctx:init`. |
-| Empty required source | `[empty-required] Required source is empty: .agentctx/<file>` | Add content to the named file. |
-| Schema violations | `[required-tag] / [enum-field] / [no-credentials] / …` naming the file, block, and rule | Fix the named block; see [schema validation](mind-ontology-schema-validation-v0.md). |
+| No `.agentctx/` | `[missing-dir] Missing .agentctx/ in <cwd>` | `Run "npm run agentctx:init" to scaffold starter files.` |
+| Missing required source | `[required-file] Missing required source: .agentctx/<file>` | `Run "npm run agentctx:init" to scaffold it, or create the file …` |
+| Empty required source | `[empty-required] Required source is empty: .agentctx/<file>` | `Add at least one "## <title> #<tag>" block to <file>.` |
+| Schema violations | `[required-tag] / [enum-field] / [no-credentials] / …` naming the file, block, and rule | per-rule remedy from `RULE_REMEDIES`, parameterized with the offending tag / field / allowed values |
 
-The `INVALID — N error(s)` summary plus a non-zero exit is the machine signal.
-See [schema validation](mind-ontology-schema-validation-v0.md) for the full rule
-list.
+The `INVALID — N error(s)` summary plus a non-zero exit is the machine signal;
+warnings also carry `fix:` lines but never flip the exit code. Programmatic
+consumers get the same hint as a `remedy` field on each issue. See
+[schema validation](mind-ontology-schema-validation-v0.md) for the full rule
+list and [schema authoring](schema-authoring.md) for the block format the
+remedies point at.
 
 ## `mind-ontology emit` (write mode)
 
@@ -101,7 +110,7 @@ exist. Specs: [W1 emit targets](workbench-w1-emit-target-spec.md),
 | `--full` with `--reconcile` | `--full cannot be combined with --reconcile (--reconcile re-emits each target against the profile recorded in its header)` | Drop one flag. Exit `2`. |
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Compile errors | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology emit --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 Warnings (stderr, exit `0`, artifacts still written — cataloged here so
 operators find them; they never change artifact bytes):
@@ -211,7 +220,7 @@ prevents producing any verdict) goes to stderr, with no partial report.
 | Any section unhealthy | **stdout report** | the per-section report; the summary line names the unhealthy sections (`UNHEALTHY - sections needing attention: …`) | Fix the named sections (re-emit for drift, answer the named CQs, fix schema errors). |
 | Broken ontology / missing `.agentctx/` | stderr | compile/validate pass-through (the `agentctx:compile` rows above) | per the compile section |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
-| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | stderr | `Unknown argument: <arg>. Run "mind-ontology status --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology preview`
 
@@ -226,7 +235,7 @@ Workbench `--format` vocabulary (`text|json`, not compile's `markdown|json`).
 | Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Bad `--risk` | `--risk must be "auto", "safe", or "risky", got: <x>` | Use `auto`, `safe`, or `risky`. |
 | Broken ontology | unchanged pass-through of the `agentctx:compile` rows above | per the compile section |
-| Unknown flag | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology preview --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology cq`
 
@@ -244,7 +253,7 @@ report), while `status` skips the section instead.
 | Unanswered required CQ(s) | **stdout report** | per-CQ `UNANSWERED … (required)` lines + `FAIL` summary | Add/extend the source blocks the CQ's topic tags point at. |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Broken ontology | stderr | compile pass-through (the `agentctx:compile` rows above) | per the compile section |
-| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | stderr | `Unknown argument: <arg>. Run "mind-ontology cq --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
 
 ## `mind-ontology review`
 
@@ -260,7 +269,36 @@ path ([W2 §2.1](workbench-w2-cli-spec.md)).
 | Not valid JSON | stderr | `Result Pack is not valid JSON: <path>` | Fix or regenerate the pack. |
 | Shape violations | **stdout report** | per-invariant `FAIL` lines + `INVALID` summary | Send back to the worker with the failed invariant. |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
-| Unknown flag | stderr | `Unknown argument: <arg>` | Remove it (see `--help`). |
+| Unknown flag | stderr | `Unknown argument: <arg>. Run "mind-ontology review --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
+
+## `mind-ontology agent-setup`
+
+`agent-setup` wires an agent client (MCP config + startup bootstrap instruction,
+[agent-setup.md](agent-setup.md)). Exit `1` on every failure, nothing written
+on failure. Write mode is **create-only**: an existing config file is never
+overwritten or merged — `--print` gives the block to merge by hand. `--print`
+itself never touches the filesystem.
+
+| Failure | Message (stderr) | Next safe action |
+|---|---|---|
+| No `--target` | `Missing required --target argument (allowed: "claude-code", "codex")` | Pass `--target claude-code` or `--target codex`. |
+| Unknown target | `--target must be one of "claude-code", "codex", got: <x>` | Use a listed target id. |
+| Existing config in write mode | `Refusing to overwrite <path>: file already exists. Re-run with --print and merge the agentctx server block by hand.` | Re-run with `--print`, merge the block by hand. |
+| Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology agent-setup --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
+
+Warnings (stderr, exit `0` — the plan is still printed/written; cataloged here
+so operators find them):
+
+| Warning | Message (stderr) |
+|---|---|
+| Server script not found | `warning: MCP server script not found under the project (looked for scripts/agentctx/mcp-server.mjs, node_modules/mind-ontology/scripts/agentctx/mcp-server.mjs); the config assumes "npm install mind-ontology" will provide it` |
+| Missing `.agentctx/` | `warning: .agentctx/ not found in the project; the MCP server fails closed (no invented context) until you scaffold sources with: mind-ontology init` |
+
+Missing `.agentctx/` is deliberately a *warning* here, not an error: wiring the
+client first and scaffolding sources second is a valid adoption order, and the
+MCP server itself fails closed (it never invents context) until the sources
+exist.
 
 ## `agentctx:mcp` (JSON-RPC error codes)
 
@@ -282,16 +320,19 @@ but they do **not yet point to a next action**. They are usable today; improving
 them is a future *engine* change (out of scope for a docs/tests lane), tracked
 here so the gap is visible rather than silently accepted:
 
-- **`Unknown argument: <arg>`** (compile & init) — names the offending flag but
-  does not point to `--help`. Candidate: append `(see --help)`.
-- **`Template not found: <name>`** (init) — names the bad template but does not
-  list the available ones. Candidate: append `Available: <list>`.
-- **`validate` issue lines** — name the file, block, and rule but carry no inline
-  fix hint or doc link. Candidate: attach a one-line remedy per rule.
+- **`review` unreadable `--pack` path** — names the path but suggests no check.
+- **`cq` out-of-range `--id`** — names the valid range but not how to list ids.
 
-Until then, fall back to `--help` (for the flag/template cases) or the
-[schema validation](mind-ontology-schema-validation-v0.md) doc (for validate
-rules).
+(Closed lanes: `validate` issue lines now carry an inline `fix:` remedy per
+rule (parameterized with the offending tag / field / allowed values) and the
+failing report links `docs/schema-authoring.md` — locked in the error-UX
+catalog test and the schema-messages remedy-coverage test.
+`Unknown argument: <arg>` now points at the command's own
+`--help` across every command — `Run "mind-ontology <command> --help" for the
+list of options.` — locked per command in the error-UX catalog test.
+`Template not found: <name>` (init) now lists the available templates and the
+`--template <name>` flag to pass one — locked in the error-UX catalog test
+and unit-tested down to the empty-templates edge case.)
 
 ---
 
@@ -309,3 +350,6 @@ them is a deliberate, reviewed UX change — not an accident:
 - [`tests/unit/emit-check.test.mjs`](../tests/unit/emit-check.test.mjs) —
   locks the `emit --check` classification matrix (every drift class, its
   detail sentence, and the three-way exit code) end-to-end.
+- [`tests/unit/agent-setup-command.test.mjs`](../tests/unit/agent-setup-command.test.mjs) —
+  locks the `agent-setup` write/print contract end-to-end, including the exit-`0`
+  warning paths above (which the catalog's non-zero-exit shape cannot carry).

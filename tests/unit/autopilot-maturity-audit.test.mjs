@@ -18,6 +18,17 @@ describe("autopilot pack maturity self-audit v1 (A64)", () => {
     expect(existsSync(DOC)).toBe(true);
   });
 
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    // The pack header back-link lives in the doc header, above the first
+    // horizontal rule. Pin it structurally (scoped to the header, with the exact
+    // link target) so the A-series pack frame can't silently drop off the top of
+    // this doc without its owning public-surface test failing.
+    const header = text().split("\n---")[0];
+    expect(header).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
+
   it("enumerates at least eight structural guarantees", () => {
     // Table rows shaped "| N | guarantee | `test` |".
     const rows = (text().match(/^\|\s*\d+\s*\|/gm) || []).length;

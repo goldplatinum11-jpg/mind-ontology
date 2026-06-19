@@ -14,6 +14,17 @@ describe("autopilot adoption walkthrough v1 (A8)", () => {
     expect(existsSync(DOC)).toBe(true);
   });
 
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    // The pack header back-link lives in the doc header, above the first
+    // horizontal rule. Pin it structurally (scoped to the header, with the
+    // exact link target) so the A-series pack frame can't silently drop off
+    // the top of this doc without its owning public-surface test failing.
+    const header = text().split("\n---")[0];
+    expect(header).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
+
   it("walks the wiring sequence: scaffold, paste blocks, wire MCP, instruct, call, verify", () => {
     const lower = text().toLowerCase();
     for (const step of ["scaffold", "autopilot blocks", "wire the mcp", "one-line instruction", "first context call", "verify"]) {

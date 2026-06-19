@@ -93,6 +93,13 @@ const PROJECTS = {
     appendFileSync(join(cwd, ".agentctx", "constraints.md"), "\n## Extra rule #safety\n\nAdded after emit.\n");
     return cwd;
   },
+  existingMcpConfig() {
+    // A project that already carries a hand-managed .mcp.json — setup's write
+    // mode must refuse to overwrite or merge it.
+    const cwd = tmp();
+    writeFileSync(join(cwd, ".mcp.json"), '{ "mcpServers": { "mine": {} } }\n');
+    return cwd;
+  },
 };
 
 // The catalog. `argv` is templated with the project cwd via the {cwd} token.
@@ -149,8 +156,7 @@ const CASES = [
     argv: ["compile", "--cwd", "{cwd}", "--task", "x", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    // No next-action hint today — see docs/cli-errors.md (candidate repair lane).
-    nextAction: null,
+    nextAction: /mind-ontology compile --help/,
   },
   {
     id: "compile: missing .agentctx/",
@@ -190,8 +196,7 @@ const CASES = [
     argv: ["init", "--cwd", "{cwd}", "--template", "does-not-exist"],
     stream: "stderr",
     names: /Template not found: does-not-exist/,
-    // Names the bad template but does not list valid ones — candidate repair lane.
-    nextAction: null,
+    nextAction: /Available templates: mind-ontology.*--template <name>/,
   },
   {
     id: "init: unknown flag",
@@ -199,7 +204,7 @@ const CASES = [
     argv: ["init", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology init --help/,
   },
   {
     id: "validate: missing .agentctx/",
@@ -215,8 +220,17 @@ const CASES = [
     argv: ["validate", "--cwd", "{cwd}"],
     stream: "stdout",
     names: /empty-required|Required source is empty: \.agentctx\/constraints\.md/,
-    // No fix hint on this issue line today — candidate repair lane.
-    nextAction: null,
+    // Issue lines now carry an inline remedy plus a doc pointer
+    // (validate-remedy-hints-v1; closed candidate repair lane).
+    nextAction: /fix: Add at least one "## <title> #<tag>" block to constraints\.md\./,
+  },
+  {
+    id: "validate: failing report links the schema authoring doc",
+    project: "emptyConstraints",
+    argv: ["validate", "--cwd", "{cwd}"],
+    stream: "stdout",
+    names: /INVALID/,
+    nextAction: /See docs\/schema-authoring\.md for the block format and per-file rules\./,
   },
   // ── W3: `mind-ontology emit` rows (W2 §10, merged into docs/cli-errors.md
   //    in the same change) ──────────────────────────────────────────────────
@@ -266,7 +280,7 @@ const CASES = [
     argv: ["emit", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology emit --help/,
   },
   {
     id: "emit: missing .agentctx/ (compile pass-through)",
@@ -300,7 +314,7 @@ const CASES = [
     argv: ["review", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology review --help/,
   },
   // ── W8: `mind-ontology cq` hard-error rows (W2 §10; the unanswered-report
   //    path and the required-only gate are locked in cq-command.test.mjs) ─────
@@ -334,7 +348,7 @@ const CASES = [
     argv: ["cq", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology cq --help/,
   },
   // ── W7: `mind-ontology status` hard-error rows (W2 §10; the unhealthy-report
   //    path is a multi-line stdout report, locked in status-command.test.mjs) ──
@@ -360,7 +374,7 @@ const CASES = [
     argv: ["status", "--cwd", "{cwd}", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology status --help/,
   },
   // ── W6: `mind-ontology preview` rows (W2 §10: identical to compile's, plus
   //    the Workbench text|json --format vocabulary) ──────────────────────────
@@ -394,7 +408,7 @@ const CASES = [
     argv: ["preview", "--cwd", "{cwd}", "--task", "x", "--bogus"],
     stream: "stderr",
     names: /Unknown argument: --bogus/,
-    nextAction: null,
+    nextAction: /mind-ontology preview --help/,
   },
   {
     id: "preview: missing .agentctx/ (compile pass-through)",
@@ -419,6 +433,51 @@ const CASES = [
     stream: "stderr",
     names: /Required Mind Ontology source is empty/,
     nextAction: /constraint block/,
+  },
+  // ── Adoption Autoload V1 follow-up: `mind-ontology setup` hard-error rows.
+  //    The two warning paths (server script not found, missing .agentctx/)
+  //    deliberately exit 0 with a stderr warning — outside the catalog shape
+  //    (non-zero exit, clean success stream) — and are locked end-to-end in
+  //    agent-setup-command.test.mjs; docs/cli-errors.md catalogs them as warnings. ──
+  {
+    id: "setup: missing --target names the allowed values",
+    project: "none",
+    argv: ["agent-setup", "--cwd", "{cwd}", "--print"],
+    stream: "stderr",
+    names: /Missing required --target argument \(allowed: "claude-code", "codex"\)/,
+    nextAction: /claude-code|codex/,
+  },
+  {
+    id: "setup: unknown target names the allowed values",
+    project: "none",
+    argv: ["agent-setup", "--cwd", "{cwd}", "--target", "cursor", "--print"],
+    stream: "stderr",
+    names: /--target must be one of "claude-code", "codex", got: cursor/,
+    nextAction: /claude-code|codex/,
+  },
+  {
+    id: "setup: bad --format uses the Workbench vocabulary",
+    project: "none",
+    argv: ["agent-setup", "--cwd", "{cwd}", "--target", "codex", "--format", "xml", "--print"],
+    stream: "stderr",
+    names: /--format must be "text" or "json", got: xml/,
+    nextAction: /text|json/,
+  },
+  {
+    id: "setup: unknown flag",
+    project: "none",
+    argv: ["agent-setup", "--cwd", "{cwd}", "--target", "codex", "--bogus", "--print"],
+    stream: "stderr",
+    names: /Unknown argument: --bogus/,
+    nextAction: /mind-ontology agent-setup --help/,
+  },
+  {
+    id: "setup: write mode refuses an existing config",
+    project: "existingMcpConfig",
+    argv: ["agent-setup", "--cwd", "{cwd}", "--target", "claude-code"],
+    stream: "stderr",
+    names: /Refusing to overwrite \.mcp\.json: file already exists/,
+    nextAction: /--print/,
   },
 ];
 

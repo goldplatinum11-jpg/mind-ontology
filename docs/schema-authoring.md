@@ -6,6 +6,10 @@ explains them in one place. Run `npm run agentctx:validate` to check your work.
 
 ## Block format (shared by every file)
 
+The skeleton below is illustrative only — angle-bracket placeholders, not a
+real source file — and is not validated. For validated minimal examples, see
+the per-file `*-schema-v0.md` reference docs.
+
 ```md
 # <File Title>
 
@@ -23,7 +27,8 @@ Block body. The compiler scores headings, tags, and body against the task.
 
 ### `constraints.md` — required, always included
 
-The only **required** file. Every compiled pack includes all of its blocks
+The only **required** file: it must exist and be non-empty (an empty
+`constraints.md` fails validation). Every compiled pack includes all of its blocks
 (`reason: "always"`). Put non-negotiable rules here. No credential-shaped values
 anywhere in any source (the validator rejects `api_key: …`, tokens, etc.).
 
@@ -56,14 +61,16 @@ anywhere in any source (the validator rejects `api_key: …`, tokens, etc.).
 ### `agent-roles.md`
 
 - Namespace tag **`#agent`** on every role block.
-- Each role block carries **exactly one** tag besides `#agent` (the role name).
+- Each role block carries **exactly one** tag besides `#agent` (the role name)
+  and a non-empty body.
 - Must include blocks tagged **`#coding`** and **`#review`**.
 
 ### `glossary.md`
 
 - Namespace tag **`#term`** on every entry.
 - Each entry needs **one extra topic tag** and a non-empty body.
-- Entry titles must be **unique** (no duplicate terms).
+- Entry titles must be **unique**, compared case-insensitively (`Foo` and `foo`
+  count as duplicates).
 
 ### `cq.md` — competency questions
 

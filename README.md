@@ -14,8 +14,8 @@ auditable compiler + MCP server over a folder of plain Markdown files you own.
 > account, no database, and no network. Hosted memory is an *optional*,
 > fail-closed on-ramp that is **off by default**.
 >
-> **License:** [Apache-2.0](LICENSE). The package is still `private`/pre-release,
-> so it is not published yet — see [Distribution & license boundary](#distribution--license-boundary).
+> **License:** [Apache-2.0](LICENSE). The package is publish-ready (`0.1.0`) but
+> not yet published — see [Distribution & license boundary](#distribution--license-boundary).
 
 ---
 
@@ -170,7 +170,16 @@ At task start, call get_context(task). Before destructive or structural
 changes, call list_constraints().
 ```
 
-See the [quickstart](docs/mind-ontology-quickstart.md) for the install-first
+One command produces this wiring per client — the MCP config plus a startup /
+first-action bootstrap instruction (deterministic, local-only, never
+overwrites an existing config):
+
+```sh
+npx mind-ontology agent-setup --target claude-code --print   # or: codex
+```
+
+See [agent setup](docs/agent-setup.md) for the adoption-autoload flow, the
+[quickstart](docs/mind-ontology-quickstart.md) for the install-first
 flow and [client setup proofs](docs/mind-ontology.md#client-setup) for
 per-tool wiring. The engine's classic entry points keep working too:
 

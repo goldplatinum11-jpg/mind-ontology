@@ -41,14 +41,19 @@ a hosted backend is **not** available from this repository.
 
 ## Verification
 
-| Gate | Command | Current |
-|---|---|---|
-| Proof | `npm run agentctx:proof` | 22/22 |
-| Validate | `npm run agentctx:validate` | VALID (0 errors) |
-| Smoke | `npm run agentctx:smoke` | SMOKE PASS (12/12) |
-| Full | `npm test` | 1205 tests across 170 files, green |
+All four release gates are green at head. Each gate reports its own live totals
+when run, so the run itself is the count of record — this table says what green
+looks like, not a number that rots.
 
-See [`testing.md`](testing.md) for the test taxonomy. The suite has been hardened
+| Gate | Command | Green looks like |
+|---|---|---|
+| Proof | `npm run agentctx:proof` | every proof test passes |
+| Validate | `npm run agentctx:validate` | `VALID` (0 errors) |
+| Smoke | `npm run agentctx:smoke` | `SMOKE PASS`, all checks |
+| Full | `npm test` | every `tests/unit` file passes; the runner's summary line carries the live file and test totals |
+
+See [`testing.md`](testing.md) for the test taxonomy and the count-of-record
+guidance. The suite has been hardened
 with guard/audit tests so docs, fixtures, and the fail-closed boundary cannot
 drift from the code (link/anchor/script audits, control-plane import audit, CLI
 error-UX, scoring/compile/metrics determinism, doc↔code consistency bindings).

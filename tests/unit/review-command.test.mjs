@@ -181,4 +181,36 @@ describe("W9 — one set of rules, two consumers", () => {
     expect(cli.ok).toBe(direct.ok);
     expect(cli.violations).toEqual(direct.violations);
   });
+
+  // The valid-pack equivalence above only proves both consumers accept a clean
+  // pack (each returns ok:true, violations:[]) — it would still pass if
+  // review.mjs forked its own copy of the rules instead of importing the shared
+  // result-pack module. Pin the shared-rule-set claim against that
+  // duplication-drift failure mode: compare the CLI verdict to
+  // validateResultPack's direct verdict across the valid pack AND one mutation
+  // per invariant, so any divergence between the two consumers' rule sets
+  // surfaces as a verdict mismatch (ok or the full violations array), not just a
+  // disagreement that happens to land on the one valid example.
+  const sharedRuleSetCases = [
+    ["a valid pack", () => {}],
+    ["a forbidden-scope admission (invariant 2)", (p) => { p.forbidden_scope_touched = true; }],
+    ["a missing required key (invariant 1)", (p) => { delete p.handoff; }],
+    ["an empty adls_completed (invariant 4)", (p) => { p.adls_completed = []; }],
+    ["an inconsistent stop state (invariant 5)", (p) => { p.status = "complete"; }],
+    [
+      "hosted leakage (invariant 3)",
+      (p) => { p.handoff = "Pushed to https://connector.example.workers.dev/mcp for ingest."; },
+    ],
+  ];
+
+  it.each(sharedRuleSetCases)(
+    "the CLI verdict equals the shared module's verdict on %s",
+    (_label, mutate) => {
+      const path = packFile(mutate);
+      const direct = validateResultPack(JSON.parse(readFileSync(path, "utf8")));
+      const cli = JSON.parse(runCli(["review", "--pack", path, "--format", "json"]).stdout);
+      expect(cli.ok).toBe(direct.ok);
+      expect(cli.violations).toEqual(direct.violations);
+    },
+  );
 });

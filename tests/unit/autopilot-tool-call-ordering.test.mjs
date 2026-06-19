@@ -13,6 +13,13 @@ describe("autopilot tool-call ordering v1 (A62)", () => {
     expect(existsSync(DOC)).toBe(true);
   });
 
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    const header = text().split(/\r?\n/).slice(0, 10).join("\n");
+    expect(header).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
+
   it("fixes the within-step sequence: get_context first, list_constraints before the risky write", () => {
     const t = text();
     const lower = t.toLowerCase();

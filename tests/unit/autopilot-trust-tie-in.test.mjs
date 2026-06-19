@@ -13,6 +13,13 @@ describe("autopilot trust tie-in v1 (A41)", () => {
     expect(existsSync(DOC)).toBe(true);
   });
 
+  it("pins the top-of-doc Autopilot Integration Pack header back-link", () => {
+    const header = text().split(/\r?\n/).slice(0, 10).join("\n");
+    expect(header).toContain(
+      "Part of the [Autopilot Integration Pack](mind-ontology-autopilot-pack-v1.md).",
+    );
+  });
+
   it("ties trust to a small auditable surface and no hidden data flow", () => {
     const lower = text().toLowerCase();
     expect(lower).toMatch(/auditable/);

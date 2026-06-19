@@ -34,25 +34,40 @@ export function parseInitArgv(argv = process.argv.slice(2)) {
     } else if (arg === "-h" || arg === "--help") {
       options.help = true;
     } else {
-      throw new Error(`Unknown argument: ${arg}`);
+      throw new Error(`Unknown argument: ${arg}. Run "mind-ontology init --help" for the list of options.`);
     }
   }
 
   return options;
 }
 
+export function listAvailableTemplates(templatesRoot = TEMPLATES_ROOT) {
+  const root = resolve(templatesRoot);
+  if (!existsSync(root)) {
+    return [];
+  }
+  return readdirSync(root, { withFileTypes: true })
+    .filter(
+      (entry) => entry.isDirectory() && existsSync(resolve(root, entry.name, DEFAULT_TARGET_DIR)),
+    )
+    .map((entry) => entry.name)
+    .sort();
+}
+
 export function initAgentctx(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const templateName = options.template ?? DEFAULT_TEMPLATE_NAME;
-  const templateDir = resolve(
-    options.templatesRoot ?? TEMPLATES_ROOT,
-    templateName,
-    DEFAULT_TARGET_DIR,
-  );
+  const templatesRoot = resolve(options.templatesRoot ?? TEMPLATES_ROOT);
+  const templateDir = resolve(templatesRoot, templateName, DEFAULT_TARGET_DIR);
   const targetDir = resolve(cwd, DEFAULT_TARGET_DIR);
 
   if (!existsSync(templateDir)) {
-    throw new Error(`Template not found: ${templateName}`);
+    const available = listAvailableTemplates(templatesRoot);
+    const hint =
+      available.length > 0
+        ? `Available templates: ${available.join(", ")}. Pass one with --template <name>.`
+        : `No templates found under ${templatesRoot}.`;
+    throw new Error(`Template not found: ${templateName}. ${hint}`);
   }
 
   if (existsSync(targetDir) && options.force !== true) {

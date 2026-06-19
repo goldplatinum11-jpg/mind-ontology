@@ -21,6 +21,9 @@ Shared `.agentctx/` Markdown convention:
   tags and stripped from the rendered title.
 - The block body describes when to use the role.
 
+The fence below is illustrative only — it shows the block shape and is not
+validated. The validated example is at the end of this document.
+
 ```md
 # Agent Roles
 
@@ -84,6 +87,22 @@ Inherits the global ontology constraints:
   role guidance and omit the rest.
 - Wired into `SOURCE_FILES` by P2-PR06; until then the schema defines the
   authoring contract only.
+
+---
+
+## Validator enforcement
+
+`npm run agentctx:validate` applies the `agent-roles.md` entry of
+`ONTOLOGY_SCHEMA` (`scripts/agentctx/schema.mjs`). Rules apply only when the
+file is present; a project without `agent-roles.md` still validates.
+
+| Rule | Level | What it checks |
+|---|---|---|
+| `namespace-required` | error | At least one block tagged `#agent` exists. |
+| `one-role-tag` | error | Every `#agent` block carries exactly one tag besides `#agent`. |
+| `non-empty-body` | error | Every `#agent` block has a non-empty body. |
+| `required-tag` | error | Blocks tagged `#coding` and `#review` exist. |
+| `no-credentials` | error | No credential-shaped `key: value` line anywhere in the file. |
 
 ---
 
