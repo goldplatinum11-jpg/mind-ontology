@@ -106,15 +106,25 @@ export function createConnector(snapshot, env = {}) {
       if (method === "POST" && pathname === "/get_context") {
         const body = await readJsonBody(request);
         if (body === null) return json(400, { error: "request body is not valid JSON" });
-        const { status, json: payload } = httpGetContext(snapshot, body);
-        return json(status, payload);
+        // A malformed bundled snapshot (or any handler error) becomes a clean 500
+        // instead of crashing the Worker — symmetric with the MCP path's -32603.
+        try {
+          const { status, json: payload } = httpGetContext(snapshot, body);
+          return json(status, payload);
+        } catch (err) {
+          return json(500, { error: "internal_error", detail: err.message });
+        }
       }
 
       if (method === "POST" && pathname === "/list_constraints") {
         const body = await readJsonBody(request);
         if (body === null) return json(400, { error: "request body is not valid JSON" });
-        const { status, json: payload } = httpListConstraints(snapshot);
-        return json(status, payload);
+        try {
+          const { status, json: payload } = httpListConstraints(snapshot);
+          return json(status, payload);
+        } catch (err) {
+          return json(500, { error: "internal_error", detail: err.message });
+        }
       }
 
       return json(404, { error: "not_found" });
