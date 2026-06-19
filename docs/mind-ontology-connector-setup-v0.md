@@ -48,7 +48,7 @@ the [HTTP endpoint design](mind-ontology-http-endpoint-design-v0.md), and the
 | **401** `unauthorized` | The Worker has `CONNECTOR_BEARER_TOKEN` set, but the request's `Authorization: Bearer <token>` is missing or wrong. | Send the matching bearer in your client's connector auth field, or unset the token for a public dev endpoint. |
 | **404** `not_found` | The path is not one of `/health`, `/get_context`, `/list_constraints`, `/mcp`. | Point the client at the correct path. For MCP, the connector URL ends in `/mcp`. |
 | **405** `method_not_allowed` | A non-`POST` request hit `/mcp`. | The remote MCP transport accepts `POST` JSON-RPC only. |
-| **Protocol mismatch** | The MCP client requested a `protocolVersion` the server does not support. | This is **not** an error — the server replies with the latest version it supports; modern clients accept that. No action needed. |
+| **Protocol mismatch** | The MCP client requested a `protocolVersion` the server does not support (or sent an unsupported `MCP-Protocol-Version` header — that returns `400`). | At `initialize` the server replies with a protocol version it supports; a client that does not support that version **may disconnect**. Use a client/version the server supports (currently `2025-06-18`, `2025-03-26`, `2024-11-05`). |
 | **Malformed JSON** | The body was not valid JSON. | On `/mcp` the server returns a JSON-RPC `-32700` parse error; on the GPT Action endpoints it returns `400`. Send a valid JSON body. |
 | **Empty / `202` on a notification** | `notifications/initialized` (and other notifications) return `202` with no body, by design. | Expected; not an error. |
 

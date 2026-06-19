@@ -15,7 +15,7 @@
 //     the CONNECTOR_BEARER_TOKEN env var (a Worker secret); no token is stored here.
 
 import { httpGetContext, httpListConstraints } from "./http-handlers.mjs";
-import { dispatchMcp } from "./mcp.mjs";
+import { dispatchMcp, SUPPORTED_PROTOCOL_VERSIONS } from "./mcp.mjs";
 // The workspace snapshot is bundled with the Worker. The committed file is an
 // EXAMPLE; an operator regenerates it for their workspace before deploy
 // (scripts/build-agentctx-snapshot.mjs) and points this import at the result.
@@ -80,6 +80,17 @@ export function createConnector(snapshot, env = {}) {
       if (isMcp) {
         if (method !== "POST") {
           return json(405, { error: "method_not_allowed", detail: "POST a JSON-RPC message to /mcp" });
+        }
+        // Streamable-HTTP MCP-Protocol-Version header: a missing header is treated
+        // as compatible (the negotiated default), but a present-but-unsupported
+        // value is a 400 per the spec — don't silently serve a mismatched client.
+        const protocolHeader = request.headers.get("mcp-protocol-version");
+        if (protocolHeader && !SUPPORTED_PROTOCOL_VERSIONS.includes(protocolHeader)) {
+          return json(400, {
+            error: "unsupported_protocol_version",
+            detail: `MCP-Protocol-Version "${protocolHeader}" is not supported`,
+            supported: SUPPORTED_PROTOCOL_VERSIONS,
+          });
         }
         const body = await readJsonBody(request);
         if (body === null) {

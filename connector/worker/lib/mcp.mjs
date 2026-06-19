@@ -27,15 +27,17 @@ import { loadSnapshot } from "./source-snapshot.mjs";
 export const SERVER_INFO = { name: "agentctx", version: "0.1.0" };
 
 // Protocol versions this hosted transport speaks, newest first. The stdio server
-// pins "2024-11-05"; hosted Streamable-HTTP clients (Claude.ai, ChatGPT) commonly
-// request "2025-03-26", so both are supported and negotiated at initialize.
-export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-03-26", "2024-11-05"];
+// pins "2024-11-05"; hosted Streamable-HTTP clients (Claude.ai, ChatGPT) request
+// recent revisions ("2025-06-18", "2025-03-26"), so all are supported and
+// negotiated at initialize.
+export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 // The version assumed when the client requests none / an unsupported one, and the
-// version a missing `MCP-Protocol-Version` HTTP header is treated as.
+// version a missing `MCP-Protocol-Version` HTTP header is treated as. Kept at a
+// broadly-compatible release rather than the newest listed above.
 export const DEFAULT_PROTOCOL_VERSION = "2025-03-26";
 
 // MCP negotiation: echo the client's requested version when supported, else fall
-// back to the latest the server supports.
+// back to the broadly-compatible default.
 export function negotiateProtocolVersion(requested) {
   return SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : DEFAULT_PROTOCOL_VERSION;
 }

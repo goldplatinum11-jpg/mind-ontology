@@ -226,4 +226,32 @@ describe("remote MCP protocol-version negotiation + transport headers (PR2)", ()
     );
     expect(present.status).toBe(200);
   });
+
+  it("echoes the 2025-06-18 protocol version when the client requests it", async () => {
+    const { json } = await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });
+    expect(json.result.protocolVersion).toBe("2025-06-18");
+  });
+
+  it("rejects an unsupported MCP-Protocol-Version header with 400", async () => {
+    const res = await connector.fetch(
+      new Request("https://connector.test/mcp", {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        headers: { "mcp-protocol-version": "1999-01-01" },
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("unsupported_protocol_version");
+  });
+
+  it("accepts a supported MCP-Protocol-Version header (newest)", async () => {
+    const res = await connector.fetch(
+      new Request("https://connector.test/mcp", {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        headers: { "mcp-protocol-version": "2025-06-18" },
+      }),
+    );
+    expect(res.status).toBe(200);
+  });
 });
