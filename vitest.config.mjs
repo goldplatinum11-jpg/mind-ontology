@@ -30,11 +30,16 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**", ".claude/**"],
     // De-flake under parallel load. A handful of heavy tests spawn child `node`
     // CLI processes and walk the whole docs tree; under the full suite's worker
-    // parallelism they occasionally exceed the 5s default or lose a transient
-    // race — all pass deterministically in isolation. `retry` re-runs only a
-    // failed test (a genuinely broken test still fails every attempt, so this
-    // masks no real bug), and the larger timeouts give the child-process /
-    // fs-heavy tests headroom. No test logic is changed.
+    // parallelism they occasionally exceeded the 5s DEFAULT timeout. All pass
+    // deterministically in isolation (no shared state — temp dirs are unique).
+    //
+    // ROOT fix: the 20s timeouts give the child-process / fs-heavy tests headroom.
+    // Evidence (Phase 14 root check): with these timeouts the FULL suite passes at
+    // --retry=0 (225 files / 2141 tests green). `retry` is therefore a SECONDARY
+    // insurance net, not load-bearing; it re-runs only a failed test, so it masks
+    // no real bug (a genuinely broken test still fails every attempt). The real
+    // long-term fix is a dedicated sequential pool for those heavy files (deferred).
+    // No test logic is changed.
     retry: 2,
     testTimeout: 20_000,
     hookTimeout: 20_000,
