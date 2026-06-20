@@ -162,6 +162,13 @@ re-derived logic, per the packet's design rule 2:
 | `cq` | the `cq` command's core (section 6) | every CQ answered |
 | `emit` | the `emit --check` core, result embedded verbatim (W1 §8: headers are the manifest) | every default target `OK` |
 
+`status`'s `emit` section checks **only the default targets** (`agents-md`,
+`claude-md`). The supported-but-not-default `cursor` / `paste-block` artifacts
+are never written by a bare `emit`, so a missing one is not drift; their
+freshness is verified explicitly with
+`mind-ontology emit --check --target cursor,paste-block`, never folded into
+`status`.
+
 **Representative tasks** for the metrics section are the rendered CQ question
 titles from `.agentctx/cq.md`, in source order. Rationale: the design packet
 asks for "pack-focus metrics for representative tasks" without saying where
