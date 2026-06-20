@@ -140,6 +140,25 @@ describe("hosted connector remote MCP (/mcp, PR2)", () => {
     expect(ok.status).toBe(200);
   });
 
+  it("auth precedence: a wrong bearer + unsupported protocol header is 401, and leaks no version list", async () => {
+    // The auth gate runs BEFORE the protocol-version header check (index.mjs), so
+    // an unauthenticated caller cannot probe the connector's supported-version set
+    // via the 400 `supported` body. Pin that ordering so a future refactor can't
+    // reorder the checks and turn this into a pre-auth version probe.
+    const guarded = createConnector(SNAPSHOT, { CONNECTOR_BEARER_TOKEN: "fake-token-for-mcp-tests-only" });
+    const res = await guarded.fetch(
+      new Request("https://connector.test/mcp", {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        headers: { authorization: "Bearer wrong-token", "mcp-protocol-version": "1999-01-01" },
+      }),
+    );
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("unauthorized");
+    expect(body.supported).toBeUndefined(); // no supported-version list leaked pre-auth
+  });
+
   it("PR1's GPT-Action /get_context stays JSON-only and intact", async () => {
     const res = await connector.fetch(
       new Request("https://connector.test/get_context", { method: "POST", body: JSON.stringify({ task: "x" }) }),
