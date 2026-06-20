@@ -79,10 +79,18 @@ describe("hosted connector HTTP surface (PR1, GPT Action)", () => {
     expect(json.error).toBe("not_found");
   });
 
-  it("remote MCP /mcp is explicitly deferred to PR2 (501, not 404)", async () => {
-    const { status, json } = await call(connector, "POST", "/mcp", {});
-    expect(status).toBe(501);
-    expect(json.error).toBe("not_implemented");
+  it("remote MCP /mcp is live (PR2) and coexists with the GPT-Action routes", async () => {
+    // Full MCP behavior is covered in agentctx-hosted-connector-mcp.test.mjs;
+    // here we only confirm PR2 wired /mcp into the same connector without
+    // disturbing PR1's HTTP surface.
+    const { status, json } = await call(connector, "POST", "/mcp", {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {},
+    });
+    expect(status).toBe(200);
+    expect(json.result.serverInfo.name).toBe("agentctx");
   });
 
   it("malformed JSON body is a 400", async () => {

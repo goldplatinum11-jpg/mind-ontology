@@ -1,0 +1,74 @@
+{
+  "note": "Realistic Streamable-HTTP MCP sessions as Claude.ai and ChatGPT developer-mode would send them (Accept header, clientInfo, MCP-Protocol-Version on post-initialize requests). Replayed in-process by agentctx-hosted-connector-remote-clients.test.mjs against the shared snapshot — no network, no deploy, no credential. Golden fixtures, not live transcripts.",
+  "snapshot": {
+    "schema": "agentctx-snapshot/v1",
+    "sources": {
+      "constraints.md": "## Keep the ontology portable #core\nReadable by any AI agent or MCP client.\n\n## Rate limit public endpoints #api\nEvery public endpoint enforces a per-key rate limit.\n",
+      "decisions.md": "## Adopt OAuth 2.0 with PKCE #auth\nThe login flow uses OAuth 2.0 with PKCE.\n"
+    }
+  },
+  "clients": [
+    {
+      "client": "claude-ai",
+      "transport": "streamable-http",
+      "negotiatedVersion": "2025-06-18",
+      "defaultHeaders": { "content-type": "application/json", "accept": "application/json, text/event-stream" },
+      "session": [
+        {
+          "name": "initialize",
+          "request": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": { "name": "claude-ai", "version": "1.0.0" } } },
+          "expect": { "status": 200, "json.result.protocolVersion": "2025-06-18", "json.result.serverInfo.name": "agentctx" }
+        },
+        {
+          "name": "notifications/initialized",
+          "headers": { "mcp-protocol-version": "2025-06-18" },
+          "request": { "jsonrpc": "2.0", "method": "notifications/initialized" },
+          "expect": { "status": 202, "bodyEmpty": true }
+        },
+        {
+          "name": "tools/list",
+          "headers": { "mcp-protocol-version": "2025-06-18" },
+          "request": { "jsonrpc": "2.0", "id": 2, "method": "tools/list" },
+          "expect": { "status": 200, "toolNames": ["get_context", "list_constraints"] }
+        },
+        {
+          "name": "tools/call get_context",
+          "headers": { "mcp-protocol-version": "2025-06-18" },
+          "request": { "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "get_context", "arguments": { "task": "Fix the OAuth login bug", "scope": "auth", "format": "json" } } },
+          "expect": { "status": 200, "contentJson.task": "Fix the OAuth login bug" }
+        }
+      ]
+    },
+    {
+      "client": "chatgpt-developer-mode",
+      "transport": "mcp",
+      "negotiatedVersion": "2025-03-26",
+      "defaultHeaders": { "content-type": "application/json", "accept": "application/json" },
+      "session": [
+        {
+          "name": "initialize",
+          "request": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": { "name": "openai-responses-mcp", "version": "1.0.0" } } },
+          "expect": { "status": 200, "json.result.protocolVersion": "2025-03-26", "json.result.serverInfo.name": "agentctx" }
+        },
+        {
+          "name": "notifications/initialized",
+          "headers": { "mcp-protocol-version": "2025-03-26" },
+          "request": { "jsonrpc": "2.0", "method": "notifications/initialized" },
+          "expect": { "status": 202, "bodyEmpty": true }
+        },
+        {
+          "name": "tools/list",
+          "headers": { "mcp-protocol-version": "2025-03-26" },
+          "request": { "jsonrpc": "2.0", "id": 2, "method": "tools/list" },
+          "expect": { "status": 200, "toolNames": ["get_context", "list_constraints"] }
+        },
+        {
+          "name": "tools/call list_constraints (markdown)",
+          "headers": { "mcp-protocol-version": "2025-03-26" },
+          "request": { "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "list_constraints", "arguments": { "format": "markdown" } } },
+          "expect": { "status": 200, "contentIncludes": "# Constraints" }
+        }
+      ]
+    }
+  ]
+}
