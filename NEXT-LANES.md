@@ -136,6 +136,39 @@ Productionizing the router (order B→A→C from the strategy dialogue):
 Remaining: none from the original scoring backlog — recency and aliases shipped
 (`--recency`, `--aliases`).
 
+## Guided adoption (`adopt`) — shipped this campaign
+
+The adoption-UX campaign collapsed the per-client onboarding ritual
+(`init` → `emit` → `agent-setup`, repeated per tool) into one guided,
+**local-first, read-only-by-default** command, `mind-ontology adopt`. A bare run
+prints the plan it would apply across every supported client (Claude Code, Codex,
+Cursor, ChatGPT / Claude.ai paste-block); `--write` is the single gate to any
+file; an existing config or a hand-edited artifact is never clobbered (it
+downgrades to a `manual_required` step) and the run still applies every other
+safe action. Shipped (docs/tests/engine-command only — `package.json` untouched,
+`agentctx:*` namespace frozen):
+
+- Normative spec [`docs/mind-ontology-adopt-spec-v1.md`](docs/mind-ontology-adopt-spec-v1.md)
+  (interface, per-target mapping, write policy, `manual_required` contract, JSON
+  shape) and the adopt error / recovery vocabulary in
+  [`docs/cli-errors.md`](docs/cli-errors.md).
+- The command (`scripts/agentctx/adopt.mjs`, registered in
+  `scripts/agentctx/cli.mjs`), unit-tested by `tests/unit/adopt-command.test.mjs`
+  and exercised end-to-end across a project-shape matrix (empty / Node /
+  pre-existing `.agentctx/` / config-conflict / malformed-source / Windows-path)
+  by `tests/unit/adoption-fixtures.test.mjs`.
+- Multi-client adoption docs: `adopt` is the recommended path in `README.md`, the
+  lead of [`docs/agent-setup.md`](docs/agent-setup.md), the
+  [`docs/mind-ontology-cli-v0.md`](docs/mind-ontology-cli-v0.md) guide, and the
+  [docs index](docs/mind-ontology.md) Client-setup section; `agent-setup` is
+  framed as the single-client primitive `adopt` composes.
+
+Remaining: none from this campaign. A future lane could make `adopt --write`
+hard-error on malformed sources instead of emitting a sparse artifact (today the
+named `validate` verify command is the safety net — characterized in
+`tests/unit/adoption-fixtures.test.mjs`); that would be a deliberate behavior
+change, not a fix.
+
 ## Never in this product (hosted/closed boundary)
 
 Memory graph storage, vector retrieval, typed-edge inference execution, writeback
