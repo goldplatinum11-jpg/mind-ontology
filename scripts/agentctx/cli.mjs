@@ -161,6 +161,13 @@ export const COMMANDS = {
     group: "operator",
     summary: "Wire an agent client (claude-code, codex): MCP config + startup bootstrap.",
   },
+  adopt: {
+    script: "adopt.mjs",
+    prefix: [],
+    npmScript: null,
+    group: "operator",
+    summary: "Guided local-first adoption: plan (and with --write apply) setup across all clients.",
+  },
   "import-sirt": {
     script: "import-sirt.mjs",
     prefix: [],
