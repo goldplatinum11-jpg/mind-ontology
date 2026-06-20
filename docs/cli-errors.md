@@ -300,6 +300,53 @@ client first and scaffolding sources second is a valid adoption order, and the
 MCP server itself fails closed (it never invents context) until the sources
 exist.
 
+## `mind-ontology adopt`
+
+`adopt` is the guided, **local-first** adoption command
+([adopt spec](mind-ontology-adopt-spec-v1.md)): it plans and (with `--write`)
+applies the setup a project needs across the supported clients. Default mode is a
+**read-only plan** — a bare `mind-ontology adopt` writes nothing; `--write` is the
+single gate to any file creation.
+
+`adopt` is a **report command**, not a fail-on-conflict command. A conflict
+(existing config, or an unmanaged/hand-edited artifact) does **not** throw — it
+downgrades to a `manual_required` outcome surfaced in `manual_steps`, the run
+still applies every other safe action, and the exit code stays `0`. Only a usage
+error (bad flag/value) or a broken ontology (`emit`/compile pass-through) is a
+hard error. Nothing is overwritten or merged, ever.
+
+Usage errors (stderr, nothing written):
+
+| Failure | Message (stderr) | Next safe action |
+|---|---|---|
+| Unknown target id | `--targets must be "all" or a comma list of "claude-code", "codex", "cursor", "paste-block", got: <x>` | Use `all` or listed client ids. |
+| Empty `--targets` | `--targets must be "all" or a comma list of "claude-code", "codex", "cursor", "paste-block", got: (empty)` | Pass `all` or at least one client id. |
+| Bad `--format` | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
+| Unknown flag | `Unknown argument: <arg>. Run "mind-ontology adopt --help" for the list of options.` | Remove the flag; `--help` lists the valid options. |
+| Broken ontology (write mode) | `emit`/compile pass-through (the `agentctx:compile` rows above) | per the compile section |
+
+`manual_required` outcomes (reported in the plan/result, **not** errors; exit
+`0`, the conflicted target is left untouched):
+
+| Conflict | Reported as | Next safe action |
+|---|---|---|
+| Emit artifact is `UNMANAGED` (headerless) | `manual_required` action + a `manual_step` naming `mind-ontology emit --force --target <id>` | Port the content into `.agentctx/`, then re-emit with `--force`. |
+| Emit artifact is `HAND-EDITED` | `manual_required` action + a `manual_step` to port the edit, then re-emit | Move the edit into `.agentctx/`, re-emit. |
+| Config file already exists (`.mcp.json` / `.codex/config.toml`) | `manual_required` action + a `manual_step` pointing at `mind-ontology agent-setup --print` | Re-run `agent-setup --print` and merge the block by hand. |
+| `paste-block` selected | always a `manual_step` (never an `action`) | Paste `mind-ontology-paste-block.md` into your ChatGPT / Claude.ai project instructions. |
+
+Warnings (stderr-style advisories carried in `warnings`, exit `0`, the plan is
+still produced/applied):
+
+| Warning | Meaning |
+|---|---|
+| `.agentctx/` absent (write mode) | `adopt --write` will scaffold a draft with `init --from-repo` before emitting. |
+| MCP server script not found under the project | The generated config assumes `npm install mind-ontology` will provide the server (same advisory as `agent-setup`). |
+
+Verify commands (named in every plan/result so the operator never guesses):
+`mind-ontology validate`, `mind-ontology status`, and
+`mind-ontology emit --check --target <selected emit targets>`.
+
 ## `agentctx:mcp` (JSON-RPC error codes)
 
 | Failure | Code | Meaning |
