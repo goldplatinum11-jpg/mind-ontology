@@ -50,7 +50,8 @@
     "agentctx:proof": "vitest run tests/unit/agentctx-proof.test.mjs",
     "agentctx:smoke": "node scripts/agentctx/acceptance-smoke.mjs",
     "agentctx:validate": "node scripts/agentctx/schema.mjs",
-    "agentctx:metrics": "node scripts/agentctx/metrics.mjs"
+    "agentctx:metrics": "node scripts/agentctx/metrics.mjs",
+    "smoke:connector:remote": "node connector/worker/scripts/smoke-remote.mjs"
   },
   "devDependencies": {
     "vitest": "^4.1.5"
