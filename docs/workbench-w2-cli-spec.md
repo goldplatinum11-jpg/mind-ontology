@@ -651,7 +651,7 @@ pointed to, no stack trace, correct stream per section 2.3.
 
 | Failure | Message (stderr) | Next safe action |
 |---|---|---|
-| Unknown target id | `--target must be one of "agents-md", "claude-md", got: <x>` | Use a registry id (W1 §2). |
+| Unknown target id | `--target must be one of "agents-md", "claude-md", "cursor", got: <x>` | Use a supported registry id (W1 §2; `cursor` is supported-but-not-default). |
 | Existing un-managed file, no `--force` | `Refusing to overwrite <path>: file exists but has no emit header. Move its content into .agentctx/ sources, then re-run with --force to overwrite.` | Port content to sources; `emit --force --target <id>`. |
 | `--full` with `--check` | `--full cannot be combined with --check (--check verifies against the profile recorded in the artifact header)` | Drop one flag. |
 | `--force` with `--check` | `--force cannot be combined with --check (--check never writes)` | Drop one flag. |

@@ -78,14 +78,15 @@ Each target carries two independent capability flags:
 Splitting the two is a deliberate design affordance: a future PR can register a
 *supported-but-not-default* target — emittable on demand via `--target` without
 expanding what a bare `emit` writes — with no surprise change to the default
-output set. v1 keeps the two sets identical (`agents-md`, `claude-md`); the
-fast-follow rows are non-default *and* unsupported until promoted.
+output set. `cursor` is exactly such a target: **supported** (section 13) but
+**not** default. `paste-block` stays non-default *and* unsupported until its own
+fast-follow lane promotes it. The default set stays `agents-md` + `claude-md`.
 
 | Target id | Artifact path (relative to `--cwd`) | Consumer | Supported (`--target`) | Default (no `--target`) |
 |---|---|---|---|---|
 | `agents-md` | `AGENTS.md` | Codex and other AGENTS.md-reading agents | **yes** | **yes** |
 | `claude-md` | `CLAUDE.md` | Claude Code project memory | **yes** | **yes** |
-| `cursor` | `.cursor/rules/mind-ontology.mdc` | Cursor rules | no (fast-follow, post-W4) | no |
+| `cursor` | `.cursor/rules/mind-ontology.mdc` | Cursor rules | **yes** | no |
 | `paste-block` | `mind-ontology-paste-block.md` | ChatGPT / Claude.ai project instructions (manual paste) | no (fast-follow, post-W4) | no |
 
 Registry rules:
@@ -106,11 +107,9 @@ Registry rules:
   Promoting a fast-follow target is therefore a two-step product decision —
   make it `supported` (emittable via `--target`) first, then `default`
   (added to the bare-`emit` set) — and each step is its own reviewable change.
-- The `cursor` row's output format is locked ahead of its engine support in
-  **section 13**, so promoting it to `supported` is implementation-only (no
-  format guessing). It promotes to `supported` **but not** `default`: a bare
-  `emit` will never write `.cursor/rules/mind-ontology.mdc`; only an explicit
-  `--target cursor` does. The `paste-block` row is specified the same way in a
+- The `cursor` row is **supported but not default** (section 13): a bare `emit`
+  never writes `.cursor/rules/mind-ontology.mdc`; only an explicit
+  `--target cursor` does. The `paste-block` row is promoted the same way in a
   later fast-follow lane.
 
 ## 3. Profiles — what each target includes
@@ -608,14 +607,11 @@ Working-tree hygiene that keeps both layers byte-stable: the
 ## 13. Cursor target (`.mdc`) output specification (fast-follow)
 
 This section is the normative byte-format lock for the `cursor` target
-(registry section 2), authored ahead of its engine support so the
-implementation cannot guess. Until the fast-follow lane flips `cursor` to
-**supported**, the registry row stays `no`/`no` and `--target cursor` is
-rejected; this section specifies exactly what `mind-ontology emit --target
-cursor` produces once supported. `cursor` is **supported-but-not-default**: a
-bare `mind-ontology emit` / `emit --check` never touches it, and the default
-set stays `agents-md` + `claude-md`; only an explicit `--target cursor` builds
-or checks it.
+(registry section 2). `cursor` is **supported-but-not-default**: a bare
+`mind-ontology emit` / `emit --check` never touches it, and the default set
+stays `agents-md` + `claude-md`; only an explicit `--target cursor` builds or
+checks it. The bytes below are frozen by the golden
+`tests/fixtures/emit/golden/template-default/cursor.mdc`.
 
 ### 13.1 Artifact path and consumer
 

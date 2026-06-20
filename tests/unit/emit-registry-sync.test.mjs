@@ -48,11 +48,11 @@ describe("emit target registry stays in sync with the W1 spec table (W1 guard)",
     }
   });
 
-  it("the supported flag matches: agents-md and claude-md only", () => {
+  it("the supported flag matches the spec table (agents-md, claude-md, cursor)", () => {
     for (const row of rows) {
       expect(EMIT_TARGETS[row.id]?.supported, row.id).toBe(row.supported);
     }
-    expect(SUPPORTED_TARGET_IDS).toEqual(["agents-md", "claude-md"]);
+    expect(SUPPORTED_TARGET_IDS).toEqual(["agents-md", "claude-md", "cursor"]);
   });
 
   it("the default flag matches: agents-md and claude-md only", () => {
@@ -62,14 +62,16 @@ describe("emit target registry stays in sync with the W1 spec table (W1 guard)",
     expect(DEFAULT_TARGET_IDS).toEqual(["agents-md", "claude-md"]);
   });
 
-  it("cursor and paste-block are registered as future targets: unsupported and non-default", () => {
-    for (const id of ["cursor", "paste-block"]) {
-      expect(EMIT_TARGETS[id]?.supported, id).toBe(false);
-      expect(EMIT_TARGETS[id]?.default, id).toBe(false);
-    }
-    expect(SUPPORTED_TARGET_IDS).not.toContain("cursor");
-    expect(SUPPORTED_TARGET_IDS).not.toContain("paste-block");
+  it("cursor is supported-but-not-default; paste-block stays unsupported and non-default", () => {
+    // cursor promoted to supported (Lane 2) but never added to the default set.
+    expect(EMIT_TARGETS.cursor?.supported).toBe(true);
+    expect(EMIT_TARGETS.cursor?.default).toBe(false);
+    expect(SUPPORTED_TARGET_IDS).toContain("cursor");
     expect(DEFAULT_TARGET_IDS).not.toContain("cursor");
+    // paste-block: still a reserved future target until its own fast-follow lane.
+    expect(EMIT_TARGETS["paste-block"]?.supported).toBe(false);
+    expect(EMIT_TARGETS["paste-block"]?.default).toBe(false);
+    expect(SUPPORTED_TARGET_IDS).not.toContain("paste-block");
     expect(DEFAULT_TARGET_IDS).not.toContain("paste-block");
   });
 
