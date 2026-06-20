@@ -10,6 +10,14 @@ logs/
 !.env.example
 *.local
 .tmp-staging/
+# Hosted connector — operator-generated artifacts. The README + wrangler.toml.example
+# tell operators to create these REAL files inside connector/worker/ (their private
+# workspace snapshot, their deploy config, their local secrets) and "never commit"
+# them. Enforce that here so a stray `git add .` cannot leak them. The committed
+# *.example variants are intentionally not matched and stay tracked.
+connector/worker/agentctx.snapshot.json
+connector/worker/wrangler.toml
+.dev.vars
 # Claude Code local session settings (session-scoped permissions — never commit)
 .claude/settings.local.json
 .claude/worktrees/

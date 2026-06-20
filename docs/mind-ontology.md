@@ -56,6 +56,7 @@ The product contract is the same two tools — `get_context(task)` and
 - [Cursor setup proof](mind-ontology-cursor-setup-proof-v0.md)
 - [MCP setup](agentctx-mcp-setup.md) · [MCP server reference](agentctx-mcp.md)
 - [Connector manifests](mind-ontology-connector-manifests-v0.md) · [thin connector strategy](mind-ontology-thin-connector-strategy-v0.md)
+- [Hosted connector setup & troubleshooting](mind-ontology-connector-setup-v0.md) — operator guide for the GPT Action / remote MCP surfaces (no live endpoint)
 
 ### Autopilot integration (for AI development lines)
 

@@ -1,0 +1,22 @@
+# EXAMPLE ONLY — copy to wrangler.toml and fill in your own values.
+#
+# PR1 ships NO runtime: this file is a template, not a deploy config. It carries
+# no account id, no route, no custom domain, and no secret. Nothing here is real.
+# Deployment is a later, separately-reviewed step.
+
+name = "agentctx-connector"
+main = "lib/index.mjs"
+compatibility_date = "2024-09-23"
+# compile.mjs imports node:fs (used only by the local-disk readers, which the
+# Worker never calls); nodejs_compat lets the bundle resolve the import.
+compatibility_flags = ["nodejs_compat"]
+
+# The workspace snapshot is bundled with the Worker. Regenerate it for YOUR
+# project before deploy, then point lib/index.mjs's snapshot import at the result:
+#   node scripts/build-agentctx-snapshot.mjs --cwd <your-project> --out agentctx.snapshot.json
+# (agentctx.snapshot.example.json is only a placeholder used by the tests.)
+
+# If your workspace is private, require a bearer token. Set it as a Worker SECRET
+# — never commit it, never put it in this file:
+#   wrangler secret put CONNECTOR_BEARER_TOKEN
+# When unset, the connector serves without auth (fine for a public dev endpoint).

@@ -25,9 +25,14 @@ describe("self-host deployment plan (P3-PR06)", () => {
     expect(text.toLowerCase()).toContain("read-only");
   });
 
-  it("does NOT introduce any wrangler/deploy config file in the repo", () => {
-    // Guard the hard-stop: this lane must not add a Worker config alongside the doc.
+  it("introduces no REAL wrangler/deploy config or committed secret (PR1 connector is example-only)", () => {
+    // P3-PR06 (this plan doc) was plan-only and forbade a connector dir entirely.
+    // The hosted connector lands in PR1 (connector/worker/ — see the
+    // agentctx-hosted-connector-*.test.mjs suites), so the connector dir now
+    // exists. The hard-stop that still holds: PR1 adds NO real deploy config and
+    // NO committed secret — only a wrangler.toml.example template.
     expect(existsSync(resolve(REPO_ROOT, "wrangler.connector.toml"))).toBe(false);
-    expect(existsSync(resolve(REPO_ROOT, "connector"))).toBe(false);
+    expect(existsSync(resolve(REPO_ROOT, "connector/worker/wrangler.toml"))).toBe(false);
+    expect(existsSync(resolve(REPO_ROOT, "connector/worker/wrangler.toml.example"))).toBe(true);
   });
 });

@@ -15,8 +15,8 @@ hosts nothing). Both hosted surfaces map to the same two read-only operations.
 
 | Operation | Input | Output |
 |---|---|---|
-| `get_context` | `{ task, scope?, format? }` | a `ContextPack` (the compiled pack, incl. `risk`) |
-| `list_constraints` | `{ format? }` | a `ConstraintsResult` (all `constraints.md` blocks) |
+| `get_context` | `{ task, scope? }` | a `ContextPack` (the compiled pack, incl. `risk`) |
+| `list_constraints` | `{}` | a `ConstraintsResult` (all `constraints.md` blocks) |
 
 Both are **read-only** and **stateless** — each call compiles fresh from
 `.agentctx/` source files. There is no third operation; anything else is
@@ -33,7 +33,7 @@ ChatGPT custom GPTs call an OpenAPI-described HTTP API. The shipped spec is
 POST /get_context
 Content-Type: application/json
 
-{ "task": "Add OAuth PKCE flow", "scope": "auth,security", "format": "json" }
+{ "task": "Add OAuth PKCE flow", "scope": "auth,security" }
 ```
 
 ```http
@@ -113,3 +113,16 @@ the ontology no-credential constraint and the thin-connector strategy.)
   (doc only; no wrangler/deploy/secret).
 - **P3-PR07** — example connector manifests (GPT Action import + Claude.ai
   connector) with placeholders only.
+
+## PR1 implementation note
+
+The GPT-Action HTTP surface designed here is implemented in PR1 under
+`connector/worker/`, serving a **bundled `.agentctx` snapshot adapter**: the
+Worker has no filesystem, so it serves a deploy-time JSON snapshot instead of
+reading `.agentctx/` directly. PR1 reuses the engine's `compileContext` /
+`parseMarkdownBlocks` / `renderContextPackJson` verbatim, so the hosted JSON
+cannot diverge from the local stdio server. PR1 covers `POST /get_context`,
+`POST /list_constraints`, and `GET /health`. PR2 adds the Remote MCP transport
+(`POST /mcp`, Streamable-HTTP JSON-RPC: `initialize` / `notifications/initialized`
+/ `tools/list` / `tools/call`) over the same snapshot adapter — see
+`connector/worker/lib/mcp.mjs`.
