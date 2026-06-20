@@ -669,7 +669,7 @@ missing `.agentctx/`, bad `--risk`, unknown flag), plus `--format must be
 | Failure | Stream | Message | Next safe action |
 |---|---|---|---|
 | Missing `cq.md` | stderr | `Missing .agentctx/cq.md. Add competency questions (see the cq schema) before running cq.` | Author `cq.md` per the [CQ schema](mind-ontology-cq-schema-v0.md). |
-| `--id` out of range | stderr | `--id must be between 1 and <N>, got: <x>` | Use a listed id. |
+| `--id` out of range | stderr | `--id must be between 1 and <N>, got: <x>. Run "mind-ontology cq --cwd <path>" without --id to list the questions and their ids.` | Run `cq` without `--id` to list the questions and their ids, then pass a listed id. |
 | Unanswered CQ(s) | **stdout report** | per-CQ `UNANSWERED` lines + summary | Add/extend the source blocks the CQ's topic tags point at. |
 | Broken ontology | stderr | compile pass-through | per the existing catalog |
 
@@ -685,7 +685,7 @@ missing `.agentctx/`, bad `--risk`, unknown flag), plus `--format must be
 | Failure | Stream | Message | Next safe action |
 |---|---|---|---|
 | Missing `--pack` | stderr | `Missing required --pack argument` | Pass `--pack <path>`. |
-| Unreadable path | stderr | `Cannot read Result Pack: <path>` | Check the path. |
+| Unreadable path | stderr | `Cannot read Result Pack: <path>. Check the path exists and is readable, then re-run with --pack <path>.` | Check the path exists and is readable, then re-run with `--pack <path>`. |
 | Not valid JSON | stderr | `Result Pack is not valid JSON: <path>` | Fix or regenerate the pack. |
 | Shape violations | **stdout report** | per-invariant `FAIL` lines | Send back to the worker with the failed invariant. |
 

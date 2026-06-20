@@ -55,7 +55,9 @@ export function loadResultPack(path) {
   try {
     raw = readFileSync(resolve(path), "utf8");
   } catch {
-    throw new Error(`Cannot read Result Pack: ${path}`);
+    throw new Error(
+      `Cannot read Result Pack: ${path}. Check the path exists and is readable, then re-run with --pack <path>.`,
+    );
   }
   try {
     return JSON.parse(raw);
