@@ -239,7 +239,7 @@ const CASES = [
     project: "initialized",
     argv: ["emit", "--cwd", "{cwd}", "--target", "bogus"],
     stream: "stderr",
-    names: /--target must be one of "agents-md", "claude-md", "cursor", got: bogus/,
+    names: /--target must be one of "agents-md", "claude-md", "cursor", "paste-block", got: bogus/,
     nextAction: /agents-md/,
   },
   {

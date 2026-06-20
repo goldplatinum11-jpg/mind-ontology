@@ -65,28 +65,30 @@ describe("argv contract (W2 §7.1)", () => {
     expect(parseEmitArgv([]).targets).toEqual(["agents-md", "claude-md"]);
   });
 
-  it("--target accepts every supported id (incl. cursor) and still rejects unsupported ids", () => {
+  it("--target accepts every supported id (incl. the fast-follow targets), in registry order", () => {
     // All supported ids selectable explicitly, always in registry order.
     expect(parseEmitArgv(["--target", "claude-md,agents-md"]).targets).toEqual([
       "agents-md",
       "claude-md",
     ]);
-    // cursor is supported-but-not-default: never in a bare default set, but
-    // accepted (and emitted alone) under an explicit --target.
+    // cursor / paste-block are supported-but-not-default: never in a bare
+    // default set, but accepted (alone or combined) under an explicit --target,
+    // always reordered to registry order regardless of flag order.
     expect(parseEmitArgv(["--target", "cursor"]).targets).toEqual(["cursor"]);
+    expect(parseEmitArgv(["--target", "paste-block"]).targets).toEqual(["paste-block"]);
+    expect(parseEmitArgv(["--target", "paste-block,cursor"]).targets).toEqual([
+      "cursor",
+      "paste-block",
+    ]);
     expect(parseEmitArgv(["--target", "cursor,agents-md"]).targets).toEqual([
       "agents-md",
       "cursor",
     ]);
-    // paste-block stays unsupported until its own fast-follow lane.
-    expect(() => parseEmitArgv(["--target", "paste-block"])).toThrow(
-      /--target must be one of "agents-md", "claude-md", "cursor"/,
-    );
   });
 
   it("rejects an unknown target id naming the registry", () => {
     expect(() => parseEmitArgv(["--target", "bogus"])).toThrow(
-      /--target must be one of "agents-md", "claude-md", "cursor", got: bogus/,
+      /--target must be one of "agents-md", "claude-md", "cursor", "paste-block", got: bogus/,
     );
   });
 
@@ -678,7 +680,7 @@ describe("write-mode hard errors (W2 §2.4: uniform exit 1)", () => {
     const cwd = project();
     const r = runCli(["emit", "--cwd", cwd, "--target", "bogus"]);
     expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/--target must be one of "agents-md", "claude-md", "cursor", got: bogus/);
+    expect(r.stderr).toMatch(/--target must be one of "agents-md", "claude-md", "cursor", "paste-block", got: bogus/);
     expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
   });
 

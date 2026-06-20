@@ -158,11 +158,12 @@ describe("--reconcile refuses unsafe classes and writes nothing", () => {
   });
 
   // Regression: reproducibility must be judged from the RECORDED header, not the
-  // requested target. A header recording an UNSUPPORTED target (`paste-block`)
-  // makes the artifact STALE-and-unreproducible; reconcile must REFUSE it even
-  // though the requested target (`agents-md`) is itself perfectly valid.
-  // (`cursor` is no longer a valid stand-in here — it is now a supported target.)
-  it("STALE with a recorded UNSUPPORTED target -> refuse, exit 1, nothing written", () => {
+  // requested target. A header recording a target id the current generator does
+  // not know (`unknown-target`) makes the artifact STALE-and-unreproducible;
+  // reconcile must REFUSE it even though the requested target (`agents-md`) is
+  // itself perfectly valid. (Every *registered* id — cursor / paste-block
+  // included — is now a supported target, so only an unknown id exercises this.)
+  it("STALE with a recorded UNKNOWN target -> refuse, exit 1, nothing written", () => {
     const cwd = emitted();
     const path = join(cwd, "AGENTS.md");
     // Rewrite only the header's target field; the payload (hence content_digest)
@@ -170,7 +171,7 @@ describe("--reconcile refuses unsafe classes and writes nothing", () => {
     // HAND-EDITED.
     const rewritten = readFileSync(path, "utf8").replace(
       /^target: agents-md$/m,
-      "target: paste-block",
+      "target: unknown-target",
     );
     writeFileSync(path, rewritten);
     const before = readFileSync(path, "utf8");
@@ -210,7 +211,7 @@ describe("--reconcile refuses unsafe classes and writes nothing", () => {
     const path = join(cwd, "AGENTS.md");
     writeFileSync(
       path,
-      readFileSync(path, "utf8").replace(/^target: agents-md$/m, "target: paste-block"),
+      readFileSync(path, "utf8").replace(/^target: agents-md$/m, "target: unknown-target"),
     );
 
     const r = runCli(["emit", "--cwd", cwd, "--check", "--target", "agents-md", "--explain"]);

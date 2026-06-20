@@ -78,16 +78,16 @@ Each target carries two independent capability flags:
 Splitting the two is a deliberate design affordance: a future PR can register a
 *supported-but-not-default* target — emittable on demand via `--target` without
 expanding what a bare `emit` writes — with no surprise change to the default
-output set. `cursor` is exactly such a target: **supported** (section 13) but
-**not** default. `paste-block` stays non-default *and* unsupported until its own
-fast-follow lane promotes it. The default set stays `agents-md` + `claude-md`.
+output set. `cursor` (section 13) and `paste-block` (section 14) are exactly
+such targets: both **supported** but **not** default. The default set stays
+`agents-md` + `claude-md`.
 
 | Target id | Artifact path (relative to `--cwd`) | Consumer | Supported (`--target`) | Default (no `--target`) |
 |---|---|---|---|---|
 | `agents-md` | `AGENTS.md` | Codex and other AGENTS.md-reading agents | **yes** | **yes** |
 | `claude-md` | `CLAUDE.md` | Claude Code project memory | **yes** | **yes** |
 | `cursor` | `.cursor/rules/mind-ontology.mdc` | Cursor rules | **yes** | no |
-| `paste-block` | `mind-ontology-paste-block.md` | ChatGPT / Claude.ai project instructions (manual paste) | no (fast-follow, post-W4) | no |
+| `paste-block` | `mind-ontology-paste-block.md` | ChatGPT / Claude.ai project instructions (manual paste) | **yes** | no |
 
 Registry rules:
 
@@ -109,8 +109,9 @@ Registry rules:
   (added to the bare-`emit` set) — and each step is its own reviewable change.
 - The `cursor` row is **supported but not default** (section 13): a bare `emit`
   never writes `.cursor/rules/mind-ontology.mdc`; only an explicit
-  `--target cursor` does. The `paste-block` row is promoted the same way in a
-  later fast-follow lane.
+  `--target cursor` does. The `paste-block` row is **supported but not default**
+  the same way (section 14): only `--target paste-block` writes
+  `mind-ontology-paste-block.md`.
 
 ## 3. Profiles — what each target includes
 
@@ -709,3 +710,57 @@ default targets use:
   bare `emit --check` never touch `.cursor/rules/mind-ontology.mdc`.
 - AGENTS.md / CLAUDE.md / paste-block bytes, and their strict byte-0 header
   rule, are unchanged by adding cursor.
+
+## 14. Paste-block target (`mind-ontology-paste-block.md`) output specification
+
+The `paste-block` target is the manual copy-paste surface for tools that have
+no file convention but a *project-instructions* text box — ChatGPT and
+Claude.ai projects. A human runs `mind-ontology emit --target paste-block`,
+opens the generated file, and pastes its contents into that box; after editing
+`.agentctx/`, they re-emit and re-paste. `paste-block` is
+**supported-but-not-default** (registry section 2): a bare
+`mind-ontology emit` / `emit --check` never touches it, and the default set
+stays `agents-md` + `claude-md`; only an explicit `--target paste-block` builds
+or checks it. The bytes are frozen by the golden
+`tests/fixtures/emit/golden/template-default/paste-block.md`.
+
+### 14.1 Byte layout
+
+Unlike `cursor`, `paste-block` has **no prelude**: it carries the standard
+mind-ontology emit header at byte 0 (section 6), exactly like AGENTS.md and
+CLAUDE.md, so drift is checkable by the same byte-0 parser path. The artifact
+is:
+
+1. the **mind-ontology emit header** HTML comment (section 6), at byte 0;
+2. the generated **body** — title, then notice, then the shared `##` sections,
+   then the footer (sections 3–4).
+
+### 14.2 Frame
+
+The frame is deliberately short and copy-friendly (the whole file is pasted by
+hand):
+
+- **Title:** `# Mind Ontology Project Instructions` (`paste-block` is the
+  title-bearing fast-follow target; `EMIT_TARGETS["paste-block"].title` is that
+  string).
+- **Notice:** one blockquote sentence — the file is generated, paste it into
+  the ChatGPT / Claude.ai project instructions, and re-emit + re-paste after
+  editing `.agentctx/`.
+- **Footer:** a one-line refresh/verify pointer
+  (`mind-ontology emit --target paste-block` /
+  `mind-ontology emit --check --target paste-block`).
+
+### 14.3 Shared payload and drift-checkability
+
+Body block rendering, section selection, profiles, the safety sweep, and the
+empty-section rule are identical to sections 3–4 (shared payload, per-target
+frame — principle 3). Because the emit header sits at byte 0, the standard
+`emit --check` path classifies `paste-block` with no special handling:
+`content_digest` over the body catches a hand edit (`HAND-EDITED`), the
+whole-artifact recompile catches source/version drift (`STALE`).
+
+### 14.4 What stays unchanged
+
+- `DEFAULT_TARGET_IDS` remains `agents-md`, `claude-md`. A bare `emit` and a
+  bare `emit --check` never write `mind-ontology-paste-block.md`.
+- AGENTS.md / CLAUDE.md / cursor bytes are unchanged by adding paste-block.
