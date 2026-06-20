@@ -10,6 +10,7 @@ import {
   DEFAULT_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
 } from "../../connector/worker/lib/mcp.mjs";
+import { TOOLS as STDIO_TOOLS } from "../../scripts/agentctx/mcp-server.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -42,6 +43,15 @@ describe("hosted connector remote MCP (/mcp, PR2)", () => {
     expect(json.result.protocolVersion).toBeTruthy();
     expect(json.result.capabilities.tools).toBeTruthy();
     expect(json.result.serverInfo).toEqual(SERVER_INFO);
+  });
+
+  it("the hosted TOOLS manifest stays byte-for-byte in sync with the stdio server's (KEEP IN SYNC contract)", () => {
+    // mcp.mjs documents that its TOOLS mirror scripts/agentctx/mcp-server.mjs and
+    // must KEEP IN SYNC, but only tool *names* were previously guarded. Pin the
+    // full manifest — names, descriptions, and inputSchemas — so a drift in
+    // either surface (a new property, a changed enum, a reworded description)
+    // fails loudly instead of silently diverging what clients are told.
+    expect(TOOLS).toEqual(STDIO_TOOLS);
   });
 
   it("tools/list returns exactly the two tools with their schemas", async () => {

@@ -42,7 +42,9 @@ const PROTOCOL_VERSION = "2024-11-05";
 // Tool manifest
 // ---------------------------------------------------------------------------
 
-const TOOLS = [
+// Exported so the hosted connector's parity test can assert its TOOLS manifest
+// (connector/worker/lib/mcp.mjs) stays byte-for-byte in sync with this one.
+export const TOOLS = [
   {
     name: "get_context",
     description:
