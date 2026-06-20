@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,5 +77,46 @@ describe("hosted connector — no-leak / placeholder audit (Phase 12)", () => {
     expect(w).not.toMatch(/account_id\s*=\s*["'][0-9a-f]/i);
     expect(w).not.toMatch(/^\s*route\s*=\s*["']https?:/im);
     expect(w).not.toMatch(/CONNECTOR_BEARER_TOKEN\s*=\s*["']/);
+  });
+});
+
+// `git check-ignore -q <path>` exits 0 when the path is ignored, 1 when it is not.
+// execFileSync throws on a non-zero exit, so a clean return means "ignored".
+function isGitIgnored(relPath) {
+  try {
+    execFileSync("git", ["check-ignore", "-q", relPath], { cwd: REPO_ROOT, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The committed audit above proves no real host/token/snapshot is tracked TODAY.
+// This block proves the repo also PREVENTS an operator from committing one
+// tomorrow: the README and wrangler.toml.example tell operators to create these
+// real files inside connector/worker/ ("never commit" them), so .gitignore must
+// actually ignore them — otherwise a stray `git add .` would leak a private
+// workspace snapshot, a real deploy config, or local secrets.
+describe("hosted connector — operator-generated artifacts are gitignored (push hardening)", () => {
+  for (const rel of [
+    "connector/worker/agentctx.snapshot.json", // operator's real workspace snapshot
+    "connector/worker/wrangler.toml", // operator's real deploy config
+    "connector/worker/.dev.vars", // wrangler local secrets (CONNECTOR_BEARER_TOKEN)
+  ]) {
+    it(`.gitignore ignores ${rel}`, () => {
+      expect(
+        isGitIgnored(rel),
+        `${rel} is NOT gitignored — an operator following the README could accidentally commit it`,
+      ).toBe(true);
+    });
+  }
+
+  it("keeps the committed *.example variants tracked (ignore rules are not over-broad)", () => {
+    for (const rel of [
+      "connector/worker/wrangler.toml.example",
+      "connector/worker/agentctx.snapshot.example.json",
+    ]) {
+      expect(isGitIgnored(rel), `${rel} must stay tracked — the example must not be ignored`).toBe(false);
+    }
   });
 });
