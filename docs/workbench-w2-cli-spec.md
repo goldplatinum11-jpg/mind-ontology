@@ -362,6 +362,19 @@ the two identical, so a bare `emit` and `--target agents-md,claude-md` cover the
 same files. Invalid flag combos fail closed (exit `1` write mode / `2` check
 mode), never silently ignore a flag.
 
+**Fast-follow targets (`cursor`, `paste-block`).** These two registry rows
+(W1 §2) are specified as *supported-but-not-default* targets — `cursor`'s byte
+format is locked in [W1 §13](workbench-w1-emit-target-spec.md), `paste-block`'s
+in a later fast-follow lane — and they become selectable via `--target` only
+when the fast-follow lanes flip their `supported` flag. Until then `--target`
+accepts only the default pair and rejects them. Once supported, they remain
+**non-default**: a bare `emit` still writes only `agents-md` + `claude-md`, and
+the fast-follow targets are emitted or checked only on an explicit
+`--target cursor` / `--target paste-block`. `cursor`'s artifact carries a Cursor
+YAML frontmatter prelude before the emit header (W1 §6, §13); the header parser
+tolerates that prelude for `cursor` only, while AGENTS.md / CLAUDE.md /
+paste-block keep the header at byte 0.
+
 Proposed `emit --help` text (final bytes frozen in W3):
 
 ```text
