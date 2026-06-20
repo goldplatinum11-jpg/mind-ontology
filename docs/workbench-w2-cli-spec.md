@@ -160,7 +160,7 @@ re-derived logic, per the packet's design rule 2:
 | `validate` | the schema validator (`schema.mjs`) | 0 errors (warnings allowed) |
 | `metrics` | `metrics.mjs` over the **representative tasks** (below) | metrics computed without error |
 | `cq` | the `cq` command's core (section 6) | every CQ answered |
-| `emit` | the `emit --check` core, result embedded verbatim (W1 §8: headers are the manifest) | every v1 target `OK` |
+| `emit` | the `emit --check` core, result embedded verbatim (W1 §8: headers are the manifest) | every default target `OK` |
 
 **Representative tasks** for the metrics section are the rendered CQ question
 titles from `.agentctx/cq.md`, in source order. Rationale: the design packet
@@ -339,7 +339,7 @@ artifact-ward, source-ward, and provenance — is in the same table.
 
 | Flag | Meaning | Constraints |
 |---|---|---|
-| `--target` | restrict to a subset of the registry (W1 §2): `agents-md`, `claude-md` | repeatable **and** CSV (mirrors `--scope`); duplicates are deduped; processing order is always registry order regardless of flag order (determinism) |
+| `--target` | select **supported** registry targets (W1 §2): `agents-md`, `claude-md`. With no `--target`, the **default** targets are used; `--target` selects any supported target (today the two sets coincide) | repeatable **and** CSV (mirrors `--scope`); duplicates are deduped; processing order is always registry order regardless of flag order (determinism) |
 | `--check` | classify instead of write (W1 §8); writes nothing | — |
 | `--explain` | annotate each `--check` verdict with WHY the target got its class and WHAT a reconcile would do; read-only (writes nothing) | valid **only** with `--check`; using it in write mode is a usage error (exit `2`) |
 | `--block-manifest` | attach per-block provenance (`source_file` / `source_block_index` / `source_block_digest` / `rendered_digest` / `emitted_index` / `section` / `forced`) to each target, recomputed **on demand** from the current sources under the profile `--explain` reports (or `null` when that profile is no longer reproducible); read-only (writes nothing) | valid **only** with `--check --explain --format json`; any other combination is a usage error (exit `2`). It is on-demand explain data — never persisted to a header or sidecar |
@@ -353,10 +353,14 @@ artifact-ward, source-ward, and provenance — is in the same table.
 | `--format` | stdout format | per section 2.1 |
 | `--cwd` | project root containing `.agentctx/`; artifacts resolve against it (W1 §2) | per section 2.1 |
 
-Defaults: with no `--target`, both write and check modes operate on **all v1
-targets** (`agents-md`, `claude-md`) — see the section 8 ruling for why this
-default survives the double-load objection. Invalid flag combos fail closed
-(exit `1` write mode / `2` check mode), never silently ignore a flag.
+Defaults: with no `--target`, both write and check modes operate on **all
+default targets** (`agents-md`, `claude-md`) — see the section 8 ruling for why
+this default survives the double-load objection. The registry distinguishes
+*supported* (selectable via `--target`, buildable) from *default* (in the
+no---target set), with default always a subset of supported (W1 §2); v1 keeps
+the two identical, so a bare `emit` and `--target agents-md,claude-md` cover the
+same files. Invalid flag combos fail closed (exit `1` write mode / `2` check
+mode), never silently ignore a flag.
 
 Proposed `emit --help` text (final bytes frozen in W3):
 
@@ -364,7 +368,7 @@ Proposed `emit --help` text (final bytes frozen in W3):
 mind-ontology emit — compile static per-tool artifacts from .agentctx/
 
 Usage:
-  mind-ontology emit [options]             write all v1 targets (AGENTS.md, CLAUDE.md)
+  mind-ontology emit [options]             write all default targets (AGENTS.md, CLAUDE.md)
   mind-ontology emit --check [options]     verify freshness; writes nothing
   mind-ontology emit --reconcile [options] safely re-emit only drifted targets
 
@@ -506,7 +510,7 @@ native file), the same context is loaded twice — pure token waste. Three
 candidate default behaviors when `--target` is not given: emit both, emit
 one recommended target, or detect the installed tools and emit accordingly.
 
-**Ruling: the default stays "emit both v1 targets". No detection. The
+**Ruling: the default stays "emit both default targets". No detection. The
 double-load is mitigated, not denied, by three measures below.**
 
 Rationale, in decision order:
@@ -540,7 +544,7 @@ The three mitigations (all normative for W3):
   target in CI. This is the same `--target` escape hatch W1 §2 already
   defines; no new mechanism.
 - **(b) Dual-target advisory (stderr, write mode).** When emit runs with
-  **no** `--target` flag and writes both v1 targets, it prints one stderr
+  **no** `--target` flag and writes both default targets, it prints one stderr
   line after the per-target lines:
 
   ```text

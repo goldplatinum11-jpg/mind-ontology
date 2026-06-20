@@ -61,8 +61,22 @@ describe("argv contract (W2 §7.1)", () => {
     expect(p.targets).toEqual(["agents-md", "claude-md"]);
   });
 
-  it("defaults to all v1 targets when --target is absent", () => {
+  it("defaults to all default targets when --target is absent", () => {
     expect(parseEmitArgv([]).targets).toEqual(["agents-md", "claude-md"]);
+  });
+
+  it("--target accepts every supported id and still rejects unsupported (future) ids", () => {
+    // Both supported ids selectable explicitly (registry order preserved).
+    expect(parseEmitArgv(["--target", "claude-md,agents-md"]).targets).toEqual([
+      "agents-md",
+      "claude-md",
+    ]);
+    // The future fast-follow targets stay unsupported in this foundation PR.
+    for (const id of ["cursor", "paste-block"]) {
+      expect(() => parseEmitArgv(["--target", id])).toThrow(
+        /--target must be one of "agents-md", "claude-md"/,
+      );
+    }
   });
 
   it("rejects an unknown target id naming the registry", () => {
