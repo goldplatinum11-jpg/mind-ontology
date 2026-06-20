@@ -45,6 +45,8 @@ const EXPECTED_FENCES = [
   { section: "The live path: compile per task, not per file", lang: "sh", class: "command-example", marker: "npx mind-ontology agent-setup --target claude-code --print   # or: codex" },
   { section: "The live path: compile per task, not per file", lang: "sh", class: "command-example", marker: "npm run agentctx:metrics  -- --task \"Plan the next PR\"   # how focused is the pack?" },
   { section: "The live path: compile per task, not per file", lang: "sh", class: "command-example", marker: "npm run agentctx:compile -- --task \"Drop the orders table\" --risk auto   # forces #safety context" },
+  { section: "Adopt it in one command", lang: "sh", class: "command-example", marker: "npx mind-ontology adopt --write" },
+  { section: "Adopt it in one command", lang: "sh", class: "command-example", marker: "npx mind-ontology adopt --targets cursor,paste-block --write" },
   { section: "Three-layer mental model", lang: "text", class: "illustrative", marker: "① route     —  pick which ontology (box) a task belongs to, from a library of many" },
   { section: "Library routing (layer ①)", lang: "json", class: "illustrative", marker: "\"triggers\": [\"checkout\", \"payment\", \"stripe\"]," },
   { section: "Library routing (layer ①)", lang: "sh", class: "command-example", marker: "npm run mind-ontology -- route   --library ./ontologies --task \"debug the checkout flow\"" },

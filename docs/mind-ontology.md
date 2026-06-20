@@ -51,6 +51,8 @@ Start here, then follow the path that matches what you're doing.
 The product contract is the same two tools — `get_context(task)` and
 `list_constraints()` — across every agent. Setup pages stay thin:
 
+- **Start here:** [`adopt` — guided adoption spec](mind-ontology-adopt-spec-v1.md) — the one read-only-by-default command that wires every client at once (`--write` to apply); composes the per-client primitives below.
+- [Agent setup (`agent-setup`)](agent-setup.md) — the single-client wiring primitive (MCP config + bootstrap instruction) that `adopt` builds on.
 - [Claude Code setup proof](mind-ontology-claude-code-setup-proof-v0.md)
 - [Codex setup proof](mind-ontology-codex-setup-proof-v0.md)
 - [Cursor setup proof](mind-ontology-cursor-setup-proof-v0.md)

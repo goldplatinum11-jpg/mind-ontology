@@ -50,6 +50,49 @@ Each command forwards its own flags. For a command's options, append `--help`:
 mind-ontology compile --help
 ```
 
+## Guided adoption: `adopt`
+
+Beyond the engine commands above, the wrapper is also the only spelling for the
+**operator commands** — units born inside the CLI with no `agentctx:*` npm alias
+(`emit`, `agent-setup`, `status`, `adopt`, and others; run `mind-ontology --help`
+for the grouped list). The headline operator command for a new project is
+`adopt`: the one guided, **local-first, read-only-by-default** entry point that
+wires a project for Mind Ontology across every supported client at once, instead
+of remembering `init` → `emit` → `agent-setup` per client.
+
+```sh
+mind-ontology adopt [--cwd <path>] [--targets all|claude-code,codex,cursor,paste-block] [--write] [--format text|json]
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--cwd <path>` | process cwd | Project root to adopt. |
+| `--targets <list>` | `all` | `all`, or a comma list of client ids (`claude-code`, `codex`, `cursor`, `paste-block`), in the order you type them. |
+| `--write` | absent | Required to create any file. Without it, `adopt` is a read-only plan. |
+| `--format text\|json` | `text` | Output format; `json` prints the locked machine shape. |
+
+Behavior, in one breath:
+
+- **Plan by default.** A bare `mind-ontology adopt` writes nothing — it inspects
+  the project and prints the plan it *would* apply. `--write` is the single gate
+  to any filesystem change.
+- **All four clients.** `--targets all` expands to `claude-code`, `codex`,
+  `cursor`, `paste-block`. `claude-code` / `codex` get a generated instruction
+  file *and* an MCP config; `cursor` / `paste-block` are emit-only.
+- **Never clobbers.** An existing config or an unmanaged / hand-edited artifact is
+  never overwritten or merged — the conflict downgrades to a `manual_required`
+  step and every *other* safe action still applies. A conflict is **not** a
+  hard error: the run completes and the exit code stays `0`.
+- **No UI automation.** The `paste-block` step is always a manual paste into the
+  ChatGPT / Claude.ai project-instructions box; `adopt` drives no browser.
+- **Names its own verify commands.** Every plan/result ends with
+  `mind-ontology validate`, `mind-ontology status`, and
+  `mind-ontology emit --check --target <selected emit targets>`.
+
+The interface, per-target mapping, write policy, and JSON shape are locked in the
+[adopt spec](mind-ontology-adopt-spec-v1.md); the failure / `manual_required`
+vocabulary is in the [CLI error catalog](cli-errors.md).
+
 ## Backward compatibility
 
 Every original command is preserved. The wrapper is additive — these continue

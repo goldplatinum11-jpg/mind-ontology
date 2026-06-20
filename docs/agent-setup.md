@@ -1,5 +1,13 @@
 # Agent setup — adoption autoload (`mind-ontology agent-setup`)
 
+> **Most projects should run [`mind-ontology adopt`](mind-ontology-adopt-spec-v1.md)
+> instead.** `adopt` is the recommended one-command path: it wires *every*
+> supported client in a single guided, read-only-by-default pass (Claude Code,
+> Codex, Cursor, and the ChatGPT / Claude.ai paste-block), scaffolding sources
+> and emitting artifacts along the way. `agent-setup` documented here is the
+> lower-level, single-client primitive `adopt` composes — reach for it directly
+> only when you want to wire exactly one client (claude-code or codex) by hand.
+
 Mind Ontology only helps an AI coding agent if the agent actually reads it.
 `mind-ontology agent-setup` makes that wiring a one-command step instead of a
 remembered ritual: for a given client it produces the MCP server config, a
