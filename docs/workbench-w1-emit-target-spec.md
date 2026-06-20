@@ -1,6 +1,6 @@
 # Workbench W1 — Emit Target Specification (v1)
 
-**Status:** specification only · docs-only lane (`claude/workbench-w1-emit-target-spec`)
+**Status:** specification record · consumed by the shipped `emit` implementation
 **Fulfills:** ADL **W1** of the
 [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) (Part B).
 The packet's provisional artifact name was `mind-ontology-emit-targets-v0.md`;
@@ -12,8 +12,9 @@ emit is OSS (Q2); v1 targets are `AGENTS.md` + `CLAUDE.md` only (Q4);
 and "Workbench" stays an internal name (Q1, Q5).
 
 This document specifies *what* `mind-ontology emit` produces and how drift is
-detected. The CLI surface (flags, error rows, `--format` contract) is W2; the
-engine implementation and golden files are W3/W4. Nothing here ships code.
+detected. The CLI surface (flags, error rows, `--format` contract) is W2. The
+shipped implementation is `scripts/agentctx/emit.mjs`, guarded by the
+`emit-*` suites under `tests/unit/`.
 
 ---
 

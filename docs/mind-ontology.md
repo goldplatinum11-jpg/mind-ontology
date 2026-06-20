@@ -132,8 +132,8 @@ Ontology easy for autonomous agent lines to consume — local-first, no hosted S
 
 ### Architecture & boundary
 
-- [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) — the human-facing operator surface (includes the AGENTS.md compile-target strategy and the implementation ADL plan; the emit track W1–W4 is shipped).
-- [Emit target spec (W1)](workbench-w1-emit-target-spec.md) · [operator CLI spec (W2)](workbench-w2-cli-spec.md) — the shipped compile-target contract.
+- [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) — the human-facing operator surface; the CLI track (`status`, `preview`, `cq`, `emit`, `review`) is shipped and guarded.
+- [Emit target spec (W1)](workbench-w1-emit-target-spec.md) · [operator CLI spec (W2)](workbench-w2-cli-spec.md) — the shipped Workbench contract consumed by the engine scripts.
 - [Typed edge model](mind-ontology-typed-edge-model-v0.md)
 - [Adapter feature flags](mind-ontology-adapter-feature-flags-v0.md)
 - [SIRT memory adapter contract](mind-ontology-sirt-memory-adapter-contract-v0.md)

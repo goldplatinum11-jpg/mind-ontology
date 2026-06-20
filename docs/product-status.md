@@ -2,7 +2,8 @@
 
 A plain snapshot of what Mind Ontology can do **today**, what is deliberately
 held closed, and what comes next. This is the standalone, local-first product;
-a hosted backend is **not** available from this repository.
+the repository includes a self-host connector package, but no managed hosted
+backend or live service is available from this repository.
 
 ---
 
@@ -20,8 +21,15 @@ a hosted backend is **not** available from this repository.
 - **CLI tooling** — `init` (non-destructive scaffold), `compile`, `validate`,
   `metrics` (pack-focus measurement), `smoke` (one-command acceptance), `proof`
   (smallest gate).
+- **Operator Workbench CLI** — `status`, `preview`, `cq`, `emit`, and `review`
+  give humans the same engine-backed view: health roll-up, pack preview,
+  competency-question checks, generated `AGENTS.md` / `CLAUDE.md` targets, and
+  Result Pack shape review.
 - **Client setup** — copy-paste configs for Claude Code, Codex, Cursor, and a thin
   OpenAPI/connector surface for ChatGPT / Claude.ai (placeholders only).
+- **Self-host connector package** — `connector/worker/` contains the bundled
+  snapshot Worker surface for GPT Actions and remote MCP, with local smoke tests
+  and example config only.
 
 ## Fail-closed by design
 
@@ -36,8 +44,9 @@ a hosted backend is **not** available from this repository.
 - **Hosted memory & writeback** — adapter **contracts only**. Feature flags
   default **off**; the writeback adapter is **proposal-only** (no `execute()`);
   no adapter performs network I/O. The local path never depends on the hosted one.
-- **Deployment** — the self-host connector is a **plan**, not a runtime: no
-  `wrangler.toml`, no Worker source, no deploy command, no secret.
+- **Deployment** — connector source exists, but operation stays explicitly
+  operator-owned: no real `wrangler.toml`, no committed secret or `.dev.vars`,
+  no live endpoint, and no deploy command has been run by this repository.
 
 ## Verification
 
@@ -60,7 +69,8 @@ error-UX, scoring/compile/metrics determinism, doc↔code consistency bindings).
 
 ## What's next
 
-The local product is complete enough to dogfood. Candidate next lanes (none of
-which require deploy, secrets, or live writes) are tracked in
-[`../NEXT-LANES.md`](../NEXT-LANES.md). The hosted on-ramp remains a future,
-opt-in, fail-closed step — not part of this repository.
+The local product and self-host connector package are complete enough to
+dogfood. Candidate next lanes (none of which require deploy, secrets, or live
+writes) are tracked in [`../NEXT-LANES.md`](../NEXT-LANES.md). A managed hosted
+service, real endpoint, and production deployment remain future, opt-in,
+fail-closed steps — not part of this repository.

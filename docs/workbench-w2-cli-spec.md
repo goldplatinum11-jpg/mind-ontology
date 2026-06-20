@@ -1,6 +1,6 @@
 # Workbench W2 — CLI Surface Specification (v1)
 
-**Status:** specification only · docs-only lane (`claude/workbench-w2-emit-cli-spec` class)
+**Status:** specification record · consumed by the shipped Workbench CLI
 **Fulfills:** ADL **W2** of the
 [Workbench v1 design packet](mind-ontology-workbench-design-v1.md) (Part B).
 The packet's provisional artifact name was `mind-ontology-workbench-cli-v0.md`;
@@ -19,8 +19,11 @@ paths stay fixed at the `--cwd` root (Q3); section-level emit stays rejected
 
 This document specifies the **operator-facing CLI surface**: flags, output
 formats, stream discipline, exit codes, error rows, and how the new verbs hang
-off the existing `agentctx` engine CLI. Engine implementation is W3+ and ships
-nothing here.
+off the existing `agentctx` engine CLI. The shipped implementations are
+`scripts/agentctx/emit.mjs`, `scripts/agentctx/preview.mjs`,
+`scripts/agentctx/status.mjs`, `scripts/agentctx/cq.mjs`, and
+`scripts/agentctx/review.mjs`, with shared helpers where the spec requires
+them.
 
 ---
 

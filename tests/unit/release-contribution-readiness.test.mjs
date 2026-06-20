@@ -43,14 +43,16 @@ describe("release checklist is concrete (M27)", () => {
   });
 });
 
-// M28 — self-host deployment stays a PLAN; no deploy is shipped or instructed as run.
-describe("self-host deployment stays plan-only (M28)", () => {
-  it("the deployment plan marks itself PLAN ONLY and defers wrangler/deploy", () => {
+// M28 — self-host deployment stays operator-owned; no live deploy is shipped or instructed as run.
+describe("self-host deployment stays operator-owned (M28)", () => {
+  it("the deployment plan distinguishes connector source from wrangler/deploy", () => {
     const d = read("docs/mind-ontology-selfhost-deployment-plan-v0.md");
-    expect(d).toMatch(/PLAN ONLY|deployment plan, not a deployment/i);
-    expect(d.toLowerCase()).toContain("ships no runtime");
+    expect(d).toMatch(/deployment plan, not a deployment|deployment is still operator-owned/i);
+    expect(d).toContain("connector/worker/");
+    expect(d.toLowerCase()).not.toContain("no worker source");
+    expect(d.toLowerCase()).toMatch(/no real `wrangler\.toml`|no live endpoint/);
     // wrangler/deploy appear only as out-of-scope, operator-later actions.
-    expect(d).toMatch(/out of scope|operator executes later|later, separately-reviewed/i);
+    expect(d).toMatch(/out of scope|operator executes later|operator explicitly deploys/i);
   });
 
   it("the quickstart tells users no deploy is required for the local path", () => {

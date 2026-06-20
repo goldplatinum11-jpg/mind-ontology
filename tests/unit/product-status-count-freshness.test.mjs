@@ -108,6 +108,26 @@ describe("product status suite-count freshness (product-status-suite-count-fresh
     }
   });
 
+  it("distinguishes the shipped connector source from a live hosted deployment", () => {
+    for (const marker of [
+      "connector/worker/",
+      "no managed hosted",
+      "no real `wrangler.toml`",
+      "no committed secret",
+      "no live endpoint",
+    ]) {
+      expect(docText, `${DOC} lost the connector deployment boundary "${marker}"`).toContain(
+        marker,
+      );
+    }
+
+    for (const stale of ["no Worker source", "the self-host connector is a **plan**, not a runtime"]) {
+      expect(docText, `${DOC} reintroduced stale pre-connector wording "${stale}"`).not.toContain(
+        stale,
+      );
+    }
+  });
+
   it("this audit is declarative: no process spawning in this file", () => {
     const self = readFileSync(fileURLToPath(import.meta.url), "utf8");
     expect(self, "count freshness must stay a prose audit").not.toMatch(
