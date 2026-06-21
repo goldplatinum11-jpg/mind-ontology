@@ -249,7 +249,7 @@ report), while `status` skips the section instead.
 | Failure | Stream | Message | Next safe action |
 |---|---|---|---|
 | Missing `cq.md` | stderr | `Missing .agentctx/cq.md. Add competency questions (see the cq schema) before running cq.` | Author `cq.md` per the [CQ schema](mind-ontology-cq-schema-v0.md). |
-| `--id` out of range | stderr | `--id must be between 1 and <N>, got: <x>` | Use a listed id. |
+| `--id` out of range | stderr | `--id must be between 1 and <N>, got: <x>. Run "mind-ontology cq --cwd <path>" without --id to list the questions and their ids.` | Run `cq` without `--id` to list the questions and their ids, then pass a listed id. |
 | Unanswered required CQ(s) | **stdout report** | per-CQ `UNANSWERED … (required)` lines + `FAIL` summary | Add/extend the source blocks the CQ's topic tags point at. |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
 | Broken ontology | stderr | compile pass-through (the `agentctx:compile` rows above) | per the compile section |
@@ -265,7 +265,7 @@ path ([W2 §2.1](workbench-w2-cli-spec.md)).
 | Failure | Stream | Message | Next safe action |
 |---|---|---|---|
 | Missing `--pack` | stderr | `Missing required --pack argument` | Pass `--pack <path>`. |
-| Unreadable path | stderr | `Cannot read Result Pack: <path>` | Check the path. |
+| Unreadable path | stderr | `Cannot read Result Pack: <path>. Check the path exists and is readable, then re-run with --pack <path>.` | Check the path exists and is readable, then re-run with `--pack <path>`. |
 | Not valid JSON | stderr | `Result Pack is not valid JSON: <path>` | Fix or regenerate the pack. |
 | Shape violations | **stdout report** | per-invariant `FAIL` lines + `INVALID` summary | Send back to the worker with the failed invariant. |
 | Bad `--format` | stderr | `--format must be "text" or "json", got: <x>` | Use `text` or `json`. |
@@ -315,15 +315,18 @@ See [`agentctx-mcp.md`](agentctx-mcp.md) for the full transport contract.
 
 ## Candidate repair lanes (message quality, not bugs)
 
-These messages already **name the problem** and the CLI fails closed correctly,
-but they do **not yet point to a next action**. They are usable today; improving
-them is a future *engine* change (out of scope for a docs/tests lane), tracked
-here so the gap is visible rather than silently accepted:
+No open candidate repair lanes: every failure message above both names the
+problem and points to a next safe action. New gaps are recorded here (with the
+message and the missing action) before they are fixed, so the backlog stays
+visible rather than silently accepted.
 
-- **`review` unreadable `--pack` path** — names the path but suggests no check.
-- **`cq` out-of-range `--id`** — names the valid range but not how to list ids.
-
-(Closed lanes: `validate` issue lines now carry an inline `fix:` remedy per
+(Closed lanes: `review` unreadable `--pack` path now names the path **and** the
+next action — `Check the path exists and is readable, then re-run with --pack
+<path>.` — and `cq` out-of-range `--id` now names the valid range **and** how to
+discover the ids — `Run "mind-ontology cq --cwd <path>" without --id to list the
+questions and their ids.` — both locked in the error-UX catalog test (their
+`nextAction` rows) and their focused command tests.
+`validate` issue lines now carry an inline `fix:` remedy per
 rule (parameterized with the offending tag / field / allowed values) and the
 failing report links `docs/schema-authoring.md` — locked in the error-UX
 catalog test and the schema-messages remedy-coverage test.

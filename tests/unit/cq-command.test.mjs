@@ -231,12 +231,14 @@ describe("W8 — cq CLI surface", () => {
     expect(out.cqs[0].id).toBe(3);
   });
 
-  it("--id out of range is a hard error naming the valid range", () => {
+  it("--id out of range names the valid range and how to list ids", () => {
     const cwd = templateProject();
     const r = runCli(["cq", "--cwd", cwd, "--id", "99"]);
     expect(r.status).toBe(1);
     expect(r.stdout).toBe("");
     expect(r.stderr).toMatch(/--id must be between 1 and 7, got: 99/);
+    // The message must point to how to discover the valid ids, not just the range.
+    expect(r.stderr).toMatch(/without --id to list the questions and their ids/);
   });
 
   it("missing cq.md is a hard error with the documented message", () => {

@@ -306,7 +306,7 @@ const CASES = [
     argv: ["review", "--pack", "does/not/exist.json"],
     stream: "stderr",
     names: /Cannot read Result Pack: does\/not\/exist\.json/,
-    nextAction: null,
+    nextAction: /Check the path .* re-run with --pack <path>/,
   },
   {
     id: "review: unknown flag",
@@ -332,7 +332,7 @@ const CASES = [
     argv: ["cq", "--cwd", "{cwd}", "--id", "99"],
     stream: "stderr",
     names: /--id must be between 1 and \d+, got: 99/,
-    nextAction: null,
+    nextAction: /without --id to list the questions and their ids/,
   },
   {
     id: "cq: bad --format",

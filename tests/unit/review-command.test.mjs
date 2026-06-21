@@ -147,11 +147,13 @@ describe("W9 — hard errors (stderr, exit 1, no report)", () => {
     expect(r.stderr).toMatch(/Missing required --pack argument/);
   });
 
-  it("unreadable path", () => {
+  it("unreadable path names the path and the next safe action", () => {
     const r = runCli(["review", "--pack", "does/not/exist.json"]);
     expect(r.status).toBe(1);
     expect(r.stdout).toBe("");
     expect(r.stderr).toMatch(/Cannot read Result Pack: does\/not\/exist\.json/);
+    // The message must not just name the path; it must point to a next step.
+    expect(r.stderr).toMatch(/Check the path .* re-run with --pack <path>/);
   });
 
   it("invalid JSON", () => {

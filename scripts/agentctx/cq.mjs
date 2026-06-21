@@ -109,7 +109,9 @@ export function runCq(options) {
   if (options.id !== null) {
     const n = Number(options.id);
     if (!Number.isInteger(n) || n < 1 || n > total) {
-      throw new Error(`--id must be between 1 and ${total}, got: ${options.id}`);
+      throw new Error(
+        `--id must be between 1 and ${total}, got: ${options.id}. Run "mind-ontology cq --cwd <path>" without --id to list the questions and their ids.`,
+      );
     }
     id = n;
   }
