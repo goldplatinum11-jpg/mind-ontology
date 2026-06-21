@@ -1,16 +1,19 @@
 # Mind Ontology — Self-Hosted Connector Deployment Plan v0
 
-**Status:** Phase 3 / P3-PR06 (multi-client distribution) — **PLAN ONLY**
+**Status:** Phase 3 / P3-PR06 (multi-client distribution) — original deployment
+plan, updated after the hosted connector source landed
 **Builds on:** [`mind-ontology-http-endpoint-design-v0.md`](mind-ontology-http-endpoint-design-v0.md)
 and [`agentctx-setup/mind-ontology-connector.openapi.json`](agentctx-setup/mind-ontology-connector.openapi.json)
 
 This is a **deployment plan**, not a deployment. It describes how an operator
 self-hosts the thin connector so ChatGPT / Claude.ai can reach their ontology.
+The repository now includes the connector source under `connector/worker/`, but
+still includes no real deployment config, no live endpoint, and no credentials.
 
-> **This PR ships no runtime.** No `wrangler.toml`, no Worker source, no deploy
-> command, no secret, no env binding is added or changed. Implementation is a
-> later, separately-reviewed step. The OSS project hosts nothing and pays for no
-> one's traffic.
+> **Deployment is still operator-owned.** `connector/worker/` provides source,
+> tests, and placeholder examples only. No real `wrangler.toml`, deploy command,
+> secret, endpoint URL, or env binding is added or changed by this repository.
+> The OSS project hosts nothing and pays for no one's traffic.
 
 ---
 
@@ -48,8 +51,8 @@ volume.
 6. Publish; put the resulting URL into the OpenAPI `servers[0].url` and the
    client connector config.
 
-**Explicitly out of scope of this plan PR:** writing the Worker, `wrangler.toml`,
-running `wrangler deploy`, or storing any secret.
+**Explicitly out of scope of this repository:** a real `wrangler.toml`, running
+`wrangler deploy`, committing endpoint URLs, or storing any secret.
 
 ---
 
@@ -107,5 +110,6 @@ snapshot build step (under `connector/worker/`) serializes a project's
 PR1 implements only the GPT-Action HTTP JSON surface (`POST /get_context`,
 `POST /list_constraints`, `GET /health`) plus a `wrangler.toml.example` template.
 Remote MCP `/mcp`, real deploy, KV/R2/GitHub sourcing, multi-workspace hosting,
-and any bearer/secret value stay out of scope and are never committed. This plan
-doc itself still **ships no runtime**; the runtime is the separately-reviewed PR1.
+and any bearer/secret value stay out of scope and are never committed. The
+runtime source is now present, but production operation remains outside this
+repository until an operator explicitly deploys it.

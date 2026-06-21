@@ -11,11 +11,13 @@ describe("self-host deployment plan (P3-PR06)", () => {
     expect(existsSync(DOC)).toBe(true);
   });
 
-  it("is plan-only and states it adds no runtime/secret", () => {
+  it("states the connector exists while deployment remains operator-owned", () => {
     const text = readFileSync(DOC, "utf8");
-    expect(text).toContain("PLAN ONLY");
-    expect(text.toLowerCase()).toContain("ships no runtime");
+    expect(text).toContain("connector/worker/");
+    expect(text.toLowerCase()).not.toContain("no worker source");
+    expect(text.toLowerCase()).toContain("deployment is still operator-owned");
     expect(text.toLowerCase()).toMatch(/no secret|never committed/);
+    expect(text.toLowerCase()).toMatch(/no real `wrangler\.toml`|no live endpoint/);
   });
 
   it("keeps the read-only two-operation boundary", () => {

@@ -1,10 +1,10 @@
 # Mind Ontology — Workbench v1 Design Packet
 
-**Status:** design only · docs-only lane (`codex/mind-ontology-workbench-design-v1`)
-**Scope:** this document specifies the Workbench; it ships no code, no engine
-change, no deploy, no secret. Engine work it proposes is marked **[engine]** and
-requires a separate lane with write access to `scripts/**`, per
-[`NEXT-LANES.md`](../NEXT-LANES.md).
+**Status:** design record · Workbench v1 CLI implementation is shipped
+(`status`, `preview`, `cq`, `emit`, `review`)
+**Scope:** this document records the Workbench design and original ADL
+decomposition. The implementation now lives under `scripts/agentctx/` and is
+guarded by the W3-W10 test suites. It still ships no deploy and no secret.
 
 This packet contains three deliverables:
 
@@ -12,6 +12,23 @@ This packet contains three deliverables:
   OSS↔paid boundary including the AGENTS.md compile-target strategy).
 - **Part B — implementation ADL decomposition** (session-sized, dependency-ordered).
 - **Part C — open questions for the operator** (decisions only Kei can make).
+
+## Current implementation status
+
+The Workbench v1 CLI track has landed:
+
+- `scripts/agentctx/emit.mjs` — W3/W4 emit, drift check, reconcile, and
+  block-level provenance.
+- `scripts/agentctx/preview.mjs` — W6 pack preview over the W5 explain tuple.
+- `scripts/agentctx/status.mjs` — W7 health roll-up over validate, metrics, CQ,
+  and emit freshness.
+- `scripts/agentctx/cq.mjs` / `scripts/agentctx/cq-core.mjs` — W8
+  competency-question answerability.
+- `scripts/agentctx/review.mjs` / `scripts/agentctx/result-pack.mjs` — W9
+  Result Pack shape review.
+
+The table in Part B is retained as the implementation history and dependency
+map. It is no longer the active backlog for W1-W10.
 
 ---
 
