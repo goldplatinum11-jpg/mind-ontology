@@ -6,6 +6,7 @@
   "description": "Thin hosted HTTP connector for Mind Ontology: GPT-Action JSON endpoints (get_context, list_constraints, health) and remote MCP (/mcp, Streamable-HTTP JSON-RPC) over a bundled .agentctx snapshot. No deploy, no real endpoint, no credential in this package.",
   "scripts": {
     "build:snapshot": "node scripts/build-agentctx-snapshot.mjs",
-    "smoke": "node scripts/smoke-local.mjs"
+    "smoke": "node scripts/smoke-local.mjs",
+    "smoke:remote": "node scripts/smoke-remote.mjs"
   }
 }
