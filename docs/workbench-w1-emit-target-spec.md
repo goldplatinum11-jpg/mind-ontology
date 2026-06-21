@@ -106,6 +106,12 @@ Registry rules:
   Promoting a fast-follow target is therefore a two-step product decision —
   make it `supported` (emittable via `--target`) first, then `default`
   (added to the bare-`emit` set) — and each step is its own reviewable change.
+- The `cursor` row's output format is locked ahead of its engine support in
+  **section 13**, so promoting it to `supported` is implementation-only (no
+  format guessing). It promotes to `supported` **but not** `default`: a bare
+  `emit` will never write `.cursor/rules/mind-ontology.mdc`; only an explicit
+  `--target cursor` does. The `paste-block` row is specified the same way in a
+  later fast-follow lane.
 
 ## 3. Profiles — what each target includes
 
@@ -310,6 +316,20 @@ Format rules (normative for W3/W4):
 The header is deliberately redundant with the visible notice line (section 4):
 the comment is for machines (`--check`, `status`), the blockquote is for the
 human who opens the file. Both ship in every target.
+
+**Target-specific prelude (header position).** For every target except
+`cursor`, the header block is the first bytes of the file (line 1, byte 0), and
+the parser requires it there — a file that does not begin with
+`<!-- mind-ontology:emit` is `UNMANAGED`. The `cursor` target (section 13) is
+the one exception: its artifact begins with a fixed Cursor YAML frontmatter
+prelude, and the emit header follows immediately after the prelude's closing
+`---`. The header parser tolerates this recognized prelude **for `cursor`
+only**; AGENTS.md, CLAUDE.md, and the paste-block target keep the strict byte-0
+rule. The prelude is fixed constant bytes (no source or machine input) and is
+excluded from both digests — `content_digest` still covers only the
+post-header payload and `source_digest` only the included sources — but it is
+part of the whole-artifact byte comparison `--check` performs (section 8), so a
+hand-edit to the frontmatter is caught as `STALE`.
 
 **Block-level provenance is on-demand, never persisted.** The header records
 only the two *file-level* digests above (`source_digest` over included files,
@@ -584,3 +604,112 @@ Working-tree hygiene that keeps both layers byte-stable: the
 `.gitattributes` lines from section 9 (`AGENTS.md text eol=lf`, same for
 `CLAUDE.md`) and the formatter exclusions from section 8
 (e.g. `.prettierignore`).
+
+## 13. Cursor target (`.mdc`) output specification (fast-follow)
+
+This section is the normative byte-format lock for the `cursor` target
+(registry section 2), authored ahead of its engine support so the
+implementation cannot guess. Until the fast-follow lane flips `cursor` to
+**supported**, the registry row stays `no`/`no` and `--target cursor` is
+rejected; this section specifies exactly what `mind-ontology emit --target
+cursor` produces once supported. `cursor` is **supported-but-not-default**: a
+bare `mind-ontology emit` / `emit --check` never touches it, and the default
+set stays `agents-md` + `claude-md`; only an explicit `--target cursor` builds
+or checks it.
+
+### 13.1 Artifact path and consumer
+
+- id `cursor`, path `.cursor/rules/mind-ontology.mdc` (registry section 2),
+  resolved against `--cwd`. The nested `.cursor/rules/` parent directories are
+  created on write (the first target whose path is not at the project root).
+- Consumer: Cursor's project-rules system, which reads `.mdc` rule files that
+  begin with a YAML frontmatter block.
+
+### 13.2 Byte layout — three regions, in order
+
+A cursor artifact is exactly, with nothing before region 1:
+
+1. **Cursor YAML frontmatter prelude** (section 13.3) — the first bytes of the
+   file (byte 0).
+2. the **mind-ontology emit header** HTML comment (section 6), immediately
+   after the prelude.
+3. the generated **body** payload — shared block rendering and sections
+   (sections 3–4).
+
+This is the one managed artifact whose emit header is not at byte 0; see
+section 6's "target-specific prelude (header position)" rule. AGENTS.md,
+CLAUDE.md, and the paste-block target keep the header at byte 0.
+
+### 13.3 Frontmatter prelude — exact bytes
+
+The prelude is a fixed three-field Cursor frontmatter block, locked
+byte-for-byte:
+
+```text
+---
+description: Mind Ontology generated project rules
+globs: "**/*"
+alwaysApply: false
+---
+```
+
+followed by a single `\n` separating it from the emit header's first line.
+Field rules (normative):
+
+- `description: Mind Ontology generated project rules` — plain unquoted scalar
+  (begins with a letter, so it is safe and unambiguous unquoted YAML).
+- `globs: "**/*"` — double-quoted. `**/*` begins with `*`, a YAML indicator
+  character, so an unquoted plain scalar would be invalid/ambiguous YAML; the
+  quotes make it a well-formed string and keep the bytes stable. The value
+  `**/*` scopes the rule to all files.
+- `alwaysApply: false` — unquoted YAML boolean. `cursor` rules are *available*
+  project rules, not always-applied ones.
+- Field order is fixed (`description`, `globs`, `alwaysApply`); no blank lines
+  inside the block; opened and closed by a line that is exactly `---`.
+
+The prelude is a **fixed engine constant** — a pure function of the target id
+with no source-file or machine input — so it inherits the section 7
+determinism guarantee. It is part of the artifact bytes and therefore part of
+the section 8 staleness byte comparison (a hand-edit to the frontmatter
+re-flags the artifact `STALE`), but it is **not** part of `content_digest`
+(which covers only the body payload after the header terminator, section 6) and
+**not** part of `source_digest` (it derives from no source file).
+
+### 13.4 Header and body
+
+- The emit header records `target: cursor` and the profile used (`default`
+  unless `--full`). `content_digest` and `source_digest` are computed exactly
+  as for every other target (section 6): `content_digest` over the body
+  payload (the bytes after the header terminator), `source_digest` over the
+  profile-included sources.
+- `cursor` is the **title-less** target: `EMIT_TARGETS.cursor.title` is `null`.
+  The body therefore has no `# <title>` first heading — it begins with the
+  cursor frame's notice, then the shared `##` sections, then the cursor footer.
+  `buildArtifact` must emit no literal `null` and no blank first heading line
+  for a title-less target (the title slot is simply omitted from the payload
+  join).
+- Body block rendering, section selection, profiles, the safety sweep, and the
+  empty-section rule are all identical to sections 3–4 (shared payload,
+  per-target frame — principle 3). Only the frame (notice/footer) and the
+  prelude differ from AGENTS.md.
+
+### 13.5 Drift-checkability
+
+`emit --check --target cursor` and `--explain` / `--reconcile` /
+classify / reconcile-source all support cursor via the same primitives the
+default targets use:
+
+- The header parser (section 6) locates the header after the recognized
+  frontmatter prelude for `cursor`; for every other target it still requires
+  the header at byte 0.
+- Staleness recompiles the **full** cursor artifact (prelude + header + body)
+  and compares bytes, so frontmatter, header, and body drift are all caught.
+- `HAND-EDITED` is judged by the body `content_digest` exactly as for other
+  targets.
+
+### 13.6 What stays unchanged
+
+- `DEFAULT_TARGET_IDS` remains `agents-md`, `claude-md`. A bare `emit` and a
+  bare `emit --check` never touch `.cursor/rules/mind-ontology.mdc`.
+- AGENTS.md / CLAUDE.md / paste-block bytes, and their strict byte-0 header
+  rule, are unchanged by adding cursor.
