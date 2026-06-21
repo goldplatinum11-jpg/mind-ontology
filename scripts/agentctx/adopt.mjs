@@ -10,15 +10,18 @@
  * happen, what needs manual action, and how to verify the result. Normative
  * contract: docs/mind-ontology-adopt-spec-v1.md.
  *
- * This lane ships the READ-ONLY planner: `mind-ontology adopt` inspects the
- * project and prints the plan it WOULD apply, writing nothing. The `--write`
- * apply path lands in the following lane; until then the surface has no flag
- * that can touch the filesystem.
+ * Default mode is a READ-ONLY plan: `mind-ontology adopt` inspects the project
+ * and prints the plan it WOULD apply, writing nothing. `--write` is the single
+ * gate to any file creation, and even then adopt only ever does safe, local,
+ * create-or-refresh setup.
  *
  * Safety: adopt adds NO new authority. It composes the already-shipped emit,
  * agent-setup, and init --from-repo contracts and inherits their guarantees:
+ *   - default mode writes nothing; --write is the single gate to file creation;
+ *   - it writes only inside --cwd (never global user config / user memory);
  *   - it never overwrites or merges an existing config or an unmanaged /
- *     hand-edited artifact — such conflicts surface as `manual_required`;
+ *     hand-edited artifact — such conflicts surface as `manual_required` and are
+ *     reported honestly, never clobbered;
  *   - it automates no ChatGPT / Claude.ai UI (paste-block is always manual);
  *   - it emits no real endpoint URLs or credentials.
  *
@@ -26,12 +29,19 @@
  * requested targets). No timestamps, machine identity, network, or model calls.
  */
 
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_AGENTCTX_DIR, readAgentctx } from "./compile.mjs";
 import { BOOTSTRAP_INSTRUCTION, buildSetupPlan } from "./agent-setup.mjs";
-import { EMIT_TARGETS, PROFILES, SUPPORTED_TARGET_IDS, classifyTarget } from "./emit.mjs";
+import {
+  EMIT_TARGETS,
+  PROFILES,
+  SUPPORTED_TARGET_IDS,
+  buildArtifact,
+  classifyTarget,
+} from "./emit.mjs";
+import { initFromRepo } from "./init-from-repo.mjs";
 
 export const ADOPT_VERSION = 1;
 
@@ -90,6 +100,7 @@ export function expandTargets(raw) {
 export function parseAdoptArgv(argv = process.argv.slice(2)) {
   const parsed = {
     targetsRaw: "all",
+    write: false,
     format: "text",
     cwd: process.cwd(),
     help: false,
@@ -99,6 +110,8 @@ export function parseAdoptArgv(argv = process.argv.slice(2)) {
     const arg = argv[i];
     if (arg === "--targets") {
       parsed.targetsRaw = String(argv[++i] ?? "");
+    } else if (arg === "--write") {
+      parsed.write = true;
     } else if (arg === "--format") {
       const f = argv[++i] ?? "";
       if (f !== "text" && f !== "json") {
@@ -195,8 +208,8 @@ export function analyzeAdoption({ cwd, targets }) {
   const warnings = [];
 
   // Sources unit — relevant only when `.agentctx/` is absent. In a read-only
-  // plan it is a `create` the operator gets once the apply path lands; the
-  // warning states the scaffold would run first.
+  // plan it is a `create` the operator gets via `--write`; the warning states
+  // the scaffold will run first.
   if (!agentctxPresent) {
     units.push({
       kind: "init-from-repo",
@@ -206,7 +219,7 @@ export function analyzeAdoption({ cwd, targets }) {
       detail: "scaffold a populated .agentctx/ draft from this repository (init --from-repo)",
     });
     warnings.push(
-      ".agentctx/ not found; adoption will scaffold a draft first with: mind-ontology init --from-repo",
+      ".agentctx/ not found; adopt --write will scaffold a draft first with: mind-ontology init --from-repo",
     );
   }
 
@@ -399,12 +412,70 @@ function render(analysis, mode, format) {
 }
 
 /**
- * Execute one adopt invocation. This lane is plan-only: it never touches the
- * filesystem. Returns { exitCode, stdout, stderr }.
+ * Apply one emit unit's write (create or refresh). STALE refresh rebuilds
+ * against the RECORDED target/profile so a `full` artifact stays `full`; a
+ * create emits the requested target at the default profile. Mirrors emit's own
+ * write (mkdir + writeFileSync); the conflict classes never reach here.
+ */
+function writeEmitUnit(cwd, sources, unit) {
+  const target = unit.class === "stale" ? unit.recordedTarget : unit.emit_target;
+  const profile = unit.class === "stale" ? unit.recordedProfile : "default";
+  const build = buildArtifact({ sources, target, profile });
+  const path = resolve(cwd, build.path);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, build.artifact, "utf8");
+}
+
+/**
+ * Execute one adopt invocation. Plan mode never touches the filesystem. Write
+ * mode scaffolds sources once (if absent), then applies every safe create /
+ * refresh; conflicts are reported, never clobbered. Returns
+ * { exitCode, stdout, stderr }.
  */
 export function runAdopt(options) {
+  if (!options.write) {
+    const analysis = analyzeAdoption({ cwd: options.cwd, targets: options.targets });
+    return render(analysis, "plan", options.format);
+  }
+
+  // Write mode. Scaffold sources first (once) so the emit targets have something
+  // to compile from; an existing `.agentctx/` is never re-scanned or overwritten.
+  const scaffolded = !existsSync(resolve(options.cwd, DEFAULT_AGENTCTX_DIR));
+  if (scaffolded) {
+    initFromRepo({ cwd: options.cwd });
+  }
+
   const analysis = analyzeAdoption({ cwd: options.cwd, targets: options.targets });
-  return render(analysis, "plan", options.format);
+
+  // analyzeAdoption records the sources unit only when `.agentctx/` is absent;
+  // after the scaffold it is present, so re-attach the init action (now applied)
+  // at the front for an honest write report.
+  if (scaffolded) {
+    analysis.units.unshift({
+      kind: "init-from-repo",
+      target: null,
+      path: `${DEFAULT_AGENTCTX_DIR}/`,
+      disposition: "create",
+      detail: "scaffolded a populated .agentctx/ draft from this repository (init --from-repo)",
+    });
+  }
+
+  const sources = readAgentctx(options.cwd);
+  for (const u of analysis.units) {
+    if (u.kind === "emit" && (u.disposition === "create" || u.disposition === "refresh")) {
+      writeEmitUnit(options.cwd, sources, u);
+    } else if (u.kind === "config" && u.disposition === "create") {
+      const setupPlan = buildSetupPlan({ cwd: options.cwd, target: u.setup_target });
+      const path = resolve(options.cwd, setupPlan.configPath);
+      // Create-only guard (race-safe): never overwrite a config that appeared.
+      if (!existsSync(path)) {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, setupPlan.configContent, "utf8");
+      }
+    }
+  }
+
+  return render(analysis, "write", options.format);
 }
 
 function printHelp() {
@@ -413,15 +484,16 @@ function printHelp() {
 Usage:
   mind-ontology adopt [options]
 
-Plans the setup a project needs across the supported clients: Claude Code,
-Codex, Cursor, and the ChatGPT / Claude.ai paste-block. This is a READ-ONLY
-plan — it inspects the project and prints what it would apply, writing nothing.
+Plans (and with --write applies) the setup a project needs across the supported
+clients: Claude Code, Codex, Cursor, and the ChatGPT / Claude.ai paste-block.
+Default mode is a READ-ONLY plan; --write is the single gate to file creation.
 
 Options:
   --targets <list>     "all" (default) or a comma list of: claude-code, codex,
                        cursor, paste-block. "all" expands in that order.
+  --write              Apply the plan. Without it, adopt writes nothing.
   --format text|json   Output format (default: text).
-  --cwd <path>         Project root to inspect (default: cwd).
+  --cwd <path>         Project root to adopt (default: cwd).
   -h, --help           Show this help message.
 
 adopt never overwrites or merges an existing config or an unmanaged / hand-edited

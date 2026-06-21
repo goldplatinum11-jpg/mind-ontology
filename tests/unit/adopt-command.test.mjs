@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -307,6 +308,104 @@ describe("adopt: leakage and wrapper dispatch", () => {
       expect(spec.emitTarget, `${id} missing emitTarget`).toBeTruthy();
       // setupTarget is null for emit-only clients (cursor, paste-block).
       expect("setupTarget" in spec, `${id} missing setupTarget key`).toBe(true);
+    }
+  });
+});
+
+describe("adopt: safe write mode (end to end)", () => {
+  it("--write is parsed; absent by default", () => {
+    expect(parseAdoptArgv([]).write).toBe(false);
+    expect(parseAdoptArgv(["--write"]).write).toBe(true);
+  });
+
+  it("scaffolds sources, emits all four artifacts, and creates both configs", () => {
+    const cwd = nodeProject();
+    const r = runCli(["adopt", "--cwd", cwd, "--write"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("Done —");
+
+    // Sources scaffolded + every artifact + every config created.
+    expect(existsSync(join(cwd, ".agentctx", "constraints.md"))).toBe(true);
+    for (const f of [
+      "AGENTS.md",
+      "CLAUDE.md",
+      ".cursor/rules/mind-ontology.mdc",
+      "mind-ontology-paste-block.md",
+      ".mcp.json",
+      ".codex/config.toml",
+    ]) {
+      expect(existsSync(join(cwd, f)), `${f} not written`).toBe(true);
+    }
+
+    // The emitted artifacts match their sources (no drift).
+    const check = runCli([
+      "emit",
+      "--check",
+      "--target",
+      "agents-md,claude-md,cursor,paste-block",
+      "--cwd",
+      cwd,
+    ]);
+    expect(check.status).toBe(0);
+
+    // The created config is byte-identical to what agent-setup writes.
+    const mcp = JSON.parse(readFileSync(join(cwd, ".mcp.json"), "utf8"));
+    expect(mcp.mcpServers.agentctx.command).toBe("node");
+  });
+
+  it("a second --write is a clean no-op: fresh artifacts skip, configs conflict", () => {
+    const cwd = nodeProject();
+    expect(runCli(["adopt", "--cwd", cwd, "--write"]).status).toBe(0);
+
+    const r = runCli(["adopt", "--cwd", cwd, "--write", "--format", "json"]);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.mode).toBe("write");
+    for (const a of out.actions.filter((x) => x.kind === "emit")) {
+      expect(a.status).toBe("skipped");
+    }
+    for (const a of out.actions.filter((x) => x.kind === "config")) {
+      expect(a.status).toBe("manual_required");
+    }
+  });
+
+  it("never overwrites an UNMANAGED artifact, but still writes the safe targets", () => {
+    const cwd = nodeProject();
+    initFromRepo({ cwd });
+    const original = "MY HAND-WRITTEN FILE\n";
+    writeFileSync(join(cwd, "AGENTS.md"), original);
+
+    const r = runCli(["adopt", "--cwd", cwd, "--targets", "codex,cursor", "--write", "--format", "json"]);
+    expect(r.status).toBe(0);
+    const out = JSON.parse(r.stdout);
+
+    const agents = out.actions.find((a) => a.kind === "emit" && a.path === "AGENTS.md");
+    expect(agents.status).toBe("manual_required");
+    // The hand-written file is untouched...
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(original);
+    // ...while the codex config and the cursor artifact are still written.
+    expect(existsSync(join(cwd, ".codex", "config.toml"))).toBe(true);
+    expect(existsSync(join(cwd, ".cursor", "rules", "mind-ontology.mdc"))).toBe(true);
+  });
+
+  it("never overwrites an existing config file", () => {
+    const cwd = nodeProject();
+    initFromRepo({ cwd });
+    const original = '{ "mcpServers": { "mine": {} } }\n';
+    writeFileSync(join(cwd, ".mcp.json"), original);
+
+    const r = runCli(["adopt", "--cwd", cwd, "--targets", "claude-code", "--write"]);
+    expect(r.status).toBe(0);
+    expect(readFileSync(join(cwd, ".mcp.json"), "utf8")).toBe(original);
+    // But the claude-md artifact (CLAUDE.md) is still emitted.
+    expect(existsSync(join(cwd, "CLAUDE.md"))).toBe(true);
+  });
+
+  it("write output carries no private infrastructure strings", () => {
+    const cwd = nodeProject();
+    const r = runCli(["adopt", "--cwd", cwd, "--write", "--format", "json"]);
+    for (const secret of PRIVATE_STRINGS) {
+      expect(r.stdout.includes(secret), `write output leaks "${secret}"`).toBe(false);
     }
   });
 });
