@@ -25,8 +25,14 @@ backend or live service is available from this repository.
   give humans the same engine-backed view: health roll-up, pack preview,
   competency-question checks, generated `AGENTS.md` / `CLAUDE.md` targets, and
   Result Pack shape review.
-- **Client setup** — copy-paste configs for Claude Code, Codex, Cursor, and a thin
-  OpenAPI/connector surface for ChatGPT / Claude.ai (placeholders only).
+- **Guided adoption** — `adopt` is the one local-first, read-only-by-default
+  command that wires an existing project across every client (Claude Code, Codex,
+  Cursor, ChatGPT / Claude.ai paste-block): a bare run prints the plan, `--write`
+  is the single gate, and conflicts surface as manual steps instead of clobbering.
+  `agent-setup` is the single-client wiring primitive it composes.
+- **Client setup** — `adopt` (above) wires every client in one pass; under it,
+  copy-paste configs for Claude Code, Codex, Cursor, and a thin OpenAPI/connector
+  surface for ChatGPT / Claude.ai (placeholders only).
 - **Self-host connector package** — `connector/worker/` contains the bundled
   snapshot Worker surface for GPT Actions and remote MCP, with local smoke tests
   and example config only.
