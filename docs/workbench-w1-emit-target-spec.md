@@ -66,12 +66,27 @@ The registry below is the normative list of targets. W3 must define a matching
 spec-consistency test that parses this table (column 1 = target id) and asserts
 it stays in sync with the constant. Rows are keyed by the stable target id.
 
-| Target id | Artifact path (relative to `--cwd`) | Consumer | v1 status |
-|---|---|---|---|
-| `agents-md` | `AGENTS.md` | Codex and other AGENTS.md-reading agents | **v1** |
-| `claude-md` | `CLAUDE.md` | Claude Code project memory | **v1** |
-| `cursor` | `.cursor/rules/mind-ontology.mdc` | Cursor rules | fast-follow (post-W4) |
-| `paste-block` | `mind-ontology-paste-block.md` | ChatGPT / Claude.ai project instructions (manual paste) | fast-follow (post-W4) |
+Each target carries two independent capability flags:
+
+- **Supported** — `--target <id>` accepts it and `emit` can build it. Every
+  "can this artifact be rebuilt" check (`--check` staleness, `--reconcile`,
+  `--explain`, `--reconcile-source`) keys off this flag.
+- **Default** — included in the no---target output set of a bare
+  `mind-ontology emit` / `emit --check`. **Default is always a subset of
+  supported**: a target can never default-emit without being buildable.
+
+Splitting the two is a deliberate design affordance: a future PR can register a
+*supported-but-not-default* target — emittable on demand via `--target` without
+expanding what a bare `emit` writes — with no surprise change to the default
+output set. v1 keeps the two sets identical (`agents-md`, `claude-md`); the
+fast-follow rows are non-default *and* unsupported until promoted.
+
+| Target id | Artifact path (relative to `--cwd`) | Consumer | Supported (`--target`) | Default (no `--target`) |
+|---|---|---|---|---|
+| `agents-md` | `AGENTS.md` | Codex and other AGENTS.md-reading agents | **yes** | **yes** |
+| `claude-md` | `CLAUDE.md` | Claude Code project memory | **yes** | **yes** |
+| `cursor` | `.cursor/rules/mind-ontology.mdc` | Cursor rules | no (fast-follow, post-W4) | no |
+| `paste-block` | `mind-ontology-paste-block.md` | ChatGPT / Claude.ai project instructions (manual paste) | no (fast-follow, post-W4) | no |
 
 Registry rules:
 
@@ -80,12 +95,17 @@ Registry rules:
   the project root containing `.agentctx/`). v1 has no path override; a
   config/manifest file is an explicit non-feature for v1 (section 9 and the
   W2 handoff).
-- The default target set for both `emit` and `emit --check` is **all v1
-  targets** (`agents-md`, `claude-md`). `--target <id>` restricts to a subset;
-  this is also the v1 escape hatch for a repo that intentionally hand-tunes
-  one file (per the operator's Q7 ruling, drift still fails CI for every
-  target that *is* checked — the escape hatch is selecting which targets are
-  managed, never downgrading a failure to a warning).
+- The default target set for both `emit` and `emit --check` is **all
+  default-flagged targets** (`agents-md`, `claude-md`). `--target <id>`
+  restricts to (or, once a supported-but-not-default target exists, extends to)
+  any **supported** target; this is also the v1 escape hatch for a repo that
+  intentionally hand-tunes one file (per the operator's Q7 ruling, drift still
+  fails CI for every target that *is* checked — the escape hatch is selecting
+  which targets are managed, never downgrading a failure to a warning).
+- **Default ⊆ supported** is an invariant the registry-sync guard asserts.
+  Promoting a fast-follow target is therefore a two-step product decision —
+  make it `supported` (emittable via `--target`) first, then `default`
+  (added to the bare-`emit` set) — and each step is its own reviewable change.
 
 ## 3. Profiles — what each target includes
 

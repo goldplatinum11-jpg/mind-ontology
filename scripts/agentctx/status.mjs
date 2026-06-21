@@ -28,7 +28,7 @@ import {
   validateAgentctxSources,
 } from "./compile.mjs";
 import { evaluateCqs, parseCqs } from "./cq-core.mjs";
-import { V1_TARGET_IDS, checkResultJson, checkTargets, renderCheckText } from "./emit.mjs";
+import { DEFAULT_TARGET_IDS, checkResultJson, checkTargets, renderCheckText } from "./emit.mjs";
 import { computeContextMetrics } from "./metrics.mjs";
 import { validateOntology } from "./schema.mjs";
 
@@ -81,7 +81,7 @@ export function buildStatus(cwd) {
     };
   }
 
-  const checkResults = checkTargets({ cwd, targets: V1_TARGET_IDS, sources });
+  const checkResults = checkTargets({ cwd, targets: DEFAULT_TARGET_IDS, sources });
   const emit = checkResultJson(checkResults);
 
   const sections = { validate, metrics, cq, emit };

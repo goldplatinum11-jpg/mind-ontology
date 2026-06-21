@@ -41,18 +41,41 @@ export const EMIT_VERSION = 2;
 export const SWEEP_EXEMPT_FILES = new Set(["cq.md"]);
 
 // Normative target registry (W1 §2). Ids are stable forever; the registry-sync
-// guard test asserts this constant matches the W1 spec table. Only `v1: true`
-// targets are emittable today; the fast-follow rows are registered so their
-// ids and artifact paths stay reserved.
+// guard test asserts this constant matches the W1 spec table.
+//
+// Two independent capability flags per target (split out of the old single `v1`
+// boolean, which conflated them):
+//   supported — `--target <id>` accepts it and `emit` can build it (a frame is
+//               defined). Validation and every "can this artifact be rebuilt"
+//               reproducibility check key off this.
+//   default   — included in the no---target output set (a bare `mind-ontology
+//               emit` / `emit --check`). MUST be a subset of supported: a target
+//               can never default-emit without being buildable. The registry-sync
+//               guard asserts default ⊆ supported.
+// Splitting the two lets a future PR register a supported-but-not-default target
+// (emittable via `--target` without expanding the default output set) with no
+// surprise to a bare `emit`. The fast-follow rows stay unsupported and
+// non-default here so their ids and artifact paths only stay reserved.
 export const EMIT_TARGETS = {
-  "agents-md": { path: "AGENTS.md", title: "# AGENTS.md", v1: true },
-  "claude-md": { path: "CLAUDE.md", title: "# CLAUDE.md", v1: true },
-  cursor: { path: ".cursor/rules/mind-ontology.mdc", title: null, v1: false },
-  "paste-block": { path: "mind-ontology-paste-block.md", title: null, v1: false },
+  "agents-md": { path: "AGENTS.md", title: "# AGENTS.md", supported: true, default: true },
+  "claude-md": { path: "CLAUDE.md", title: "# CLAUDE.md", supported: true, default: true },
+  cursor: { path: ".cursor/rules/mind-ontology.mdc", title: null, supported: false, default: false },
+  "paste-block": { path: "mind-ontology-paste-block.md", title: null, supported: false, default: false },
 };
 
-export const V1_TARGET_IDS = Object.keys(EMIT_TARGETS).filter(
-  (id) => EMIT_TARGETS[id].v1,
+// Targets `--target` accepts and `emit` can build, in registry order. Drives
+// --target validation, the allowed-list error message, and every
+// reproducibility check (a header recording an unsupported target cannot be
+// rebuilt by buildArtifact).
+export const SUPPORTED_TARGET_IDS = Object.keys(EMIT_TARGETS).filter(
+  (id) => EMIT_TARGETS[id].supported,
+);
+
+// The no---target output set, in registry order. Always a subset of
+// SUPPORTED_TARGET_IDS (registry-sync guard). Drives parseEmitArgv's default
+// target set and the dual-target advisory's "both default targets" scoping.
+export const DEFAULT_TARGET_IDS = Object.keys(EMIT_TARGETS).filter(
+  (id) => EMIT_TARGETS[id].default,
 );
 
 // Profiles are fixed engine constants (W1 §3; W2 §12: no profile editing) so
@@ -210,9 +233,9 @@ function buildBlockManifestEntry(block, renderedText, { emittedIndex, section, f
  */
 export function buildArtifact({ sources, target, profile = "default" }) {
   const spec = EMIT_TARGETS[target];
-  if (!spec || !spec.v1) {
+  if (!spec || !spec.supported) {
     throw new Error(
-      `--target must be one of ${V1_TARGET_IDS.map((id) => `"${id}"`).join(", ")}, got: ${target}`,
+      `--target must be one of ${SUPPORTED_TARGET_IDS.map((id) => `"${id}"`).join(", ")}, got: ${target}`,
     );
   }
   const rules = PROFILES[profile];
@@ -441,9 +464,10 @@ export function classifyTarget({ cwd, target, sources }) {
     ...recorded,
   };
   if (parsed.header.emit_version !== String(EMIT_VERSION)) return stale;
-  // A header naming an unknown target or profile cannot be reproduced by the
-  // current generator; re-emitting (which records current names) resolves it.
-  if (!EMIT_TARGETS[parsed.header.target]?.v1 || !PROFILES[parsed.header.profile]) {
+  // A header naming an unsupported target or unknown profile cannot be
+  // reproduced by the current generator; re-emitting (which records current
+  // names) resolves it.
+  if (!EMIT_TARGETS[parsed.header.target]?.supported || !PROFILES[parsed.header.profile]) {
     return stale;
   }
 
@@ -502,7 +526,7 @@ export function explainTarget({ cwd, target, sources, result }) {
     // the header's recorded profile and compare it to the header's record. A
     // reproducible profile is required to rebuild; otherwise the comparison is
     // undefined (null), mirroring the classifier treating it as stale.
-    if (EMIT_TARGETS[parsed.header.target]?.v1 && PROFILES[parsed.header.profile]) {
+    if (EMIT_TARGETS[parsed.header.target]?.supported && PROFILES[parsed.header.profile]) {
       const expected = buildArtifact({
         sources,
         target: parsed.header.target,
@@ -515,7 +539,7 @@ export function explainTarget({ cwd, target, sources, result }) {
   // A STALE artifact is only safe to auto-reconcile when its RECORDED
   // target/profile is still reproducible — judged from the threaded recorded
   // fields, the SAME test `--reconcile` applies (single source of truth). An
-  // unreproducible STALE (header records an unknown profile / non-v1 target) is
+  // unreproducible STALE (header records an unknown profile / unsupported target) is
   // one reconcile REFUSES, so explain must not advertise --reconcile for it.
   const staleReproducible = result.status === "stale" && staleIsReproducible(result);
 
@@ -954,9 +978,9 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     }
   }
 
-  const allowed = V1_TARGET_IDS.map((t) => `"${t}"`).join(", ");
+  const allowed = SUPPORTED_TARGET_IDS.map((t) => `"${t}"`).join(", ");
   for (const id of parsed.targets) {
-    if (!EMIT_TARGETS[id]?.v1) {
+    if (!EMIT_TARGETS[id]?.supported) {
       throw new Error(`--target must be one of ${allowed}, got: ${id}`);
     }
   }
@@ -1043,17 +1067,19 @@ export function parseEmitArgv(argv = process.argv.slice(2)) {
     throw new Error("--apply is only valid with --reconcile-source");
   }
 
-  // Default target set: all v1 targets (W1 §2, W2 §8 ruling). Explicit
-  // targets are deduped and processed in registry order regardless of flag
+  // Default target set when --target is omitted: the default-flagged targets
+  // (W1 §2, W2 §8 ruling). An explicit --target may name any SUPPORTED target;
+  // both paths are deduped and processed in registry order regardless of flag
   // order (determinism, W2 §7.1).
-  const requested = parsed.targetFlagGiven ? new Set(parsed.targets) : new Set(V1_TARGET_IDS);
-  parsed.targets = V1_TARGET_IDS.filter((id) => requested.has(id));
+  const requested = parsed.targetFlagGiven ? new Set(parsed.targets) : new Set(DEFAULT_TARGET_IDS);
+  const allowedTargets = parsed.targetFlagGiven ? SUPPORTED_TARGET_IDS : DEFAULT_TARGET_IDS;
+  parsed.targets = allowedTargets.filter((id) => requested.has(id));
 
   return parsed;
 }
 
 // W2 §8(b) dual-target advisory — a pure function of the flag set, printed
-// only on a no---target emit of both v1 targets; never in artifact bytes.
+// only on a no---target emit of both default targets; never in artifact bytes.
 export const DUAL_TARGET_NOTE = [
   "note: AGENTS.md and CLAUDE.md carry identical payloads. If every tool you run",
   "reads AGENTS.md, emit only it: mind-ontology emit --target agents-md",
@@ -1274,7 +1300,7 @@ export function runEmitCheck(options) {
   // attach the per-block provenance the current sources produce for each target
   // under the profile --explain already reports (recorded profile if managed,
   // else default). It is null whenever the recorded header is NOT reproducible
-  // — an unknown recorded profile OR a non-v1 recorded target — so it stays in
+  // — an unknown recorded profile OR an unsupported recorded target — so it stays in
   // lock-step with --explain's own reproducibility signal
   // (sourceDigestMatchesCurrent === null while a header is present) and never
   // claims provenance for an artifact it cannot rebuild. Reuses buildArtifact;
@@ -1333,8 +1359,8 @@ function reconcileRefusal(result) {
       return `${result.path} (${result.target}) is HAND-EDITED; a re-emit would discard the hand edit. Move the edit into the .agentctx/ source, then run: mind-ontology emit --target ${result.target}`;
     default:
       // A STALE target whose recorded target/profile is no longer reproducible
-      // (unknown profile / non-v1 target in the header): re-emitting would have
-      // to invent a profile, which could silently change the artifact's scope.
+      // (unknown profile / unsupported target in the header): re-emitting would
+      // have to invent a profile, which could silently change the artifact's scope.
       return `${result.path} (${result.target}) records a target/profile that is no longer reproducible; reconcile will not guess a profile. Re-emit it explicitly with a known profile.`;
   }
 }
@@ -1342,13 +1368,13 @@ function reconcileRefusal(result) {
 // Whether a STALE artifact can be reconciled by rebuilding against the
 // target/profile RECORDED IN ITS HEADER. emit_version-only staleness is
 // reproducible (the recorded names are still known); a header recording an
-// unknown profile or a non-v1 target is NOT — judged from the recorded fields,
+// unknown profile or an unsupported target is NOT — judged from the recorded fields,
 // never the requested target (the same test classifyTarget itself applies, and
 // what --check --explain reports). A missing/headerless result has no recorded
 // fields and is handled by other branches, never reaches here.
 function staleIsReproducible(result) {
   return Boolean(
-    EMIT_TARGETS[result.recordedTarget]?.v1 && PROFILES[result.recordedProfile],
+    EMIT_TARGETS[result.recordedTarget]?.supported && PROFILES[result.recordedProfile],
   );
 }
 
@@ -1431,8 +1457,8 @@ export function runEmitReconcile(options) {
   });
   if (refusals.length > 0) return renderArtifactReconcileRefusal(refusals);
 
-  // Phase 3 — write all planned artifacts. Reconcile only ever writes the v1
-  // artifact paths (AGENTS.md / CLAUDE.md), never `.agentctx/`.
+  // Phase 3 — write all planned artifacts. Reconcile only ever writes the
+  // target artifact paths (AGENTS.md / CLAUDE.md), never `.agentctx/`.
   for (const { build } of planned) {
     const path = resolve(options.cwd, build.path);
     mkdirSync(dirname(path), { recursive: true });
@@ -1524,7 +1550,7 @@ export function runEmitReconcileBlockLevel(options) {
   }
 
   // Phase 3 — write all patched artifacts. Each is byte-identical to a
-  // file-level reconcile; only v1 artifact paths are written, never `.agentctx/`.
+  // file-level reconcile; only target artifact paths are written, never `.agentctx/`.
   for (const { build, artifact } of planned) {
     const path = resolve(options.cwd, build.path);
     mkdirSync(dirname(path), { recursive: true });
@@ -1785,7 +1811,7 @@ export function runEmitReconcileSource(options) {
       return { target: r.target, path: r.path, status: r.status, action: "refused", reason: reconcileSourceRefusal(r) };
     }
     // Reproducibility gate (single source of truth: the RECORDED header fields).
-    if (!(EMIT_TARGETS[r.recordedTarget]?.v1 && PROFILES[r.recordedProfile])) {
+    if (!(EMIT_TARGETS[r.recordedTarget]?.supported && PROFILES[r.recordedProfile])) {
       return {
         target: r.target,
         path: r.path,
@@ -2297,7 +2323,7 @@ function printHelp() {
   return `mind-ontology emit — compile static per-tool artifacts from .agentctx/
 
 Usage:
-  mind-ontology emit [options]             write all v1 targets (AGENTS.md, CLAUDE.md)
+  mind-ontology emit [options]             write all default targets (AGENTS.md, CLAUDE.md)
   mind-ontology emit --check [options]     verify freshness; writes nothing
   mind-ontology emit --reconcile [options] safely re-emit only drifted targets
   mind-ontology emit --reconcile-source    preview patching a hand-edit BACK to
