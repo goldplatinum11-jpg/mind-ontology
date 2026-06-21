@@ -226,6 +226,42 @@ writeback is proposal-only). See
 
 ---
 
+## Adopt it in one command
+
+Wiring an existing project for every client is a single guided, **local-first,
+read-only-by-default** command. A bare `mind-ontology adopt` writes nothing — it
+inspects the project and prints the plan it *would* apply: which sources to
+scaffold, which artifacts to emit, which MCP configs to create, and the manual
+steps it can't do for you. `--write` is the one gate that turns the plan into
+files:
+
+```sh
+npx mind-ontology adopt
+npx mind-ontology adopt --write
+```
+
+It covers all four clients in one pass — Claude Code, Codex, Cursor, and the
+ChatGPT / Claude.ai paste-block — and never overwrites or merges an existing
+config or a hand-edited artifact: such conflicts come back as **manual steps**,
+not silent clobbering, and the run still applies every other safe action. Pick a
+subset with `--targets`:
+
+```sh
+npx mind-ontology adopt --targets cursor,paste-block --write
+```
+
+`adopt` automates **no** ChatGPT / Claude.ai UI — the paste-block is always a
+manual paste into the model's project-instructions box. And wiring an MCP config
+is a practical helper, **not** a guarantee that every agent run auto-calls the
+server: the generated instruction files are what a client auto-reads at startup,
+and the one-line bootstrap instruction is what asks the agent to actually call
+`get_context` / `list_constraints`. `adopt` composes the same per-client wiring
+[`agent-setup`](docs/agent-setup.md) produces; the full per-target mapping, write
+policy, and `manual_required` contract are in the
+[adopt spec](docs/mind-ontology-adopt-spec-v1.md).
+
+---
+
 ## Three-layer mental model
 
 Mind Ontology has three layers, each opt-in from the one before it:
