@@ -165,6 +165,60 @@ describe("golden artifact: cursor target (supported-but-not-default)", () => {
   });
 });
 
+describe("golden artifact: paste-block target (supported-but-not-default)", () => {
+  it("emit --target paste-block writes the frozen file (byte-0 header, no prelude) and nothing else", () => {
+    const cwd = projectFrom(TEMPLATE_AGENTCTX);
+    const r = runCli(["emit", "--cwd", cwd, "--target", "paste-block"]);
+    expect(r.status, r.stderr).toBe(0);
+    const file = join(cwd, "mind-ontology-paste-block.md");
+    expect(readFileSync(file, "utf8")).toBe(golden("template-default/paste-block.md"));
+    // Standard byte-0 header (unlike cursor, no prelude) with a visible title.
+    const golden_ = golden("template-default/paste-block.md");
+    expect(golden_.startsWith("<!-- mind-ontology:emit\n")).toBe(true);
+    const parsed = parseEmitHeader(golden_);
+    expect(parsed.header.target).toBe("paste-block");
+    expect(parsed.payload.startsWith("# Mind Ontology Project Instructions")).toBe(true);
+    expect(sha256(parsed.payload)).toBe(parsed.header.content_digest);
+    // Only the paste-block artifact is written.
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(cwd, "CLAUDE.md"))).toBe(false);
+    expect(r.stdout.trim()).toMatch(
+      /^WROTE {2}mind-ontology-paste-block\.md {2}\(paste-block, profile default, \d+ payload lines\)$/,
+    );
+  });
+
+  it("paste-block's `##` section payload is byte-identical to AGENTS.md (shared payload, W1 §3)", () => {
+    const sections = (s) => {
+      const body = s.slice(s.indexOf("-->\n") + 4);
+      return body.slice(body.indexOf("\n## "), body.lastIndexOf("\n---\n"));
+    };
+    expect(sections(golden("template-default/paste-block.md"))).toBe(
+      sections(golden("template-default/AGENTS.md")),
+    );
+  });
+
+  it("--target cursor,paste-block writes both non-default targets in registry order and they check fresh", () => {
+    const cwd = projectFrom(TEMPLATE_AGENTCTX);
+    const r = runCli(["emit", "--cwd", cwd, "--target", "cursor,paste-block"]);
+    expect(r.status, r.stderr).toBe(0);
+    const lines = r.stdout.trim().split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain(".cursor/rules/mind-ontology.mdc"); // cursor first (registry order)
+    expect(lines[1]).toContain("mind-ontology-paste-block.md");
+    // Both fresh under a combined --check; default targets never written.
+    const chk = runCli(["emit", "--cwd", cwd, "--check", "--target", "cursor,paste-block"]);
+    expect(chk.status, chk.stdout).toBe(0);
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(cwd, "CLAUDE.md"))).toBe(false);
+  });
+
+  it("bare emit never writes the paste-block artifact (it is not default)", () => {
+    const cwd = projectFrom(TEMPLATE_AGENTCTX);
+    expect(runCli(["emit", "--cwd", cwd]).status).toBe(0);
+    expect(existsSync(join(cwd, "mind-ontology-paste-block.md"))).toBe(false);
+  });
+});
+
 describe("golden JSON shapes (freeze 6-7)", () => {
   it("emit --format json matches the frozen write-result shape", () => {
     const cwd = projectFrom(TEMPLATE_AGENTCTX);

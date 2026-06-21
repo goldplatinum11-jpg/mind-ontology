@@ -48,11 +48,11 @@ describe("emit target registry stays in sync with the W1 spec table (W1 guard)",
     }
   });
 
-  it("the supported flag matches the spec table (agents-md, claude-md, cursor)", () => {
+  it("the supported flag matches the spec table (all four targets supported)", () => {
     for (const row of rows) {
       expect(EMIT_TARGETS[row.id]?.supported, row.id).toBe(row.supported);
     }
-    expect(SUPPORTED_TARGET_IDS).toEqual(["agents-md", "claude-md", "cursor"]);
+    expect(SUPPORTED_TARGET_IDS).toEqual(["agents-md", "claude-md", "cursor", "paste-block"]);
   });
 
   it("the default flag matches: agents-md and claude-md only", () => {
@@ -62,17 +62,15 @@ describe("emit target registry stays in sync with the W1 spec table (W1 guard)",
     expect(DEFAULT_TARGET_IDS).toEqual(["agents-md", "claude-md"]);
   });
 
-  it("cursor is supported-but-not-default; paste-block stays unsupported and non-default", () => {
-    // cursor promoted to supported (Lane 2) but never added to the default set.
-    expect(EMIT_TARGETS.cursor?.supported).toBe(true);
-    expect(EMIT_TARGETS.cursor?.default).toBe(false);
-    expect(SUPPORTED_TARGET_IDS).toContain("cursor");
-    expect(DEFAULT_TARGET_IDS).not.toContain("cursor");
-    // paste-block: still a reserved future target until its own fast-follow lane.
-    expect(EMIT_TARGETS["paste-block"]?.supported).toBe(false);
-    expect(EMIT_TARGETS["paste-block"]?.default).toBe(false);
-    expect(SUPPORTED_TARGET_IDS).not.toContain("paste-block");
-    expect(DEFAULT_TARGET_IDS).not.toContain("paste-block");
+  it("cursor and paste-block are supported-but-not-default", () => {
+    // Both fast-follow targets are promoted to supported (Lanes 2-3) but neither
+    // is ever added to the default set.
+    for (const id of ["cursor", "paste-block"]) {
+      expect(EMIT_TARGETS[id]?.supported, id).toBe(true);
+      expect(EMIT_TARGETS[id]?.default, id).toBe(false);
+      expect(SUPPORTED_TARGET_IDS, id).toContain(id);
+      expect(DEFAULT_TARGET_IDS, id).not.toContain(id);
+    }
   });
 
   it("default is always a subset of supported (a target cannot default-emit without being buildable)", () => {
