@@ -2435,7 +2435,11 @@ Usage:
                                            .agentctx/ sources; writes nothing
 
 Options:
-  --target <id>[,<id>]   Restrict to targets: agents-md, claude-md. Repeatable.
+  --target <id>[,<id>]   Select targets: ${SUPPORTED_TARGET_IDS.join(", ")}.
+                         Default (no --target): ${DEFAULT_TARGET_IDS.join(", ")}.
+                         cursor / paste-block are supported but NOT default —
+                         emit them explicitly, e.g. --target cursor,paste-block.
+                         Repeatable and CSV; processed in registry order.
   --check                Classify each target (OK/MISSING/UNMANAGED/HAND-EDITED/STALE).
                          Exit 0 fresh, 1 drift, 2 error.
   --explain              With --check only: explain why each target got its class

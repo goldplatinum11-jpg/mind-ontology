@@ -110,10 +110,23 @@ OK - 2 of 2 targets fresh
 
 Every command and output block above is the real behavior of the shipped
 engine, verified against this README by
-`tests/unit/readme-claims-audit.test.mjs`. v1 emits two targets, `agents-md`
-and `claude-md`; `--target` narrows the set, `--full` opts into a
-whole-ontology dump, and a pre-existing hand-written file is never silently
-overwritten (see the [emit target spec](docs/workbench-w1-emit-target-spec.md)).
+`tests/unit/readme-claims-audit.test.mjs`. A bare `emit` writes the two
+**default** targets; two more **supported** targets are emitted on demand with
+`--target`:
+
+| Target | Command | Writes | For |
+|---|---|---|---|
+| `agents-md` | `mind-ontology emit` (default) | `AGENTS.md` | Codex and other AGENTS.md readers |
+| `claude-md` | `mind-ontology emit` (default) | `CLAUDE.md` | Claude Code project memory |
+| `cursor` | `mind-ontology emit --target cursor` | `.cursor/rules/mind-ontology.mdc` | Cursor project rules |
+| `paste-block` | `mind-ontology emit --target paste-block` | `mind-ontology-paste-block.md` | ChatGPT / Claude.ai project instructions (manual paste) |
+
+`cursor` and `paste-block` are **supported but not default** — a bare `emit`
+never writes them, so they never grow your default output set unasked; emit
+both at once with `mind-ontology emit --target cursor,paste-block`. `--full`
+opts into a whole-ontology dump, and a pre-existing hand-written file is never
+silently overwritten (see the
+[emit target spec](docs/workbench-w1-emit-target-spec.md)).
 
 ## Drift fails CI
 
@@ -387,7 +400,7 @@ the [CQ schema](docs/mind-ontology-cq-schema-v0.md) and the template at
 | Scoring signals | `--rich-scoring` heading boost, `--recency` date tie-breaker, `--aliases` synonym expansion, `--explain` per-block provenance | shipped |
 | Budget | `--max-tokens` opt-in compaction (priority-ordered, never drops constraints or risk-forced safety) | shipped |
 | Library routing | `route` / `compile --library` deterministic box selection, `doctor` library linter, `scaffold` manifest drafter | shipped |
-| Emit | `AGENTS.md` + `CLAUDE.md` compile targets, deterministic with fingerprint headers, `emit --check` drift gate for CI | shipped |
+| Emit | `AGENTS.md` + `CLAUDE.md` default targets, plus on-demand `cursor` `.mdc` and a ChatGPT/Claude.ai paste-block (`--target`), deterministic with fingerprint headers, `emit --check` drift gate for CI | shipped |
 | Tooling | `init`, `compile`, `validate`, `metrics`, `smoke`, `proof` — plus a unified [`mind-ontology` CLI](docs/mind-ontology-cli-v0.md) | shipped |
 | Clients | Claude Code / Codex / Cursor (proven), ChatGPT / Claude.ai (thin connector, designed) | shipped / designed |
 | Hosted on-ramp | optional hosted memory + writeback, fail-closed, off by default | contracts only |

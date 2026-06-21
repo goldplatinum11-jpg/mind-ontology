@@ -42,7 +42,7 @@ Start here, then follow the path that matches what you're doing.
 - [How the compiler scores blocks](how-scoring-works.md) — why a block is in or out.
 - [Concepts](concepts.md) — the product's own vocabulary.
 - [Task risk modes](mind-ontology-task-risk-modes-v0.md) — fail-closed guardrails.
-- [Emit target spec](workbench-w1-emit-target-spec.md) — compile `AGENTS.md` / `CLAUDE.md` from the ontology; headers, drift classes, CI recipe.
+- [Emit target spec](workbench-w1-emit-target-spec.md) — compile `AGENTS.md` / `CLAUDE.md` (default) plus, on demand via `--target`, a `cursor` `.mdc` and a ChatGPT/Claude.ai paste-block; headers, drift classes, CI recipe.
 - [Operator CLI spec](workbench-w2-cli-spec.md) — `emit` flags, exit codes, and JSON shapes.
 - [CLI error reference](cli-errors.md) — every failure mode and its fix.
 
